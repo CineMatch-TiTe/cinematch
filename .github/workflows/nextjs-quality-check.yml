@@ -1,7 +1,18 @@
 name: Next.js Quality Check
 
 on:
+  push:
+    paths:
+      - "frontend/**"
+      - ".github/workflows/nextjs-quality-check.yml"
+    branches:
+      - main
   pull_request:
+    paths:
+      - "frontend/**"
+      - ".github/workflows/nextjs-quality-check.yml"
+    branches:
+      - main
 
 jobs:
   quality_checks:
