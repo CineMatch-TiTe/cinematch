@@ -1,0 +1,52 @@
+name: Next.js Quality Check
+
+on:
+  push:
+    paths:
+      - "frontend/**"
+      - ".github/workflows/nextjs-quality-check.yml"
+    branches:
+      - main
+  pull_request:
+    paths:
+      - "frontend/**"
+      - ".github/workflows/nextjs-quality-check.yml"
+    branches:
+      - main
+
+jobs:
+  quality_checks:
+    name: Run Next.js Code Quality Checks
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./frontend
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24.x'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Cache Next.js
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.npm
+            ${{ github.workspace }}/frontend/.next/cache
+          key: ${{ runner.os }}-nextjs-npm-${{ hashFiles('**/package-lock.json') }}-${{ hashFiles('**/*.js', '**/*.jsx', '**/*.ts', '**/*.tsx') }}
+          restore-keys: |
+            ${{ runner.os }}-nextjs-npm-${{ hashFiles('**/package-lock.json') }}-
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run ESLint
+        run: npm run lint
+
+      - name: Run Next.js Build
+        run: npm run build
