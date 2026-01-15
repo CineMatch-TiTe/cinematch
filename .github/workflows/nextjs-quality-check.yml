@@ -1,7 +1,6 @@
 name: Next.js Quality Check
 
 on:
-  push:
   pull_request:
 
 jobs:
