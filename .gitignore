@@ -1,0 +1,4 @@
+# ignore rust build files
+**/target
+
+.env

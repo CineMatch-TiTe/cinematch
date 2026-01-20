@@ -1,0 +1,11 @@
+[workspace]
+resolver = "3"
+members = [
+    "backend/cinematch-server",
+    "backend/cinematch-party-api",
+    "backend/cinematch-db",
+    "backend/cinematch-recommendation-engine"
+]
+default-members = [
+    "backend/cinematch-server",
+]
