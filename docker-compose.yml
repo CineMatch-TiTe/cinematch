@@ -6,38 +6,39 @@ networks:
   internet:
 
 services:
-  cinematch-server:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-    ports:
-      - "8080:8080"
-    environment:
-      - DATABASE_URL=postgres://cinematch_user:password@cinematch-db:5432/cinematch_db
-      - REDIS_URL=redis://cinematch-redis:6379
-      - QDRANT_URL=http://qdrant:6333
-    depends_on:
-      - cinematch-db
-      - cinematch-redis
-      - qdrant
-    networks:
-      - db_network
-      - internet
-    env_file:
-      - .env
+  # cinematch-server:
+  #   build:
+  #     context: ./backend
+  #     dockerfile: Dockerfile
+  #   ports:
+  #     - "8080:8080"
+  #   environment:
+  #     - DATABASE_URL=postgres://cinematch_user:password@cinematch-db:5432/cinematch_db
+  #     - REDIS_URL=redis://cinematch-redis:6379
+  #     - QDRANT_URL=http://qdrant:6333
+  #   depends_on:
+  #     - cinematch-db
+  #     - cinematch-redis
+  #     - qdrant
+  #   networks:
+  #     - db_network
+  #     - internet
+  #   env_file:
+  #     - .env
 
   cinematch-db:
     image: postgres:15
     environment:
       - POSTGRES_USER=cinematch_user
       - POSTGRES_PASSWORD=password
-      - POSTGRES_DB=cinematch_db
+      - POSTGRES_DB=cinematch
     ports:
       - "5432:5432"
     volumes:
       - cinematch_db_data:/var/lib/postgresql/data
     networks:
       - db_network
+      - internet
 
   cinematch-redis:
     image: redis:7

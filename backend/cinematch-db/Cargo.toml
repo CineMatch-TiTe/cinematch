@@ -4,3 +4,11 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+diesel = { version = "2.2.0", features = ["chrono", "uuid"] }
+diesel-async = { version = "0.7", features = ["postgres", "deadpool"] }
+diesel-derive-enum = { version = "2.1", features = ["postgres"] }
+futures-util = { version = "0.3", features = ["std"] }
+uuid = { version = "1.6", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+thiserror = "2.0"
+rand = "0.9"

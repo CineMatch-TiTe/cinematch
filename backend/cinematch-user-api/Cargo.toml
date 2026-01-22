@@ -1,5 +1,5 @@
 [package]
-name = "cinematch-party-api"
+name = "cinematch-user-api"
 version = "0.1.0"
 edition = "2024"
 
@@ -16,6 +16,10 @@ chrono = { version = "0.4", features = ["serde"] }
 utoipa = { version = "5.4", features = ["chrono", "uuid"] }
 utoipa-swagger-ui = "9.0.2"
 utoipa-actix-web = "0.1.2"
+
+actix-jwt-auth-middleware = "0.5.0"
+ed25519-compact = "2.2.0"
+jwt-compact = { version = "0.8.0", features = ["ed25519-compact"] }
 
 rand = "0.9"
 jsonwebtoken = { version = "10.2", features = ["rust_crypto"] }

@@ -4,8 +4,9 @@ members = [
     "backend/cinematch-server",
     "backend/cinematch-party-api",
     "backend/cinematch-db",
-    "backend/cinematch-recommendation-engine"
-]
+    "backend/cinematch-recommendation-engine",
+    "backend/cinematch-user-api",
+    "backend/cinematch-common"]
 default-members = [
     "backend/cinematch-server",
 ]
