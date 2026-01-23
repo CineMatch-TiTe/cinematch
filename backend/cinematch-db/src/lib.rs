@@ -16,10 +16,17 @@ mod party;
 mod user;
 
 pub use models::*;
+use diesel::PgConnection;
+use diesel::Connection;
 
 // ============================================================================
 // Error Types
 // ============================================================================
+
+use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
+pub const MIGRATIONS: EmbeddedMigrations = embed_migrations!("../cinematch-db/migrations");
+
+use std::error::Error;
 
 #[derive(Error, Debug)]
 pub enum DbError {
@@ -41,64 +48,14 @@ pub enum DbError {
     #[error("External account not found")]
     ExternalAccountNotFound,
 
-    #[error("Cannot kick yourself from party")]
-    CannotKickSelf,
-
     #[error("User is not a party member")]
     NotPartyMember,
 
-    #[error("Only party leader can perform this action")]
-    NotPartyLeader,
-
     #[error("Failed to generate unique party code after max attempts")]
     CodeGenerationFailed,
-
-    #[error("Invalid state transition: {0}")]
-    InvalidStateTransition(String),
-
-    #[error("Invalid username: {0}")]
-    InvalidUsername(String),
 }
 
 pub type DbResult<T> = Result<T, DbError>;
-
-// ============================================================================
-// Validation
-// ============================================================================
-
-/// Username constraints
-const USERNAME_MIN_LENGTH: usize = 3;
-const USERNAME_MAX_LENGTH: usize = 32;
-
-/// Validate a username: 3-32 chars, alphanumeric + underscore only
-pub fn validate_username(username: &str) -> DbResult<()> {
-    let len = username.len();
-
-    if len < USERNAME_MIN_LENGTH {
-        return Err(DbError::InvalidUsername(format!(
-            "Username must be at least {} characters",
-            USERNAME_MIN_LENGTH
-        )));
-    }
-
-    if len > USERNAME_MAX_LENGTH {
-        return Err(DbError::InvalidUsername(format!(
-            "Username must be at most {} characters",
-            USERNAME_MAX_LENGTH
-        )));
-    }
-
-    if !username
-        .chars()
-        .all(|c| c.is_ascii_alphanumeric() || c == '_')
-    {
-        return Err(DbError::InvalidUsername(
-            "Username can only contain letters, numbers, and underscores".to_string(),
-        ));
-    }
-
-    Ok(())
-}
 
 // ============================================================================
 // Database Connection Pool
@@ -124,5 +81,14 @@ impl Database {
         &self,
     ) -> DbResult<diesel_async::pooled_connection::deadpool::Object<AsyncPgConnection>> {
         self.pool.get().await.map_err(DbError::from)
+    }
+
+    pub async fn run_migrations(&self, database_url: &str) -> Result<(), Box<dyn Error + Send + Sync + 'static>> {
+        let mut conn = PgConnection::establish(database_url)
+        .unwrap_or_else(|_| panic!("Error connecting to {}", database_url));
+
+        conn.run_pending_migrations(MIGRATIONS)?;
+
+        Ok(())
     }
 }

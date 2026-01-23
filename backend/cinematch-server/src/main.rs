@@ -1,23 +1,24 @@
 use actix_web::{middleware::Logger, web, App, HttpServer};
+
+use actix_cors::Cors;
+use actix_web::http;
+use actix_web::{cookie::Key};
+use actix_identity::IdentityMiddleware;
+use actix_session::{storage::RedisSessionStore, SessionMiddleware};
+
 use utoipa::{OpenApi};
 use utoipa_swagger_ui::{{SwaggerUi, Url}};
 use std::net::Ipv4Addr;
+use std::time::Duration;
 
 use log::error;
-use ed25519_compact::KeyPair;
-
-use actix_jwt_auth_middleware::use_jwt::UseJWTOnApp;
-use actix_jwt_auth_middleware::{Authority, TokenSigner};
-use jwt_compact::alg::Ed25519;
 
 // Database
 use cinematch_db::Database;
 use cinematch_party_api::{configure as configure_party_routes, PartyApiDoc};
 use cinematch_user_api::{configure as configure_user_routes, UserApiDoc};
+
 // use cinematch_recommendation_engine::configure_recommendation_routes;
-
-use cinematch_common::UserClaims;
-
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
@@ -27,7 +28,22 @@ async fn main() -> std::io::Result<()> {
     let db_loc = std::env::var("DATABASE_URL").unwrap_or_else(|_| "postgres://user:password@localhost/cinematch".to_string());
     log::info!("Connecting to database at {}", db_loc); 
 
+    // Run database migrations
+
     let db_pool = Database::new(&db_loc).expect("Failed to initialize database");
+
+    let redis_loc = std::env::var("REDIS_URL").unwrap_or_else(|_| "redis://127.0.0.1:6379".to_string());
+    log::info!("Connecting to redis at {}", redis_loc); 
+    let cfg = deadpool_redis::Config::from_url(redis_loc.clone());
+    let pool = cfg.create_pool(Some(deadpool_redis::Runtime::Tokio1)).unwrap_or_else(|_| panic!("Failed to create Redis pool using {}", redis_loc));
+    let redis_store = RedisSessionStore::new_pooled(pool)
+        .await
+        .unwrap();
+
+    if let Err(e) = db_pool.run_migrations(&db_loc).await {
+        error!("Failed to run database migrations: {}", e);
+        return Err(std::io::Error::other("migration error"));
+    }
 
     let data = web::Data::new(db_pool);
 
@@ -46,35 +62,51 @@ async fn main() -> std::io::Result<()> {
 
     log::info!("Starting server bind on [{}]:{}", host, port);
 
+    // try read from env, else random 
+    let secret_key = match std::env::var("JWT_SECRET_KEY") {
+        Ok(key_str) => {
+            log::info!("Using JWT secret key from environment variable");
+            Key::from(key_str.as_bytes())
+        },
+        Err(_) => { 
+            log::warn!("JWT_SECRET_KEY not set, generating random key for debug build");
+            Key::generate()
+        }
+    };
 
-    let KeyPair {
-        pk: public_key,
-        sk: secret_key,
-    } = KeyPair::generate();
+
+    let deadline_expiration = Duration::from_secs(24 * 60 * 60); // last visit this long ago will be logged out
+    let last_login_duration = Duration::from_secs(30 * 24 * 60 * 60); // last login this long ago will be logged out
 
     // Start the server with single IPv4 binding
     let server = HttpServer::new(move || {
-
-        let authority = Authority::<UserClaims, Ed25519, _, _>::new()
-            .refresh_authorizer(|| async move { Ok(()) })
-            .token_signer(Some(
-                TokenSigner::new()
-                    .signing_key(secret_key.clone())
-                    .algorithm(Ed25519)
-                    .build()
-                    .expect("Failed to build token signer"),
-            ))
-            .verifying_key(public_key)
-            .build()
-            .expect("Failed to build authority");
+        let identity_mw = IdentityMiddleware::builder()
+            .visit_deadline(Some(deadline_expiration))
+            .login_deadline(Some(last_login_duration))
+            .build();
 
         App::new()
-            .app_data(data.clone())
+            .wrap(identity_mw)
+            .wrap(SessionMiddleware::new(
+                 redis_store.clone(),
+                 secret_key.clone(),
+            ))
             .wrap(Logger::default())
-            .use_jwt(authority.clone(), web::scope("/api/party")) // claims available at all routes
-            .use_jwt(authority, web::scope("/api/user/rename"))
-            .configure(configure_party_routes)
-            .configure(configure_user_routes)
+            .wrap(
+                Cors::default()
+                    .allowed_origin("http://localhost:3000") // Your frontend URL (e.g., React/Vite dev server)
+                    .allowed_methods(vec!["GET", "POST", "PUT", "DELETE", "PATCH"])
+                    .allowed_headers(vec![
+                        http::header::AUTHORIZATION,
+                        http::header::ACCEPT,
+                        http::header::CONTENT_TYPE,
+                        http::header::COOKIE,
+                    ])
+                    .max_age(3600),
+            )
+
+            .app_data(data.clone())
+            .configure(configure_party_routes).configure(configure_user_routes)
             // .configure(configure_recommendation_engine)
             .service(SwaggerUi::new("/swagger-ui/{_:.*}").urls(vec![
                 (

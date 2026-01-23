@@ -128,7 +128,9 @@ impl Database {
     }
 
     /// Delete (disband) a party
-    /// Marked unsafe, since todo what to do when party disbanded
+    /// # Safety
+    /// This function is unsafe because it may leave orphaned records or inconsistent state if not all related data is cleaned up.
+    /// Caller must ensure all necessary cleanup is performed after party deletion.
     pub async unsafe fn delete_party(&self, party_id: Uuid) -> DbResult<usize> {
         use schema::parties::dsl::*;
 
@@ -195,45 +197,18 @@ impl Database {
 // ============================================================================
 
 impl Database {
-    /// Advance party to the next phase (leader only)
-    /// State flow: Created -> Picking -> Voting -> Watching -> Review
-    /// Returns the updated party
-    pub async fn advance_party_phase(
+    /// Set the party's state and reset all members' ready states
+    pub async fn set_phase(
         &self,
         party_id: Uuid,
-        leader_id: Uuid,
+        new_state: PartyState,
     ) -> DbResult<Party> {
         use schema::parties::dsl::*;
-
-        let party = self.get_party(party_id).await?;
-
-        // Verify requester is leader
-        if party.party_leader_id != leader_id {
-            return Err(DbError::NotPartyLeader);
-        }
-
-        // Determine next state
-        let next_state = match party.state {
-            PartyState::Created => PartyState::Picking,
-            PartyState::Picking => PartyState::Voting,
-            PartyState::Voting => PartyState::Watching,
-            PartyState::Watching => PartyState::Review,
-            PartyState::Review | PartyState::Disbanded => {
-                return Err(DbError::InvalidStateTransition(
-                    "Cannot advance from this state. Use start_new_round from Review.".to_string(),
-                ));
-            }
-        };
-
-        // If leaving Created state, release the join code
-        if party.state == PartyState::Created {
-            let _ = self.release_party_code(party_id).await;
-        }
 
         // Update state
         let mut conn = self.conn().await?;
         let updated_party = diesel::update(parties.find(party_id))
-            .set(state.eq(next_state))
+            .set(state.eq(new_state))
             .returning(Party::as_returning())
             .get_result(&mut conn)
             .await?;
@@ -244,36 +219,14 @@ impl Database {
         Ok(updated_party)
     }
 
-    /// Start a new movie round from Review state (leader only)
+    /// Start a new movie round
     /// Resets to Created state with a new join code, keeps existing members
     pub async fn start_new_round(
         &self,
         party_id: Uuid,
-        leader_id: Uuid,
-    ) -> DbResult<(Party, PartyCode)> {
-        use schema::parties::dsl::*;
-
-        let party = self.get_party(party_id).await?;
-
-        // Verify requester is leader
-        if party.party_leader_id != leader_id {
-            return Err(DbError::NotPartyLeader);
-        }
-
-        // Can only start new round from Review state
-        if party.state != PartyState::Review {
-            return Err(DbError::InvalidStateTransition(
-                "Can only start new round from Review state".to_string(),
-            ));
-        }
-
+    ) -> DbResult<PartyCode> {
         // Reset to Created state
         let mut conn = self.conn().await?;
-        let updated_party = diesel::update(parties.find(party_id))
-            .set(state.eq(PartyState::Created))
-            .returning(Party::as_returning())
-            .get_result(&mut conn)
-            .await?;
 
         // Generate new join code
         let code = self.generate_party_code_internal(&mut conn, party_id).await?;
@@ -281,19 +234,12 @@ impl Database {
         // Reset all members' ready state
         self.reset_all_ready_states(party_id).await?;
 
-        Ok((updated_party, code))
+        Ok(code)
     }
 
     /// Disband a party (leader only)
-    pub async fn disband_party(&self, party_id: Uuid, leader_id: Uuid) -> DbResult<Party> {
+    pub async fn disband_party(&self, party_id: Uuid) -> DbResult<Party> {
         use schema::parties::dsl::*;
-
-        let party = self.get_party(party_id).await?;
-
-        // Verify requester is leader
-        if party.party_leader_id != leader_id {
-            return Err(DbError::NotPartyLeader);
-        }
 
         // Release code if exists
         let _ = self.release_party_code(party_id).await;
@@ -330,7 +276,7 @@ impl Database {
     }
 
     /// Remove a user from a party
-    pub async fn remove_party_member(&self, pid: Uuid, uid: Uuid) -> DbResult<usize> {
+    pub async fn remove_party_member(&self, pid: Uuid, uid: Uuid) -> DbResult<()> {
         use schema::party_members::dsl::*;
 
         let mut conn = self.conn().await?;
@@ -342,24 +288,11 @@ impl Database {
         .execute(&mut conn)
         .await
         .map_err(DbError::from)
-    }
-
-    /// Get all members of a party (User info only)
-    pub async fn get_party_members(&self, pid: Uuid) -> DbResult<Vec<User>> {
-        use schema::{party_members, users};
-
-        let mut conn = self.conn().await?;
-        party_members::table
-            .inner_join(users::table)
-            .filter(party_members::party_id.eq(pid))
-            .select(User::as_select())
-            .load(&mut conn)
-            .await
-            .map_err(DbError::from)
+        .map(|_| ())
     }
 
     /// Get all party member records (includes joined_at and is_ready)
-    pub async fn get_party_member_records(&self, pid: Uuid) -> DbResult<Vec<PartyMember>> {
+    pub async fn get_party_members(&self, pid: Uuid) -> DbResult<Vec<PartyMember>> {
         use schema::party_members::dsl::*;
 
         let mut conn = self.conn().await?;
@@ -371,33 +304,49 @@ impl Database {
             .map_err(DbError::from)
     }
 
-    /// Get all parties a user is a member of
-    pub async fn get_user_parties(&self, uid: Uuid) -> DbResult<Vec<Party>> {
-        use schema::{parties, party_members};
+        /// Get all party user records, for names etc.
+    pub async fn get_party_users(&self, pid: Uuid) -> DbResult<Vec<User>> {
+        use schema::party_members::dsl::*;
 
         let mut conn = self.conn().await?;
-        party_members::table
-            .inner_join(parties::table)
-            .filter(party_members::user_id.eq(uid))
-            .select(Party::as_select())
+        party_members
+            .inner_join(crate::schema::users::table)
+            .filter(party_id.eq(pid))
+            .select(User::as_select())
             .load(&mut conn)
             .await
             .map_err(DbError::from)
-    }
+    }   
+
 
     /// Check if a user is a member of a party
     pub async fn is_party_member(&self, pid: Uuid, uid: Uuid) -> DbResult<bool> {
         use schema::party_members::dsl::*;
 
         let mut conn = self.conn().await?;
-        let count: i64 = party_members
+        let exists = party_members
             .filter(party_id.eq(pid))
             .filter(user_id.eq(uid))
-            .count()
-            .get_result(&mut conn)
-            .await?;
+            .select(PartyMember::as_select())
+            .first(&mut conn)
+            .await
+            .optional()?;
 
-        Ok(count > 0)
+        Ok(exists.is_some())
+    }
+
+    /// Get a specific party member record
+    pub async fn get_party_member(&self, pid: Uuid, uid: Uuid) -> DbResult<Option<PartyMember>> {
+        use schema::party_members::dsl::*;
+        let mut conn = self.conn().await?;
+        party_members
+            .filter(party_id.eq(pid))
+            .filter(user_id.eq(uid))
+            .select(PartyMember::as_select())
+            .first(&mut conn)
+            .await
+            .optional()
+            .map_err(DbError::from)
     }
 
     /// Get the oldest member of a party (by joined_at)
@@ -415,76 +364,6 @@ impl Database {
             .map_err(DbError::from)
     }
 
-    /// Kick a user from a party (leader only, cannot kick self)
-    pub async fn kick_party_member(
-        &self,
-        pid: Uuid,
-        leader_id: Uuid,
-        target_user_id: Uuid,
-    ) -> DbResult<()> {
-        // Cannot kick yourself
-        if leader_id == target_user_id {
-            return Err(DbError::CannotKickSelf);
-        }
-
-        // Verify the requester is the party leader
-        let party = self.get_party(pid).await?;
-        if party.party_leader_id != leader_id {
-            return Err(DbError::NotPartyLeader);
-        }
-
-        // Check target is actually a member
-        if !self.is_party_member(pid, target_user_id).await? {
-            return Err(DbError::NotPartyMember);
-        }
-
-        // Remove the member
-        self.remove_party_member(pid, target_user_id).await?;
-        Ok(())
-    }
-
-    /// Leave a party. If the leader leaves, the oldest member becomes the new leader.
-    /// If no members remain, the party is disbanded.
-    pub async fn leave_party(&self, pid: Uuid, uid: Uuid) -> DbResult<Option<Party>> {
-        use schema::parties::dsl::*;
-
-        // Get the party
-        let party = self.get_party(pid).await?;
-
-        // Check user is actually a member
-        if !self.is_party_member(pid, uid).await? {
-            return Err(DbError::NotPartyMember);
-        }
-
-        // Remove the user from the party
-        self.remove_party_member(pid, uid).await?;
-
-        // If the leaving user was the leader, transfer leadership or disband
-        if party.party_leader_id == uid {
-            // Find the oldest remaining member
-            if let Some(oldest_member) = self.get_oldest_party_member(pid).await? {
-                // Transfer leadership to oldest member
-                let mut conn = self.conn().await?;
-                let updated_party = diesel::update(parties.find(pid))
-                    .set(party_leader_id.eq(oldest_member.user_id))
-                    .returning(Party::as_returning())
-                    .get_result(&mut conn)
-                    .await?;
-                return Ok(Some(updated_party));
-            } else {
-                // No members left, disband the party
-                let mut conn = self.conn().await?;
-                diesel::update(parties.find(pid))
-                    .set(state.eq(PartyState::Disbanded))
-                    .execute(&mut conn)
-                    .await?;
-                return Ok(None);
-            }
-        }
-
-        // User was not the leader, just return the party as-is
-        Ok(Some(party))
-    }
 }
 
 // ============================================================================
@@ -492,37 +371,6 @@ impl Database {
 // ============================================================================
 
 impl Database {
-    /// Toggle a member's ready state
-    /// Returns the new ready state
-    pub async fn toggle_member_ready(&self, pid: Uuid, uid: Uuid) -> DbResult<bool> {
-        use schema::party_members::dsl::*;
-
-        // First get current state
-        let mut conn = self.conn().await?;
-        let member: Option<PartyMember> = party_members
-            .filter(party_id.eq(pid))
-            .filter(user_id.eq(uid))
-            .select(PartyMember::as_select())
-            .first(&mut conn)
-            .await
-            .optional()?;
-
-        let member = member.ok_or(DbError::NotPartyMember)?;
-        let new_ready = !member.is_ready;
-
-        // Update
-        diesel::update(
-            party_members
-                .filter(party_id.eq(pid))
-                .filter(user_id.eq(uid)),
-        )
-        .set(is_ready.eq(new_ready))
-        .execute(&mut conn)
-        .await?;
-
-        Ok(new_ready)
-    }
-
     /// Set a member's ready state explicitly
     pub async fn set_member_ready(&self, pid: Uuid, uid: Uuid, ready: bool) -> DbResult<()> {
         use schema::party_members::dsl::*;

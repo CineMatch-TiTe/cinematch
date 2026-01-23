@@ -55,6 +55,25 @@ pub struct UserResponse {
     pub updated_at: DateTime<Utc>,
 }
 
+/// Response with current user info and token details
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+pub struct CurrentUserResponse {
+    /// The user's unique ID
+    pub user_id: Uuid,
+    /// The user's display name
+    pub username: String,
+    /// Whether this is a guest/oneshot user
+    pub is_guest: bool,
+    /// When the user was created
+    pub created_at: DateTime<Utc>,
+    /// When the user was last updated
+    pub updated_at: DateTime<Utc>,
+    /// Token expiry timestamp (Unix seconds)
+    pub token_expires_at: i64,
+    /// Seconds until token expiry
+    pub token_expires_in: i64,
+}
+
 // ============================================================================
 // User Request Models
 // ============================================================================

@@ -26,7 +26,7 @@ use utoipa::OpenApi;
         handlers::get_party_members,
         handlers::kick_member,
         handlers::transfer_leadership,
-        handlers::toggle_ready,
+        handlers::set_ready,
         handlers::advance_phase,
         handlers::start_new_round,
         handlers::disband_party,

@@ -3,20 +3,24 @@
 //! These handlers implement the user management endpoints.
 //! 
 
+
+
+use actix_identity::Identity;
 use actix_web::{web, HttpResponse};
+use actix_web::HttpRequest;
+use actix_web::HttpMessage;
+use log::{debug, trace};
 use uuid::Uuid;
 
-use actix_jwt_auth_middleware::TokenSigner;
-use jwt_compact::alg::Ed25519;
+use log::error;
 
 use crate::models::*;
 use cinematch_db::{Database, DbError};
 
-use cinematch_common::UserClaims;
+use cinematch_common::extract_user_id;
 
 /// Application state wrapper providing database access
 pub type AppState = web::Data<Database>;
-type Signer = web::Data<TokenSigner<UserClaims, Ed25519>>;
 
 // ============================================================================
 // User Management Endpoints
@@ -36,15 +40,21 @@ type Signer = web::Data<TokenSigner<UserClaims, Ed25519>>;
     post,
     path = "/api/user/login/guest",
     responses(
-        (status = 201, description = "Guest user created successfully", body = GuestLoginResponse),
+        (status = 201, description = "Guest user created successfully"),
+        (status = 409, description = "Already logged in", body = ErrorResponse),
         (status = 500, description = "Internal server error", body = ErrorResponse)
     ),
-    tags = ["user"],
+    tags = ["auth"],
     operation_id = "login_guest"
 )]
 
-pub async fn login_guest(db: AppState, token_signer: Signer) -> HttpResponse {
-    // Generate a random username for guest user
+pub async fn login_guest(db: AppState, request: HttpRequest, user: Option<Identity>) -> HttpResponse {
+    if let Some(existing_user) = user {
+        trace!("User already logged in with ID: {:?}", existing_user.id());
+        return HttpResponse::Conflict().json(ErrorResponse::new("User already logged in"));
+    }
+    
+    // Generate a random username for guest user, this can also be empty
     let random_suffix = Uuid::new_v4()
         .to_string()
         .chars()
@@ -52,46 +62,20 @@ pub async fn login_guest(db: AppState, token_signer: Signer) -> HttpResponse {
         .collect::<String>();
     let username = format!("guest_{}", random_suffix);
 
+    debug!("Creating guest user with username: {}", username);
     match db.create_guest_user(&username).await {
         Ok(user) => {
-
-            let claims = UserClaims {
-                user_id: user.id,
-            };
-
-            let response = GuestLoginResponse {
-                user_id: user.id,
-                username: user.username,
-                is_guest: user.oneshot,
-                created_at: user.created_at,
-            };
-
-            let access_cookie = match token_signer.create_access_cookie(&claims) {
-                Ok(cookie) => cookie,
-                Err(e) => {
-                    log::error!("Failed to create access cookie: {}", e);
-                    return HttpResponse::InternalServerError().json(ErrorResponse::new(format!(
-                        "Failed to create access cookie: {}",
-                        e
-                    )));
+            match Identity::login(&request.extensions(), user.id.to_string()) {
+                Ok(_) => {
+                    trace!("User identity set in session for user_id={}", user.id);
+                    HttpResponse::Created().finish()
                 }
-            };
-
-            let refresh_cookie = match token_signer.create_refresh_cookie(&claims) {
-                Ok(cookie) => cookie,
                 Err(e) => {
-                    log::error!("Failed to create refresh cookie: {}", e);
-                    return HttpResponse::InternalServerError().json(ErrorResponse::new(format!(
-                        "Failed to create refresh cookie: {}",
-                        e
-                    )));
+                    error!("Failed to set user identity in session: {}", e);
+                    HttpResponse::InternalServerError().json(ErrorResponse::new("Failed to set user identity in session"))
                 }
-            };
+            }
 
-            HttpResponse::Created()
-            .cookie(access_cookie)
-            .cookie(refresh_cookie)
-            .json(response)
         }
         Err(e) => {
             log::error!("Failed to create guest user: {}", e);
@@ -128,26 +112,37 @@ pub async fn login_guest(db: AppState, token_signer: Signer) -> HttpResponse {
     operation_id = "rename_user"
 )]
 pub async fn rename_user(
-    claims: UserClaims,
     db: AppState,
     user_id: web::Path<Uuid>,
     body: web::Json<RenameUserRequest>,
+    user: Identity,
 ) -> HttpResponse {
     let user_id = user_id.into_inner();
     let new_username = body.new_username.trim();
 
+    let claims = extract_user_id!(user);
+
+    if claims != user_id {
+        trace!("Unauthorized rename attempt: claims.user_id={} != target_user_id={}", claims, user_id);
+        return HttpResponse::Forbidden().finish();
+    }
+
     // Validate username length
     if new_username.len() < 3 || new_username.len() > 32 {
+        trace!("Invalid username length: {}", new_username.len());
         return HttpResponse::BadRequest().json(ErrorResponse::new(
             "Username must be between 3 and 32 characters",
         ));
     }
 
-    if claims.user_id != user_id {
-        return HttpResponse::Forbidden().finish();
-    }
+    debug!("Auth passed - renaming user {} to '{}'", user_id, new_username);
 
-    match db.update_user_username(user_id, new_username).await {
+    let update = cinematch_db::UpdateUser {
+        username: Some(new_username),
+        oneshot: None,
+    };
+
+    match db.update_user(user_id, update).await {
         Ok(_) => {
             HttpResponse::Ok().finish()
         }
@@ -162,4 +157,87 @@ pub async fn rename_user(
             )))
         }
     }
+}
+/// Get current user info
+///
+/// Returns the currently authenticated user's profile information
+/// along with JWT token validity details.
+///
+/// **Auth Required**: User must be authenticated with a valid JWT token.
+#[utoipa::path(
+    get,
+    path = "/api/user",
+    responses(
+        (status = 200, description = "User info retrieved successfully", body = CurrentUserResponse),
+        (status = 401, description = "Unauthorized - authentication required", body = ErrorResponse),
+        (status = 404, description = "User not found", body = ErrorResponse),
+        (status = 500, description = "Internal server error", body = ErrorResponse)
+    ),
+    tags = ["user"],
+    security(("bearer_auth" = [])),
+    operation_id = "get_current_user"
+)]
+pub async fn get_current_user(
+    user: Identity,
+    db: AppState,
+) -> HttpResponse {
+    let user_id = extract_user_id!(user);
+
+    match db.get_user(user_id).await {
+        Ok(user) => {
+            debug!("Successfully fetched user profile for {}", user_id);
+            // Token expiry: 24 hours from now
+            let now = chrono::Utc::now().timestamp();
+            let token_expires_in = 24 * 60 * 60; // 24 hours in seconds
+            let token_expires_at = now + token_expires_in;
+
+            let response = CurrentUserResponse {
+                user_id: user.id,
+                username: user.username,
+                is_guest: user.oneshot,
+                created_at: user.created_at,
+                updated_at: user.updated_at,
+                token_expires_at,
+                token_expires_in,
+            };
+            HttpResponse::Ok().json(response)
+        }
+        Err(DbError::UserNotFound(_)) => {
+            HttpResponse::NotFound().json(ErrorResponse::new("User not found"))
+        }
+        Err(e) => {
+            log::error!("Failed to get user: {}", e);
+            HttpResponse::InternalServerError().json(ErrorResponse::new(format!(
+                "Failed to get user: {}",
+                e
+            )))
+        }
+    }
+}
+
+/// Logout user
+///
+/// Clears authentication cookies by setting them to expire.
+/// This effectively logs out the user on the client side.
+///
+/// **Auth**: No authentication required (any user can logout).
+#[utoipa::path(
+    post,
+    path = "/api/user/logout",
+    responses(
+        (status = 200, description = "Successfully logged out"),
+        (status = 204, description = "No user was logged in"),
+        (status = 500, description = "Internal server error", body = ErrorResponse)
+    ),
+    tags = ["auth"],
+    operation_id = "logout_user"
+)]
+pub async fn logout_user(user: Option<Identity>) -> HttpResponse {
+    if let Some(user) = user {
+        user.logout();
+        HttpResponse::Ok().finish()
+    } else {
+        HttpResponse::NoContent().finish()
+    }
+    
 }

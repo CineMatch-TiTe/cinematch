@@ -3,7 +3,7 @@ use actix_web::web;
 
 use crate::handlers;
 
-/// Configure all party API routes under /api/party
+/// Configure all party API routes under /party (already under /api scope from main.rs)
 pub fn configure(cfg: &mut web::ServiceConfig) {
     cfg.service(
         web::scope("/api/party")
@@ -22,7 +22,7 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
                 web::post().to(handlers::transfer_leadership),
             )
             // Ready State
-            .route("/{party_id}/ready", web::post().to(handlers::toggle_ready))
+            .route("/{party_id}/ready", web::post().to(handlers::set_ready))
             // Phase Control (Leader Only)
             .route("/{party_id}/advance", web::post().to(handlers::advance_phase))
             .route("/{party_id}/new-round", web::post().to(handlers::start_new_round))

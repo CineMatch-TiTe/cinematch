@@ -1,7 +1,7 @@
 FROM rust:alpine AS builder
 
 # swagger ui needs curl at comptime
-RUN apk add --no-cache curl 
+RUN apk add --no-cache curl musl-dev build-base pkgconfig openssl-dev openssl-libs-static
 
 COPY . /usr/src/cinematch
 WORKDIR /usr/src/cinematch
@@ -11,5 +11,5 @@ RUN cargo install --path cinematch-server
 FROM scratch
 COPY --from=builder /usr/local/cargo/bin/cinematch-server /usr/local/bin/cinematch-server
 
-EXPOSE 8080
+EXPOSE 8085
 CMD ["cinematch-server"]

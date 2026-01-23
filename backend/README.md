@@ -20,6 +20,9 @@ figure out how to auto migrate diesel in prod (eg fresh install should apply all
 add healthcheck to docker
 
 
+party code generation is not ideal, perhaps investigate some time based 
+
+
 Recommendation engine code is still very wip,
 embedding crate which analyzed the data and generated vectors will come with recommendation engine
 

@@ -141,6 +141,12 @@ pub struct TransferLeadershipRequest {
 // Ready State Models
 // ============================================================================
 
+/// Request to set ready state
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+pub struct SetReadyRequest {
+    pub is_ready: bool,
+}
+
 /// Response after toggling ready state
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct ReadyStateResponse {

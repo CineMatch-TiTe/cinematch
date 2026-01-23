@@ -17,8 +17,10 @@ utoipa = { version = "5.4", features = ["chrono", "uuid"] }
 utoipa-swagger-ui = "9.0.2"
 utoipa-actix-web = "0.1.2"
 
+actix-identity = "0.9.0"
+actix-session = { version = "0.11", features = ["redis-pool", "redis-session-rustls"] }
+
 rand = "0.9"
-jsonwebtoken = { version = "10.2", features = ["rust_crypto"] }
 ulid = { version = "1.1", features = ["serde"] }
 
 cinematch-db = { path = "../cinematch-db" }
