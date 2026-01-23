@@ -1,6 +1,8 @@
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
+pub mod vote_store;
+
 /// Standard error response
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct ErrorResponse {
