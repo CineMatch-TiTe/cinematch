@@ -1,0 +1,38 @@
+name: Cleanup PR Images
+
+description: Remove Docker images for closed or merged PRs from GHCR.
+
+on:
+  pull_request:
+    types: [closed]
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    permissions:
+      packages: write
+      contents: read
+    steps:
+      - name: Set lowercase image name
+        run: echo "IMAGE_NAME=$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')-backend" >> $GITHUB_ENV
+
+      - name: Delete PR image from GHCR
+        env:
+          REGISTRY: ghcr.io
+          IMAGE_NAME: ${{ env.IMAGE_NAME }}
+          PR_NUM: ${{ github.event.pull_request.number }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          IMAGE_REF="$REGISTRY/$IMAGE_NAME:pr-$PR_NUM"
+          echo "Deleting $IMAGE_REF"
+          # Get the image digest for the PR tag
+          DIGEST=$(curl -s -H "Authorization: Bearer $GITHUB_TOKEN" \
+            "https://ghcr.io/v2/${IMAGE_NAME}/manifests/pr-$PR_NUM" \
+            -I | grep Docker-Content-Digest | awk '{print $2}' | tr -d '\r')
+          if [ -n "$DIGEST" ]; then
+            curl -X DELETE -H "Authorization: Bearer $GITHUB_TOKEN" \
+              "https://ghcr.io/v2/${IMAGE_NAME}/manifests/$DIGEST"
+            echo "Deleted image $IMAGE_REF ($DIGEST)"
+          else
+            echo "No image found for $IMAGE_REF"
+          fi
