@@ -5,7 +5,8 @@ use diesel_async::RunQueryDsl;
 use uuid::Uuid;
 
 use crate::models::{NewUser, UpdateUser, User};
-use crate::schema;
+use crate::schema::parties;
+use crate::{Party, schema};
 use crate::{Database, DbError, DbResult};
 
 impl Database {
@@ -63,6 +64,24 @@ impl Database {
             .optional()?
             .ok_or(DbError::UserNotFound(user_id))
     }
+
+    /// Get a users party which they are in (this can only return one ongoing party)
+    pub async fn get_user_active_party(&self, user_id: Uuid) -> DbResult<Uuid> {
+        use schema::party_members::dsl as pm;
+        use schema::parties::dsl as p;
+
+        let mut conn = self.conn().await?;
+        pm::party_members
+            .inner_join(p::parties.on(p::id.eq(pm::party_id)))
+            .filter(pm::user_id.eq(user_id))
+            .select(p::id)
+            .first::<Uuid>(&mut conn)
+            .await
+            .optional()?
+            .ok_or(DbError::UserNotInParty(user_id))
+
+    }
+
 
     /// Update a user
     pub async fn update_user(&self, user_id: Uuid, update: UpdateUser<'_>) -> DbResult<User> {

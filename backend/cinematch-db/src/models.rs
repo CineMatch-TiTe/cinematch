@@ -8,7 +8,7 @@ use crate::schema::{external_accounts, parties, party_codes, party_members, user
 // Enums (mapped to PostgreSQL ENUMs)
 // ============================================================================
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, diesel_derive_enum::DbEnum)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, diesel_derive_enum::DbEnum, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
 #[ExistingTypePath = "crate::schema::sql_types::PartyState"]
 pub enum PartyState {
     Created, // Initial state, people can join and start picking

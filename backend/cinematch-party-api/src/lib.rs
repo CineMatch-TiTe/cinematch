@@ -13,6 +13,8 @@ pub use routes::configure;
 // Re-export models for convenience
 pub use models::*;
 
+use cinematch_common::ErrorResponse;
+
 use utoipa::OpenApi;
 
 /// OpenAPI documentation for the Party API

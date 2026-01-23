@@ -6,24 +6,6 @@ use utoipa::ToSchema;
 use uuid::Uuid;
 
 // ============================================================================
-// Error Response
-// ============================================================================
-
-/// Standard error response
-#[derive(Debug, Serialize, Deserialize, ToSchema)]
-pub struct ErrorResponse {
-    pub error: String,
-}
-
-impl ErrorResponse {
-    pub fn new(error: impl Into<String>) -> Self {
-        Self {
-            error: error.into(),
-        }
-    }
-}
-
-// ============================================================================
 // User Responses
 // ============================================================================
 

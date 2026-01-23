@@ -331,7 +331,6 @@ impl Database {
             .first(&mut conn)
             .await
             .optional()?;
-
         Ok(exists.is_some())
     }
 

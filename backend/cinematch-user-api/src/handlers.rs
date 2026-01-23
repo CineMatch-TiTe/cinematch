@@ -17,7 +17,7 @@ use log::error;
 use crate::models::*;
 use cinematch_db::{Database, DbError};
 
-use cinematch_common::extract_user_id;
+use cinematch_common::{extract_user_id, ErrorResponse};
 
 /// Application state wrapper providing database access
 pub type AppState = web::Data<Database>;

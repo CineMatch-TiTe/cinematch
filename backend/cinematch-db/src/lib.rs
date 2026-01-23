@@ -51,6 +51,9 @@ pub enum DbError {
     #[error("User is not a party member")]
     NotPartyMember,
 
+    #[error("User is not in a party: {0}")]
+    UserNotInParty(Uuid),
+
     #[error("Failed to generate unique party code after max attempts")]
     CodeGenerationFailed,
 }

@@ -24,7 +24,7 @@ use log::{debug, trace, error};
 use uuid::Uuid;
 
 use crate::models::*;
-use cinematch_common::extract_user_id;
+use cinematch_common::{extract_user_id, ErrorResponse};
 use cinematch_db::{Database, DbError, PartyState};
 
 /// Application state wrapper providing database access
@@ -57,7 +57,7 @@ pub async fn create_party(
     db: AppState,
     user: Option<Identity>,
 ) -> HttpResponse {
-    let user_id = extract_user_id!(option user);
+    let user_id = extract_user_id!(user);
 
     trace!("POST /api/party - user_id={}", user_id);
 
@@ -575,34 +575,6 @@ pub async fn transfer_leadership(
     let new_leader_id = body.new_leader_id;
     let requester_id = extract_user_id!(user);
 
-    // Verify requester is a member
-    match db.is_party_member(party_id, requester_id).await {
-        Ok(false) => {
-            return HttpResponse::Forbidden()
-                .json(ErrorResponse::new("Not a member of this party"));
-        }
-        Err(e) => {
-            error!("Failed to check membership: {}", e);
-            return HttpResponse::InternalServerError()
-                .json(ErrorResponse::new("Failed to check membership"));
-        }
-        Ok(true) => {}
-    }
-
-    // Verify new leader is a party member
-    match db.is_party_member(party_id, new_leader_id).await {
-        Ok(true) => {}
-        Ok(false) => {
-            return HttpResponse::BadRequest()
-                .json(ErrorResponse::new("New leader must be a party member"));
-        }
-        Err(e) => {
-            error!("Failed to check membership: {}", e);
-            return HttpResponse::InternalServerError()
-                .json(ErrorResponse::new("Failed to verify membership"));
-        }
-    }
-
     // Verify requester is the current leader
     match db.get_party(party_id).await {
         Ok(party) if party.party_leader_id != requester_id => {
@@ -618,6 +590,21 @@ pub async fn transfer_leadership(
                 .json(ErrorResponse::new("Failed to verify leadership"));
         }
         _ => {}
+    }
+
+
+    // Verify new leader is a party member
+    match db.is_party_member(party_id, new_leader_id).await {
+        Ok(true) => {}
+        Ok(false) => {
+            return HttpResponse::BadRequest()
+                .json(ErrorResponse::new("New leader must be a party member"));
+        }
+        Err(e) => {
+            error!("Failed to check membership: {}", e);
+            return HttpResponse::InternalServerError()
+                .json(ErrorResponse::new("Failed to verify membership for new leader"));
+        }
     }
 
     match db.transfer_party_leadership(party_id, new_leader_id).await {

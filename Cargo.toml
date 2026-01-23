@@ -6,7 +6,7 @@ members = [
     "backend/cinematch-db",
     "backend/cinematch-recommendation-engine",
     "backend/cinematch-user-api",
-    "backend/cinematch-common"]
+    "backend/cinematch-common", "backend/cinematch-websockets"]
 default-members = [
     "backend/cinematch-server",
 ]

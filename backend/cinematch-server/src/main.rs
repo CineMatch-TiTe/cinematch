@@ -13,10 +13,16 @@ use std::time::Duration;
 
 use log::error;
 
+
+use actix_wsb::Broadcaster;
+
+mod websocket;
+
 // Database
 use cinematch_db::Database;
 use cinematch_party_api::{configure as configure_party_routes, PartyApiDoc};
 use cinematch_user_api::{configure as configure_user_routes, UserApiDoc};
+use crate::websocket::{WebsocketApiDoc, websocket_controller};
 
 // use cinematch_recommendation_engine::configure_recommendation_routes;
 
@@ -26,9 +32,7 @@ async fn main() -> std::io::Result<()> {
     env_logger::init();
 
     let db_loc = std::env::var("DATABASE_URL").unwrap_or_else(|_| "postgres://user:password@localhost/cinematch".to_string());
-    log::info!("Connecting to database at {}", db_loc); 
-
-    // Run database migrations
+    log::info!("Connecting to database at {}", db_loc);
 
     let db_pool = Database::new(&db_loc).expect("Failed to initialize database");
 
@@ -40,6 +44,7 @@ async fn main() -> std::io::Result<()> {
         .await
         .unwrap();
 
+    // Run database migrations
     if let Err(e) = db_pool.run_migrations(&db_loc).await {
         error!("Failed to run database migrations: {}", e);
         return Err(std::io::Error::other("migration error"));
@@ -63,6 +68,7 @@ async fn main() -> std::io::Result<()> {
     log::info!("Starting server bind on [{}]:{}", host, port);
 
     // try read from env, else random 
+    // TODO! we shouldnt use as bytes since this can crash if entropy (byte count is too low)
     let secret_key = match std::env::var("JWT_SECRET_KEY") {
         Ok(key_str) => {
             log::info!("Using JWT secret key from environment variable");
@@ -77,6 +83,9 @@ async fn main() -> std::io::Result<()> {
 
     let deadline_expiration = Duration::from_secs(24 * 60 * 60); // last visit this long ago will be logged out
     let last_login_duration = Duration::from_secs(30 * 24 * 60 * 60); // last login this long ago will be logged out
+
+    let rooms = Broadcaster::new();
+    let rooms_data = web::Data::new(rooms);
 
     // Start the server with single IPv4 binding
     let server = HttpServer::new(move || {
@@ -106,7 +115,9 @@ async fn main() -> std::io::Result<()> {
             )
 
             .app_data(data.clone())
+            .app_data(rooms_data.clone())
             .configure(configure_party_routes).configure(configure_user_routes)
+            .route("/api/ws", web::get().to(websocket_controller))
             // .configure(configure_recommendation_engine)
             .service(SwaggerUi::new("/swagger-ui/{_:.*}").urls(vec![
                 (
@@ -116,6 +127,10 @@ async fn main() -> std::io::Result<()> {
                 (
                     Url::new("api/users", "/api-docs/users.json"),
                     UserApiDoc::openapi(),
+                ),
+                (
+                    Url::new("api/ws", "/api-docs/ws.json"),
+                    WebsocketApiDoc::openapi(),
                 ),
             ]))
     });
