@@ -52,7 +52,9 @@ impl Database {
             .await?;
 
         // Generate a unique code with retries
-        let code = self.generate_party_code_internal(&mut conn, party.id).await?;
+        let code = self
+            .generate_party_code_internal(&mut conn, party.id)
+            .await?;
 
         Ok((party, code))
     }
@@ -198,11 +200,7 @@ impl Database {
 
 impl Database {
     /// Set the party's state and reset all members' ready states
-    pub async fn set_phase(
-        &self,
-        party_id: Uuid,
-        new_state: PartyState,
-    ) -> DbResult<Party> {
+    pub async fn set_phase(&self, party_id: Uuid, new_state: PartyState) -> DbResult<Party> {
         use schema::parties::dsl::*;
 
         // Update state
@@ -221,15 +219,14 @@ impl Database {
 
     /// Start a new movie round
     /// Resets to Created state with a new join code, keeps existing members
-    pub async fn start_new_round(
-        &self,
-        party_id: Uuid,
-    ) -> DbResult<PartyCode> {
+    pub async fn start_new_round(&self, party_id: Uuid) -> DbResult<PartyCode> {
         // Reset to Created state
         let mut conn = self.conn().await?;
 
         // Generate new join code
-        let code = self.generate_party_code_internal(&mut conn, party_id).await?;
+        let code = self
+            .generate_party_code_internal(&mut conn, party_id)
+            .await?;
 
         // Reset all members' ready state
         self.reset_all_ready_states(party_id).await?;
@@ -304,7 +301,7 @@ impl Database {
             .map_err(DbError::from)
     }
 
-        /// Get all party user records, for names etc.
+    /// Get all party user records, for names etc.
     pub async fn get_party_users(&self, pid: Uuid) -> DbResult<Vec<User>> {
         use schema::party_members::dsl::*;
 
@@ -316,8 +313,7 @@ impl Database {
             .load(&mut conn)
             .await
             .map_err(DbError::from)
-    }   
-
+    }
 
     /// Check if a user is a member of a party
     pub async fn is_party_member(&self, pid: Uuid, uid: Uuid) -> DbResult<bool> {
@@ -362,7 +358,6 @@ impl Database {
             .optional()
             .map_err(DbError::from)
     }
-
 }
 
 // ============================================================================

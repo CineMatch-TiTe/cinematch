@@ -541,6 +541,30 @@ dependencies = [
 ]
 
 [[package]]
+name = "cinematch-api"
+version = "0.1.0"
+dependencies = [
+ "actix-identity",
+ "actix-session",
+ "actix-web",
+ "actix-ws",
+ "actix-ws-broadcaster",
+ "chrono",
+ "cinematch-common",
+ "cinematch-db",
+ "env_logger",
+ "futures",
+ "log",
+ "rand 0.9.2",
+ "serde",
+ "serde_json",
+ "ulid",
+ "utoipa",
+ "utoipa-actix-web",
+ "uuid",
+]
+
+[[package]]
 name = "cinematch-common"
 version = "0.1.0"
 dependencies = [
@@ -570,29 +594,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "cinematch-party-api"
-version = "0.1.0"
-dependencies = [
- "actix-identity",
- "actix-session",
- "actix-web",
- "chrono",
- "cinematch-common",
- "cinematch-db",
- "env_logger",
- "futures",
- "log",
- "rand 0.9.2",
- "serde",
- "serde_json",
- "ulid",
- "utoipa",
- "utoipa-actix-web",
- "utoipa-swagger-ui",
- "uuid",
-]
-
-[[package]]
 name = "cinematch-recommendation-engine"
 version = "0.1.0"
 
@@ -607,11 +608,10 @@ dependencies = [
  "actix-ws",
  "actix-ws-broadcaster",
  "chrono",
+ "cinematch-api",
  "cinematch-common",
  "cinematch-db",
- "cinematch-party-api",
  "cinematch-recommendation-engine",
- "cinematch-user-api",
  "deadpool-redis",
  "dotenvy",
  "env_logger",
@@ -623,39 +623,11 @@ dependencies = [
  "tokio",
  "utoipa",
  "utoipa-actix-web",
+ "utoipa-rapidoc",
+ "utoipa-redoc",
+ "utoipa-scalar",
  "utoipa-swagger-ui",
  "uuid",
-]
-
-[[package]]
-name = "cinematch-user-api"
-version = "0.1.0"
-dependencies = [
- "actix-identity",
- "actix-session",
- "actix-web",
- "chrono",
- "cinematch-common",
- "cinematch-db",
- "env_logger",
- "futures",
- "log",
- "rand 0.9.2",
- "serde",
- "serde_json",
- "ulid",
- "utoipa",
- "utoipa-actix-web",
- "utoipa-swagger-ui",
- "uuid",
-]
-
-[[package]]
-name = "cinematch-websockets"
-version = "0.1.0"
-dependencies = [
- "actix-ws",
- "actix-ws-broadcaster",
 ]
 
 [[package]]
@@ -2802,8 +2774,45 @@ checksum = "6d79d08d92ab8af4c5e8a6da20c47ae3f61a0f1dabc1997cdf2d082b757ca08b"
 dependencies = [
  "proc-macro2",
  "quote",
+ "regex",
  "syn",
  "uuid",
+]
+
+[[package]]
+name = "utoipa-rapidoc"
+version = "6.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e5f8f5abd341cce16bb4f09a8bafc087d4884a004f25fb980e538d51d6501dab"
+dependencies = [
+ "actix-web",
+ "serde",
+ "serde_json",
+ "utoipa",
+]
+
+[[package]]
+name = "utoipa-redoc"
+version = "6.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6427547f6db7ec006cbbef95f7565952a16f362e298b416d2d497d9706fef72d"
+dependencies = [
+ "actix-web",
+ "serde",
+ "serde_json",
+ "utoipa",
+]
+
+[[package]]
+name = "utoipa-scalar"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "59559e1509172f6b26c1cdbc7247c4ddd1ac6560fe94b584f81ee489b141f719"
+dependencies = [
+ "actix-web",
+ "serde",
+ "serde_json",
+ "utoipa",
 ]
 
 [[package]]

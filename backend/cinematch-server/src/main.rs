@@ -1,28 +1,32 @@
-use actix_web::{middleware::Logger, web, App, HttpServer};
+use actix_web::{App, HttpServer, middleware::Logger, web};
 
 use actix_cors::Cors;
-use actix_web::http;
-use actix_web::{cookie::Key};
 use actix_identity::IdentityMiddleware;
-use actix_session::{storage::RedisSessionStore, SessionMiddleware};
+use actix_session::{SessionMiddleware, storage::RedisSessionStore};
+use actix_web::cookie::Key;
+use actix_web::http;
 
-use utoipa::{OpenApi};
-use utoipa_swagger_ui::{{SwaggerUi, Url}};
+use utoipa::{
+    Modify, OpenApi,
+    openapi::security::{ApiKey, ApiKeyValue, SecurityScheme},
+};
+
 use std::net::Ipv4Addr;
 use std::time::Duration;
 
 use log::error;
 
+use utoipa_actix_web::AppExt;
+use utoipa_rapidoc::RapiDoc;
+use utoipa_redoc::{Redoc, Servable};
+use utoipa_scalar::{Scalar, Servable as ScalarServable};
+use utoipa_swagger_ui::SwaggerUi;
 
 use actix_wsb::Broadcaster;
 
-mod websocket;
-
 // Database
+use cinematch_api::ApiDoc;
 use cinematch_db::Database;
-use cinematch_party_api::{configure as configure_party_routes, PartyApiDoc};
-use cinematch_user_api::{configure as configure_user_routes, UserApiDoc};
-use crate::websocket::{WebsocketApiDoc, websocket_controller};
 
 // use cinematch_recommendation_engine::configure_recommendation_routes;
 
@@ -31,18 +35,20 @@ async fn main() -> std::io::Result<()> {
     dotenvy::dotenv().ok();
     env_logger::init();
 
-    let db_loc = std::env::var("DATABASE_URL").unwrap_or_else(|_| "postgres://user:password@localhost/cinematch".to_string());
+    let db_loc = std::env::var("DATABASE_URL")
+        .unwrap_or_else(|_| "postgres://user:password@localhost/cinematch".to_string());
     log::info!("Connecting to database at {}", db_loc);
 
     let db_pool = Database::new(&db_loc).expect("Failed to initialize database");
 
-    let redis_loc = std::env::var("REDIS_URL").unwrap_or_else(|_| "redis://127.0.0.1:6379".to_string());
-    log::info!("Connecting to redis at {}", redis_loc); 
+    let redis_loc =
+        std::env::var("REDIS_URL").unwrap_or_else(|_| "redis://127.0.0.1:6379".to_string());
+    log::info!("Connecting to redis at {}", redis_loc);
     let cfg = deadpool_redis::Config::from_url(redis_loc.clone());
-    let pool = cfg.create_pool(Some(deadpool_redis::Runtime::Tokio1)).unwrap_or_else(|_| panic!("Failed to create Redis pool using {}", redis_loc));
-    let redis_store = RedisSessionStore::new_pooled(pool)
-        .await
-        .unwrap();
+    let pool = cfg
+        .create_pool(Some(deadpool_redis::Runtime::Tokio1))
+        .unwrap_or_else(|_| panic!("Failed to create Redis pool using {}", redis_loc));
+    let redis_store = RedisSessionStore::new_pooled(pool).await.unwrap();
 
     // Run database migrations
     if let Err(e) = db_pool.run_migrations(&db_loc).await {
@@ -67,19 +73,18 @@ async fn main() -> std::io::Result<()> {
 
     log::info!("Starting server bind on [{}]:{}", host, port);
 
-    // try read from env, else random 
+    // try read from env, else random
     // TODO! we shouldnt use as bytes since this can crash if entropy (byte count is too low)
-    let secret_key = match std::env::var("JWT_SECRET_KEY") {
+    let secret_key = match std::env::var("SECRET_TOKEN") {
         Ok(key_str) => {
             log::info!("Using JWT secret key from environment variable");
             Key::from(key_str.as_bytes())
-        },
-        Err(_) => { 
-            log::warn!("JWT_SECRET_KEY not set, generating random key for debug build");
+        }
+        Err(_) => {
+            log::warn!("SECRET_TOKEN not set, generating random key for debug build");
             Key::generate()
         }
     };
-
 
     let deadline_expiration = Duration::from_secs(24 * 60 * 60); // last visit this long ago will be logged out
     let last_login_duration = Duration::from_secs(30 * 24 * 60 * 60); // last login this long ago will be logged out
@@ -87,7 +92,6 @@ async fn main() -> std::io::Result<()> {
     let rooms = Broadcaster::new();
     let rooms_data = web::Data::new(rooms);
 
-    // Start the server with single IPv4 binding
     let server = HttpServer::new(move || {
         let identity_mw = IdentityMiddleware::builder()
             .visit_deadline(Some(deadline_expiration))
@@ -95,46 +99,58 @@ async fn main() -> std::io::Result<()> {
             .build();
 
         App::new()
-            .wrap(identity_mw)
-            .wrap(SessionMiddleware::new(
-                 redis_store.clone(),
-                 secret_key.clone(),
-            ))
-            .wrap(Logger::default())
-            .wrap(
-                Cors::default()
-                    .allowed_origin("http://localhost:3000") // Your frontend URL (e.g., React/Vite dev server)
-                    .allowed_methods(vec!["GET", "POST", "PUT", "DELETE", "PATCH"])
-                    .allowed_headers(vec![
-                        http::header::AUTHORIZATION,
-                        http::header::ACCEPT,
-                        http::header::CONTENT_TYPE,
-                        http::header::COOKIE,
-                    ])
-                    .max_age(3600),
-            )
-
+            .into_utoipa_app()
+            .openapi(ApiDoc::openapi())
+            .map(|app| app.wrap(identity_mw))
+            .map(|app| {
+                app.wrap(SessionMiddleware::new(
+                    redis_store.clone(),
+                    secret_key.clone(),
+                ))
+            })
+            .map(|app| {
+                app.wrap(
+                    Cors::default()
+                        .allowed_origin("http://localhost:3000") // Your frontend URL (e.g., React/Vite dev server)
+                        .allowed_methods(vec!["GET", "POST", "PUT", "DELETE", "PATCH"])
+                        .allowed_headers(vec![
+                            http::header::AUTHORIZATION,
+                            http::header::ACCEPT,
+                            http::header::CONTENT_TYPE,
+                            http::header::COOKIE,
+                        ])
+                        .max_age(3600),
+                )
+            })
+            .map(|app| app.wrap(Logger::default()))
             .app_data(data.clone())
             .app_data(rooms_data.clone())
-            .configure(configure_party_routes).configure(configure_user_routes)
-            .route("/api/ws", web::get().to(websocket_controller))
-            // .configure(configure_recommendation_engine)
-            .service(SwaggerUi::new("/swagger-ui/{_:.*}").urls(vec![
-                (
-                    Url::new("api/party", "/api-docs/party.json"),
-                    PartyApiDoc::openapi(),
-                ),
-                (
-                    Url::new("api/users", "/api-docs/users.json"),
-                    UserApiDoc::openapi(),
-                ),
-                (
-                    Url::new("api/ws", "/api-docs/ws.json"),
-                    WebsocketApiDoc::openapi(),
-                ),
-            ]))
+            // /api/user, /api/party, /api/ws, etc
+            .service(
+                utoipa_actix_web::scope("/api/user")
+                    .configure(cinematch_api::routes::configure_user()),
+            )
+            .service(
+                utoipa_actix_web::scope("/api/party")
+                    .configure(cinematch_api::routes::configure_party()),
+            )
+            .service(
+                utoipa_actix_web::scope("/api/ws")
+                    .configure(cinematch_api::routes::configure_websocket()),
+            )
+            .openapi_service(|api| Redoc::with_url("/redoc", api))
+            .openapi_service(|api| {
+                SwaggerUi::new("/swagger-ui/{_:.*}").url("/api-docs/openapi.json", api)
+            })
+            // There is no need to create RapiDoc::with_openapi because the OpenApi is served
+            // via SwaggerUi. Instead we only make rapidoc to point to the existing doc.
+            //
+            // If we wanted to serve the schema, the following would work:
+            // .openapi_service(|api| RapiDoc::with_openapi("/api-docs/openapi2.json", api).path("/rapidoc"))
+            .map(|app| app.service(RapiDoc::new("/api-docs/openapi.json").path("/rapidoc")))
+            .openapi_service(|api| Scalar::with_url("/scalar", api))
+            .into_app()
     });
 
     server.bind((host, port))?.run().await
 }
-

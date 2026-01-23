@@ -19,13 +19,13 @@ impl ErrorResponse {
 macro_rules! extract_user_id {
     ($identity:expr) => {{
         use ::actix_web::HttpResponse;
-        use ::uuid::Uuid;
         use ::log::{error, trace};
         use ::std::convert::Into;
-        
+        use ::uuid::Uuid;
+
         // Convert to Option<&Identity> to handle both cases
         let identity_opt: Option<::actix_identity::Identity> = $identity.into();
-        
+
         match identity_opt {
             Some(identity) => match identity.id() {
                 Ok(id_str) => match Uuid::parse_str(&id_str) {

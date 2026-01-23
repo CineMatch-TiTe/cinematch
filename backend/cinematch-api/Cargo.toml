@@ -1,5 +1,5 @@
 [package]
-name = "cinematch-user-api"
+name = "cinematch-api"
 version = "0.1.0"
 edition = "2024"
 
@@ -13,8 +13,7 @@ futures = "0.3"
 uuid = { version = "1.6", features = ["v4", "v7", "serde"] }
 chrono = { version = "0.4", features = ["serde"] }
 
-utoipa = { version = "5.4", features = ["chrono", "uuid"] }
-utoipa-swagger-ui = "9.0.2"
+utoipa = { version = "5.4", features = ["chrono", "uuid", "actix_extras"] }
 utoipa-actix-web = "0.1.2"
 
 actix-identity = "0.9.0"
@@ -22,6 +21,9 @@ actix-session = { version = "0.11", features = ["redis-pool", "redis-session-rus
 
 rand = "0.9"
 ulid = { version = "1.1", features = ["serde"] }
+
+actix-ws-broadcaster = "0.12.0"
+actix-ws = "0.3.1"
 
 cinematch-db = { path = "../cinematch-db" }
 cinematch-common = { path = "../cinematch-common" }

@@ -2,9 +2,9 @@
 //!
 //! This crate provides async database models and connection utilities for the CineMatch application.
 
-use diesel_async::pooled_connection::deadpool::Pool;
-use diesel_async::pooled_connection::AsyncDieselConnectionManager;
 use diesel_async::AsyncPgConnection;
+use diesel_async::pooled_connection::AsyncDieselConnectionManager;
+use diesel_async::pooled_connection::deadpool::Pool;
 use thiserror::Error;
 use uuid::Uuid;
 
@@ -15,15 +15,15 @@ mod external_account;
 mod party;
 mod user;
 
-pub use models::*;
-use diesel::PgConnection;
 use diesel::Connection;
+use diesel::PgConnection;
+pub use models::*;
 
 // ============================================================================
 // Error Types
 // ============================================================================
 
-use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
+use diesel_migrations::{EmbeddedMigrations, MigrationHarness, embed_migrations};
 pub const MIGRATIONS: EmbeddedMigrations = embed_migrations!("../cinematch-db/migrations");
 
 use std::error::Error;
@@ -86,9 +86,12 @@ impl Database {
         self.pool.get().await.map_err(DbError::from)
     }
 
-    pub async fn run_migrations(&self, database_url: &str) -> Result<(), Box<dyn Error + Send + Sync + 'static>> {
+    pub async fn run_migrations(
+        &self,
+        database_url: &str,
+    ) -> Result<(), Box<dyn Error + Send + Sync + 'static>> {
         let mut conn = PgConnection::establish(database_url)
-        .unwrap_or_else(|_| panic!("Error connecting to {}", database_url));
+            .unwrap_or_else(|_| panic!("Error connecting to {}", database_url));
 
         conn.run_pending_migrations(MIGRATIONS)?;
 

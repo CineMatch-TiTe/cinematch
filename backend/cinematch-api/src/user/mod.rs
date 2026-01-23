@@ -1,4 +1,5 @@
-//! API request/response models with utoipa OpenAPI documentation
+pub use self::handlers::*;
+pub mod handlers;
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};

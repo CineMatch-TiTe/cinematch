@@ -1,26 +1,24 @@
 //! User API route handlers for Actix-web
 //!
 //! These handlers implement the user management endpoints.
-//! 
-
-
+//!
 
 use actix_identity::Identity;
-use actix_web::{web, HttpResponse};
-use actix_web::HttpRequest;
 use actix_web::HttpMessage;
+use actix_web::HttpRequest;
+use actix_web::{HttpResponse, get, patch, post, web};
 use log::{debug, trace};
 use uuid::Uuid;
 
 use log::error;
 
-use crate::models::*;
+use super::{CurrentUserResponse, RenameUserRequest};
+
+use crate::AppState;
+
 use cinematch_db::{Database, DbError};
 
-use cinematch_common::{extract_user_id, ErrorResponse};
-
-/// Application state wrapper providing database access
-pub type AppState = web::Data<Database>;
+use cinematch_common::{ErrorResponse, extract_user_id};
 
 // ============================================================================
 // User Management Endpoints
@@ -37,23 +35,27 @@ pub type AppState = web::Data<Database>;
 ///
 /// **Auth**: No authentication required.
 #[utoipa::path(
-    post,
-    path = "/api/user/login/guest",
     responses(
         (status = 201, description = "Guest user created successfully"),
         (status = 409, description = "Already logged in", body = ErrorResponse),
         (status = 500, description = "Internal server error", body = ErrorResponse)
     ),
-    tags = ["auth"],
+
+    tags = ["user"],
     operation_id = "login_guest"
 )]
+#[post("/login/guest")]
 
-pub async fn login_guest(db: AppState, request: HttpRequest, user: Option<Identity>) -> HttpResponse {
+pub async fn login_guest(
+    db: AppState,
+    request: HttpRequest,
+    user: Option<Identity>,
+) -> HttpResponse {
     if let Some(existing_user) = user {
         trace!("User already logged in with ID: {:?}", existing_user.id());
         return HttpResponse::Conflict().json(ErrorResponse::new("User already logged in"));
     }
-    
+
     // Generate a random username for guest user, this can also be empty
     let random_suffix = Uuid::new_v4()
         .to_string()
@@ -64,19 +66,17 @@ pub async fn login_guest(db: AppState, request: HttpRequest, user: Option<Identi
 
     debug!("Creating guest user with username: {}", username);
     match db.create_guest_user(&username).await {
-        Ok(user) => {
-            match Identity::login(&request.extensions(), user.id.to_string()) {
-                Ok(_) => {
-                    trace!("User identity set in session for user_id={}", user.id);
-                    HttpResponse::Created().finish()
-                }
-                Err(e) => {
-                    error!("Failed to set user identity in session: {}", e);
-                    HttpResponse::InternalServerError().json(ErrorResponse::new("Failed to set user identity in session"))
-                }
+        Ok(user) => match Identity::login(&request.extensions(), user.id.to_string()) {
+            Ok(_) => {
+                trace!("User identity set in session for user_id={}", user.id);
+                HttpResponse::Created().finish()
             }
-
-        }
+            Err(e) => {
+                error!("Failed to set user identity in session: {}", e);
+                HttpResponse::InternalServerError()
+                    .json(ErrorResponse::new("Failed to set user identity in session"))
+            }
+        },
         Err(e) => {
             log::error!("Failed to create guest user: {}", e);
             HttpResponse::InternalServerError().json(ErrorResponse::new(format!(
@@ -94,8 +94,6 @@ pub async fn login_guest(db: AppState, request: HttpRequest, user: Option<Identi
 /// **Auth Required**: User can only rename their own account (user_id must match JWT token).
 ///
 #[utoipa::path(
-    patch,
-    path = "/api/user/rename/{user_id}",
     request_body = RenameUserRequest,
     responses(
         (status = 200, description = "User renamed successfully"),
@@ -111,6 +109,7 @@ pub async fn login_guest(db: AppState, request: HttpRequest, user: Option<Identi
     tags = ["user"],
     operation_id = "rename_user"
 )]
+#[patch("/rename/{user_id}")]
 pub async fn rename_user(
     db: AppState,
     user_id: web::Path<Uuid>,
@@ -123,7 +122,10 @@ pub async fn rename_user(
     let claims = extract_user_id!(user);
 
     if claims != user_id {
-        trace!("Unauthorized rename attempt: claims.user_id={} != target_user_id={}", claims, user_id);
+        trace!(
+            "Unauthorized rename attempt: claims.user_id={} != target_user_id={}",
+            claims, user_id
+        );
         return HttpResponse::Forbidden().finish();
     }
 
@@ -135,7 +137,10 @@ pub async fn rename_user(
         ));
     }
 
-    debug!("Auth passed - renaming user {} to '{}'", user_id, new_username);
+    debug!(
+        "Auth passed - renaming user {} to '{}'",
+        user_id, new_username
+    );
 
     let update = cinematch_db::UpdateUser {
         username: Some(new_username),
@@ -143,18 +148,12 @@ pub async fn rename_user(
     };
 
     match db.update_user(user_id, update).await {
-        Ok(_) => {
-            HttpResponse::Ok().finish()
-        }
-        Err(DbError::UserNotFound(_)) => {
-            HttpResponse::NotFound().finish()
-        }
+        Ok(_) => HttpResponse::Ok().finish(),
+        Err(DbError::UserNotFound(_)) => HttpResponse::NotFound().finish(),
         Err(e) => {
             log::error!("Failed to rename user: {}", e);
-            HttpResponse::InternalServerError().json(ErrorResponse::new(format!(
-                "Failed to rename user: {}",
-                e
-            )))
+            HttpResponse::InternalServerError()
+                .json(ErrorResponse::new(format!("Failed to rename user: {}", e)))
         }
     }
 }
@@ -165,8 +164,6 @@ pub async fn rename_user(
 ///
 /// **Auth Required**: User must be authenticated with a valid JWT token.
 #[utoipa::path(
-    get,
-    path = "/api/user",
     responses(
         (status = 200, description = "User info retrieved successfully", body = CurrentUserResponse),
         (status = 401, description = "Unauthorized - authentication required", body = ErrorResponse),
@@ -177,10 +174,8 @@ pub async fn rename_user(
     security(("bearer_auth" = [])),
     operation_id = "get_current_user"
 )]
-pub async fn get_current_user(
-    user: Identity,
-    db: AppState,
-) -> HttpResponse {
+#[get("")]
+pub async fn get_current_user(user: Identity, db: AppState) -> HttpResponse {
     let user_id = extract_user_id!(user);
 
     match db.get_user(user_id).await {
@@ -207,10 +202,8 @@ pub async fn get_current_user(
         }
         Err(e) => {
             log::error!("Failed to get user: {}", e);
-            HttpResponse::InternalServerError().json(ErrorResponse::new(format!(
-                "Failed to get user: {}",
-                e
-            )))
+            HttpResponse::InternalServerError()
+                .json(ErrorResponse::new(format!("Failed to get user: {}", e)))
         }
     }
 }
@@ -222,16 +215,15 @@ pub async fn get_current_user(
 ///
 /// **Auth**: No authentication required (any user can logout).
 #[utoipa::path(
-    post,
-    path = "/api/user/logout",
     responses(
         (status = 200, description = "Successfully logged out"),
         (status = 204, description = "No user was logged in"),
         (status = 500, description = "Internal server error", body = ErrorResponse)
     ),
-    tags = ["auth"],
+    tags = ["user"],
     operation_id = "logout_user"
 )]
+#[post("/logout")]
 pub async fn logout_user(user: Option<Identity>) -> HttpResponse {
     if let Some(user) = user {
         user.logout();
@@ -239,5 +231,4 @@ pub async fn logout_user(user: Option<Identity>) -> HttpResponse {
     } else {
         HttpResponse::NoContent().finish()
     }
-    
 }

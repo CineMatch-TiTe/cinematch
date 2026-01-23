@@ -1,4 +1,3 @@
-
 use utoipa::ToSchema;
 use uuid::Uuid;
 
@@ -15,9 +14,8 @@ pub enum ServerMessage {
     UpdateReadyState(ReadyStateUpdate),
     PartyDisbanded,
 
-    // Voting phase 
+    // Voting phase
     MovieVoteUpdate(MovieVoteUpdate),
-
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize, ToSchema)]
@@ -56,5 +54,5 @@ pub enum ClientMessage {
 #[derive(Debug, serde::Serialize, serde::Deserialize, ToSchema)]
 pub struct VoteMovie {
     pub movie_id: String, //we're using tmdb ids
-    pub vote: bool, // true = like, false = dislike
+    pub vote: bool,       // true = like, false = dislike
 }

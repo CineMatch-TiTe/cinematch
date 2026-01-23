@@ -6,8 +6,8 @@ use uuid::Uuid;
 
 use crate::models::{NewUser, UpdateUser, User};
 use crate::schema::parties;
-use crate::{Party, schema};
 use crate::{Database, DbError, DbResult};
+use crate::{Party, schema};
 
 impl Database {
     /// Create a new oneshot (temporary) user
@@ -67,8 +67,8 @@ impl Database {
 
     /// Get a users party which they are in (this can only return one ongoing party)
     pub async fn get_user_active_party(&self, user_id: Uuid) -> DbResult<Uuid> {
-        use schema::party_members::dsl as pm;
         use schema::parties::dsl as p;
+        use schema::party_members::dsl as pm;
 
         let mut conn = self.conn().await?;
         pm::party_members
@@ -79,9 +79,7 @@ impl Database {
             .await
             .optional()?
             .ok_or(DbError::UserNotInParty(user_id))
-
     }
-
 
     /// Update a user
     pub async fn update_user(&self, user_id: Uuid, update: UpdateUser<'_>) -> DbResult<User> {

@@ -1,8 +1,0 @@
-[package]
-name = "cinematch-websockets"
-version = "0.1.0"
-edition = "2024"
-
-[dependencies]
-actix-ws-broadcaster = "0.12.0"
-actix-ws = "0.3.1"

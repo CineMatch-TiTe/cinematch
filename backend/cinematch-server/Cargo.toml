@@ -15,9 +15,14 @@ log = "0.4"
 dotenvy = "0.15"
 futures = "0.3"
 
-utoipa = { version = "5.4", features = ["chrono", "uuid"] }
+utoipa = { version = "5.4", features = ["chrono", "uuid", "actix_extras"] }
 utoipa-swagger-ui = { version = "9.0.2", features = ["actix-web"] }
 utoipa-actix-web = "0.1.2"
+
+utoipa-rapidoc = { version = "6.0.0", features = ["actix-web"] }
+utoipa-redoc = { version = "6.0.0", features = ["actix-web"] }
+utoipa-scalar = { version = "0.3.0", features = ["actix-web"] }
+
 
 uuid = { version = "1.6", features = ["v4", "serde"] }
 rand = "0.9"
@@ -33,8 +38,7 @@ actix-ws = "0.3.1"
 
 # Local crates
 cinematch-db = { path = "../cinematch-db" }
-cinematch-party-api = { path = "../cinematch-party-api" }
-cinematch-user-api = { path = "../cinematch-user-api" }
+cinematch-api = { path = "../cinematch-api" }
 cinematch-recommendation-engine = { path = "../cinematch-recommendation-engine" }
 cinematch-common = { path = "../cinematch-common" }
 
