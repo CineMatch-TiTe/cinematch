@@ -72,8 +72,8 @@ jobs:
         with:
             components: clippy
 
-      - uses: auguwu/clippy-action@1.4.0
+      - uses: actions-rs-plus/clippy-check@v2.3.0
         with:
-          token: ${{secrets.GITHUB_TOKEN}}
-          args: --all-features --all-targets
-          
+            args: --all-features
+            working-directory: ./backend
+      

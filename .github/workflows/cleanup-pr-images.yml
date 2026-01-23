@@ -1,7 +1,5 @@
 name: Cleanup PR Images
 
-description: Remove Docker images for closed or merged PRs from GHCR.
-
 on:
   pull_request:
     types: [closed]
