@@ -55,7 +55,7 @@ pub async fn send_message_to_party(
     broadcaster: &Arc<RwLock<Broadcaster>>,
     room_id: String,
     message: &ServerMessage,
-    ignore_users: Option<&Vec<Uuid>>,
+    ignore_users: Option<&[Uuid]>,
 ) {
     let msg_text = match serde_json::to_string(message) {
         Ok(text) => text,

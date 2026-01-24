@@ -12,7 +12,7 @@ use utoipa::ToSchema;
 use uuid::Uuid;
 
 // Re-export types that are used in responses
-pub use super::VoteStore;
+pub use super::VoteState;
 pub use crate::AppState;
 pub use cinematch_common::ErrorResponse;
 pub use cinematch_common::extract_user_id;
@@ -145,6 +145,16 @@ pub struct SetReadyRequest {
 pub struct ReadyStateResponse {
     /// Whether all members are now ready
     pub all_ready: bool,
+}
+
+// ============================================================================
+// Vote Models
+// ============================================================================
+
+/// Request to set ready state
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+pub struct VoteMovieRequest {
+    pub like: bool,
 }
 
 // ============================================================================

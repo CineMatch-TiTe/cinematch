@@ -7,13 +7,13 @@ mod websocket;
 
 pub mod routes;
 
-use cinematch_common::vote_store;
-
+use actix_wsb::Broadcaster;
+use cinematch_common::vote_store::VoteStore;
 // Re-export the database type for convenience
 pub use cinematch_db::Database;
 pub type AppState = web::Data<Database>;
-pub type VoteStore = web::Data<vote_store::VoteStore>;
-
+pub type VoteState = web::Data<VoteStore>;
+pub type RoomsState = web::Data<std::sync::Arc<std::sync::RwLock<Broadcaster>>>;
 #[derive(OpenApi)]
 #[openapi(
     tags(

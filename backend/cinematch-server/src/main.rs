@@ -40,7 +40,11 @@ async fn main() -> std::io::Result<()> {
         .unwrap_or_else(|_| "postgres://user:password@localhost/cinematch".to_string());
     log::info!("Connecting to database at {}", db_loc);
 
-    let db_pool = Database::new(&db_loc).expect("Failed to initialize database");
+    let vector_loc =
+        std::env::var("QDRANT_URL").unwrap_or_else(|_| "http://localhost:6333".to_string());
+    log::info!("Connecting to Qdrant at {}", vector_loc);
+
+    let db_pool = Database::new(&db_loc, &vector_loc).expect("Failed to initialize databases");
 
     let redis_loc =
         std::env::var("REDIS_URL").unwrap_or_else(|_| "redis://127.0.0.1:6379".to_string());

@@ -15,11 +15,11 @@ pub enum ServerMessage {
     PartyDisbanded,
 
     // Voting phase
-    MovieVoteUpdate(MovieVoteUpdate),
+    MovieVoteUpdate(MovieVotes),
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize, ToSchema)]
-pub struct MovieVoteUpdate {
+pub struct MovieVotes {
     pub movie_id: String,
     pub likes: u32,
     pub dislikes: u32,

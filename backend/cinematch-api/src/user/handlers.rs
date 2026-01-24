@@ -12,7 +12,7 @@ use uuid::Uuid;
 
 use log::error;
 
-use super::{CurrentUserResponse, RenameUserRequest};
+use super::{CurrentUserResponse, GuestUserRequest, RenameUserRequest, GuestLoginResponse};
 
 use crate::AppState;
 
@@ -35,8 +35,10 @@ use cinematch_common::{ErrorResponse, extract_user_id};
 ///
 /// **Auth**: No authentication required.
 #[utoipa::path(
+    request_body = GuestUserRequest,
     responses(
-        (status = 201, description = "Guest user created successfully"),
+        (status = 201, description = "Guest user created successfully", body = GuestLoginResponse),
+        (status = 400, description = "Invalid username", body = ErrorResponse),
         (status = 409, description = "Already logged in", body = ErrorResponse),
         (status = 500, description = "Internal server error", body = ErrorResponse)
     ),
@@ -49,6 +51,7 @@ use cinematch_common::{ErrorResponse, extract_user_id};
 pub async fn login_guest(
     db: AppState,
     request: HttpRequest,
+    username: web::Json<GuestUserRequest>,
     user: Option<Identity>,
 ) -> HttpResponse {
     if let Some(existing_user) = user {
@@ -56,20 +59,28 @@ pub async fn login_guest(
         return HttpResponse::Conflict().json(ErrorResponse::new("User already logged in"));
     }
 
-    // Generate a random username for guest user, this can also be empty
-    let random_suffix = Uuid::new_v4()
-        .to_string()
-        .chars()
-        .take(8)
-        .collect::<String>();
-    let username = format!("guest_{}", random_suffix);
-
+    let username = match &username.username {
+        Some(name) => {
+            let name = cinematch_common::extract_and_validate_username!(name); // early return on invalid
+            name
+        }
+        None => {
+            // Generate a random username for guest user, this can also be empty
+            let random_suffix = Uuid::new_v4()
+                .to_string()
+                .chars()
+                .take(8)
+                .collect::<String>();
+            let username = format!("guest_{}", random_suffix);
+            username
+        }
+    };
     debug!("Creating guest user with username: {}", username);
     match db.create_guest_user(&username).await {
         Ok(user) => match Identity::login(&request.extensions(), user.id.to_string()) {
             Ok(_) => {
                 trace!("User identity set in session for user_id={}", user.id);
-                HttpResponse::Created().finish()
+                HttpResponse::Created().json(GuestLoginResponse { user_id: user.id, username: user.username})
             }
             Err(e) => {
                 error!("Failed to set user identity in session: {}", e);
@@ -117,7 +128,6 @@ pub async fn rename_user(
     user: Identity,
 ) -> HttpResponse {
     let user_id = user_id.into_inner();
-    let new_username = body.new_username.trim();
 
     let claims = extract_user_id!(user);
 
@@ -130,20 +140,10 @@ pub async fn rename_user(
     }
 
     // Validate username length
-    if new_username.len() < 3 || new_username.len() > 32 {
-        trace!("Invalid username length: {}", new_username.len());
-        return HttpResponse::BadRequest().json(ErrorResponse::new(
-            "Username must be between 3 and 32 characters",
-        ));
-    }
-
-    debug!(
-        "Auth passed - renaming user {} to '{}'",
-        user_id, new_username
-    );
+    let new_username = cinematch_common::extract_and_validate_username!(&body.new_username);
 
     let update = cinematch_db::UpdateUser {
-        username: Some(new_username),
+        username: Some(&new_username),
         oneshot: None,
     };
 
