@@ -16,19 +16,19 @@ export default function HomeRoute() {
       <main className="relative z-10 w-full max-w-md px-6">
         <div className="mb-8 text-center">
           <h1 className="text-4xl font-bold tracking-tighter text-white mb-2">CineMatch</h1>
-          <p className="text-zinc-400">Liity mukaan partyyn ja arvaa mitä haluat nähdä!</p>
+          <p className="text-zinc-400">Join to party and guess what you want to watch!</p>
         </div>
 
         <Card className="border-zinc-800 bg-zinc-900/50 backdrop-blur-xl shadow-2xl">
           <CardHeader>
-            <CardTitle className="text-lg font-medium text-zinc-200">Liity partyyn</CardTitle>
+            <CardTitle className="text-lg font-medium text-zinc-200">Join to party</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-4">
               <div className="relative">
                 <User className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-zinc-500" />
                 <Input
-                  placeholder="Nimesi"
+                  placeholder="Your name"
                   className="pl-10 bg-zinc-950/50 border-zinc-700 text-zinc-100 placeholder:text-zinc-500 focus-visible:ring-red-600 focus-visible:border-red-600"
                 />
               </div>
@@ -36,14 +36,14 @@ export default function HomeRoute() {
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-zinc-500" />
                 <Input
-                  placeholder="Liittymiskoodi"
+                  placeholder="Join code"
                   className="pl-10 bg-zinc-950/50 border-zinc-700 text-zinc-100 placeholder:text-zinc-500 focus-visible:ring-red-600 focus-visible:border-red-600"
                 />
               </div>
             </div>
 
             <Button className="w-full bg-red-900 hover:bg-red-800 text-white font-semibold py-6 text-lg shadow-[0_0_15px_rgba(153,27,27,0.5)] transition-all hover:shadow-[0_0_25px_rgba(153,27,27,0.6)]">
-              Kirjaudu vierailijana
+              Join as guest
             </Button>
 
             <div className="pt-2 text-center">
@@ -51,7 +51,7 @@ export default function HomeRoute() {
                 href="/create-party"
                 className="text-sm text-yellow-500 hover:text-yellow-400 transition-colors hover:underline"
               >
-                Haluatko hostata uuden partyn?
+                Want to host a new party?
               </Link>
             </div>
           </CardContent>
