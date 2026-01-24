@@ -4,7 +4,7 @@ import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { User, Lock } from 'lucide-react'
 
-export default function Home() {
+export default function HomeRoute() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-zinc-950 font-sans text-zinc-100 selection:bg-red-500/30">
       {/* Background ambience - mimics the cinematic feel */}
