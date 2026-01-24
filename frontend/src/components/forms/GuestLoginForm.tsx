@@ -3,6 +3,7 @@
 import { useActionState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 import { User, Lock, Loader2 } from 'lucide-react'
 import { guestLoginAction } from '@/app/actions'
 
@@ -16,6 +17,14 @@ export function GuestLoginForm({ initialJoinCode }: Readonly<{ initialJoinCode?:
 
   return (
     <form action={formAction} className="space-y-4">
+      {state?.message && state.message !== 'Validation failed' && (
+        <Alert
+          variant="destructive"
+          className="bg-red-500/10 border-red-500/50 text-red-200 [&>svg]:text-red-200"
+        >
+          <AlertDescription className="text-red-200/90">{state.message}</AlertDescription>
+        </Alert>
+      )}
       <div className="space-y-4">
         <div className="space-y-1">
           <div className="relative">

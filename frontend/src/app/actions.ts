@@ -4,6 +4,7 @@ import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { z } from 'zod'
 import { loginGuest } from '@/server/user/user'
+import { joinParty } from '@/server/party/party'
 
 const usernameSchema = z
   .string()
@@ -64,12 +65,26 @@ export async function guestLoginAction(prevState: unknown, formData: FormData) {
         const [cookiePart] = setCookieHeader.split(';')
         const [name, value] = cookiePart.split('=')
         if (name && value) {
-          const cookieStore = await cookies()
-          cookieStore.set(name.trim(), value.trim(), {
-            httpOnly: true, // Should match what backend sent, but let's be safe
-            sameSite: 'lax',
-            path: '/'
+          // Attempt to join the party using the new session cookie
+          const cookieString = `${name.trim()}=${value.trim()}`
+          const joinResponse = await joinParty(result.data.joinCode, {
+            headers: {
+              Cookie: cookieString
+            }
           })
+
+          if (joinResponse.status === 200) {
+            const cookieStore = await cookies()
+            cookieStore.set(name.trim(), value.trim(), {
+              httpOnly: true, // Should match what backend sent, but let's be safe
+              sameSite: 'lax',
+              path: '/'
+            })
+          } else {
+            return {
+              message: 'Login successful, but failed to join party. Please check the code.'
+            }
+          }
         }
       }
     } else {
