@@ -9,10 +9,12 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@faker-js/faker": "^10.2.0",
     "@radix-ui/react-slot": "^1.2.4",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "lucide-react": "^0.562.0",
+    "msw": "^2.12.7",
     "next": "16.1.2",
     "react": "19.2.3",
     "react-dom": "19.2.3",
