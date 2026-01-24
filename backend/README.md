@@ -15,9 +15,10 @@ investigate is it worth having each api in their own crate or should we combine 
 
 also move common logic to common like the username validation and constants
 
-figure out how to auto migrate diesel in prod (eg fresh install should apply all migrations and updates should apply migrations correctly)
-
 add healthcheck to docker
+
+
+party code generation is not ideal, perhaps investigate some time based 
 
 
 Recommendation engine code is still very wip,

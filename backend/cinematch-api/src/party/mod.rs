@@ -1,31 +1,24 @@
-//! API request/response models with utoipa OpenAPI documentation
+pub mod crud;
+pub mod leader_ops;
+pub mod user_ops;
+
+pub use self::crud::*;
+pub use self::leader_ops::*;
+pub use self::user_ops::*;
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
 
-// Re-export db types that are used in responses
+// Re-export types that are used in responses
+pub use super::VoteStore;
+pub use crate::AppState;
+pub use cinematch_common::ErrorResponse;
+pub use cinematch_common::extract_user_id;
+pub use cinematch_db::DbError;
+pub use cinematch_db::PartyCode;
 pub use cinematch_db::PartyState;
-
-// ============================================================================
-// Error Response
-// ============================================================================
-
-/// Standard error response
-#[derive(Debug, Serialize, Deserialize, ToSchema)]
-pub struct ErrorResponse {
-    pub error: String,
-}
-
-impl ErrorResponse {
-    pub fn new(error: impl Into<String>) -> Self {
-        Self {
-            error: error.into(),
-        }
-    }
-}
-
 // ============================================================================
 // Party Responses
 // ============================================================================
@@ -140,6 +133,12 @@ pub struct TransferLeadershipRequest {
 // ============================================================================
 // Ready State Models
 // ============================================================================
+
+/// Request to set ready state
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+pub struct SetReadyRequest {
+    pub is_ready: bool,
+}
 
 /// Response after toggling ready state
 #[derive(Debug, Serialize, Deserialize, ToSchema)]

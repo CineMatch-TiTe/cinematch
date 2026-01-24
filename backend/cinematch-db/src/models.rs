@@ -8,14 +8,24 @@ use crate::schema::{external_accounts, parties, party_codes, party_members, user
 // Enums (mapped to PostgreSQL ENUMs)
 // ============================================================================
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, diesel_derive_enum::DbEnum)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    diesel_derive_enum::DbEnum,
+    serde::Serialize,
+    serde::Deserialize,
+    utoipa::ToSchema,
+)]
 #[ExistingTypePath = "crate::schema::sql_types::PartyState"]
 pub enum PartyState {
-    Created, // Initial state, people can join and start picking
+    Created,   // Initial state, people can join and start picking
     Picking, // people can pick movies (taste), people cant join anymore (code is freed, and party is identified by uuid)
     Voting, // people can vote on picked movies, until a movie is decided, we can go to picking or watching from here
     Watching, // movie is being watched, people can start review after 15 minutes, and can update their review
-    Review, // 90% of runtime passed start showin results, leader can also skip
+    Review,   // 90% of runtime passed start showin results, leader can also skip
     Disbanded, // dead party, keep for history
 }
 

@@ -5,6 +5,7 @@ edition = "2024"
 
 [dependencies]
 actix-web = "4"
+actix-cors = "0.7"
 
 tokio = { version = "1", features = ["full"] }
 serde = { version = "1.0", features = ["derive"] }
@@ -14,23 +15,32 @@ log = "0.4"
 dotenvy = "0.15"
 futures = "0.3"
 
-utoipa = { version = "5.4", features = ["chrono", "uuid"] }
+utoipa = { version = "5.4", features = ["chrono", "uuid", "actix_extras"] }
 utoipa-swagger-ui = { version = "9.0.2", features = ["actix-web"] }
 utoipa-actix-web = "0.1.2"
+
+utoipa-rapidoc = { version = "6.0.0", features = ["actix-web"] }
+utoipa-redoc = { version = "6.0.0", features = ["actix-web"] }
+utoipa-scalar = { version = "0.3.0", features = ["actix-web"] }
+
 
 uuid = { version = "1.6", features = ["v4", "serde"] }
 rand = "0.9"
 chrono = { version = "0.4", features = ["serde"] }
-redis = { version = "1", features = ["tokio-comp", "connection-manager"] }
 
-actix-jwt-auth-middleware = "0.5.0"
-ed25519-compact = "2.2.0"
-jwt-compact = { version = "0.8.0", features = ["ed25519-compact"] }
+deadpool-redis = "0.22.1"
+
+actix-identity = "0.9.0"
+actix-session = { version = "0.11", features = ["redis-pool", "redis-session-rustls"] }
+
+actix-ws-broadcaster = "0.12.0"
+actix-ws = "0.3.1"
 
 # Local crates
 cinematch-db = { path = "../cinematch-db" }
-cinematch-party-api = { path = "../cinematch-party-api" }
-cinematch-user-api = { path = "../cinematch-user-api" }
+cinematch-api = { path = "../cinematch-api" }
 cinematch-recommendation-engine = { path = "../cinematch-recommendation-engine" }
 cinematch-common = { path = "../cinematch-common" }
+
+
 
