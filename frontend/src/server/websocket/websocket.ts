@@ -8,6 +8,7 @@ import type {
   ErrorResponse
 } from '../../model';
 
+import customInstance from '../../lib/orval-client';
 
 export type websocketControllerResponse200 = {
   data: void
@@ -53,19 +54,13 @@ export const getWebsocketControllerUrl = () => {
 
 export const websocketController = async ( options?: RequestInit): Promise<websocketControllerResponse> => {
   
-  const res = await fetch(getWebsocketControllerUrl(),
+  return customInstance<websocketControllerResponse>(getWebsocketControllerUrl(),
   {      
     ...options,
     method: 'GET'
     
     
   }
-)
-
-  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
-  
-  const data: websocketControllerResponse['data'] = body ? JSON.parse(body) : {}
-  return { data, status: res.status, headers: res.headers } as websocketControllerResponse
-}
+);}
 
 

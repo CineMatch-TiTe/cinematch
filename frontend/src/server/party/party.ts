@@ -16,6 +16,7 @@ import type {
   TransferLeadershipRequest
 } from '../../model';
 
+import customInstance from '../../lib/orval-client';
 
 export type createPartyResponse201 = {
   data: CreatePartyResponse
@@ -56,20 +57,14 @@ export const getCreatePartyUrl = () => {
 
 export const createParty = async ( options?: RequestInit): Promise<createPartyResponse> => {
   
-  const res = await fetch(getCreatePartyUrl(),
+  return customInstance<createPartyResponse>(getCreatePartyUrl(),
   {      
     ...options,
     method: 'POST'
     
     
   }
-)
-
-  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
-  
-  const data: createPartyResponse['data'] = body ? JSON.parse(body) : {}
-  return { data, status: res.status, headers: res.headers } as createPartyResponse
-}
+);}
 
 
 export type joinPartyResponse200 = {
@@ -116,20 +111,14 @@ export const getJoinPartyUrl = (code: string,) => {
 
 export const joinParty = async (code: string, options?: RequestInit): Promise<joinPartyResponse> => {
   
-  const res = await fetch(getJoinPartyUrl(code),
+  return customInstance<joinPartyResponse>(getJoinPartyUrl(code),
   {      
     ...options,
     method: 'POST'
     
     
   }
-)
-
-  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
-  
-  const data: joinPartyResponse['data'] = body ? JSON.parse(body) : {}
-  return { data, status: res.status, headers: res.headers } as joinPartyResponse
-}
+);}
 
 
 export type getPartyResponse200 = {
@@ -176,20 +165,14 @@ export const getGetPartyUrl = (partyId: string,) => {
 
 export const getParty = async (partyId: string, options?: RequestInit): Promise<getPartyResponse> => {
   
-  const res = await fetch(getGetPartyUrl(partyId),
+  return customInstance<getPartyResponse>(getGetPartyUrl(partyId),
   {      
     ...options,
     method: 'GET'
     
     
   }
-)
-
-  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
-  
-  const data: getPartyResponse['data'] = body ? JSON.parse(body) : {}
-  return { data, status: res.status, headers: res.headers } as getPartyResponse
-}
+);}
 
 
 export type advancePhaseResponse200 = {
@@ -241,20 +224,14 @@ export const getAdvancePhaseUrl = (partyId: string,) => {
 
 export const advancePhase = async (partyId: string, options?: RequestInit): Promise<advancePhaseResponse> => {
   
-  const res = await fetch(getAdvancePhaseUrl(partyId),
+  return customInstance<advancePhaseResponse>(getAdvancePhaseUrl(partyId),
   {      
     ...options,
     method: 'POST'
     
     
   }
-)
-
-  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
-  
-  const data: advancePhaseResponse['data'] = body ? JSON.parse(body) : {}
-  return { data, status: res.status, headers: res.headers } as advancePhaseResponse
-}
+);}
 
 
 /**
@@ -308,20 +285,14 @@ export const getDisbandPartyUrl = (partyId: string,) => {
 
 export const disbandParty = async (partyId: string, options?: RequestInit): Promise<disbandPartyResponse> => {
   
-  const res = await fetch(getDisbandPartyUrl(partyId),
+  return customInstance<disbandPartyResponse>(getDisbandPartyUrl(partyId),
   {      
     ...options,
     method: 'POST'
     
     
   }
-)
-
-  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
-  
-  const data: disbandPartyResponse['data'] = body ? JSON.parse(body) : {}
-  return { data, status: res.status, headers: res.headers } as disbandPartyResponse
-}
+);}
 
 
 /**
@@ -381,7 +352,7 @@ export const getKickMemberUrl = (partyId: string,) => {
 export const kickMember = async (partyId: string,
     kickMemberRequest: KickMemberRequest, options?: RequestInit): Promise<kickMemberResponse> => {
   
-  const res = await fetch(getKickMemberUrl(partyId),
+  return customInstance<kickMemberResponse>(getKickMemberUrl(partyId),
   {      
     ...options,
     method: 'POST',
@@ -389,13 +360,7 @@ export const kickMember = async (partyId: string,
     body: JSON.stringify(
       kickMemberRequest,)
   }
-)
-
-  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
-  
-  const data: kickMemberResponse['data'] = body ? JSON.parse(body) : {}
-  return { data, status: res.status, headers: res.headers } as kickMemberResponse
-}
+);}
 
 
 /**
@@ -450,20 +415,14 @@ export const getLeavePartyUrl = (partyId: string,) => {
 
 export const leaveParty = async (partyId: string, options?: RequestInit): Promise<leavePartyResponse> => {
   
-  const res = await fetch(getLeavePartyUrl(partyId),
+  return customInstance<leavePartyResponse>(getLeavePartyUrl(partyId),
   {      
     ...options,
     method: 'POST'
     
     
   }
-)
-
-  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
-  
-  const data: leavePartyResponse['data'] = body ? JSON.parse(body) : {}
-  return { data, status: res.status, headers: res.headers } as leavePartyResponse
-}
+);}
 
 
 export type getPartyMembersResponse200 = {
@@ -510,20 +469,14 @@ export const getGetPartyMembersUrl = (partyId: string,) => {
 
 export const getPartyMembers = async (partyId: string, options?: RequestInit): Promise<getPartyMembersResponse> => {
   
-  const res = await fetch(getGetPartyMembersUrl(partyId),
+  return customInstance<getPartyMembersResponse>(getGetPartyMembersUrl(partyId),
   {      
     ...options,
     method: 'GET'
     
     
   }
-)
-
-  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
-  
-  const data: getPartyMembersResponse['data'] = body ? JSON.parse(body) : {}
-  return { data, status: res.status, headers: res.headers } as getPartyMembersResponse
-}
+);}
 
 
 /**
@@ -584,20 +537,14 @@ export const getStartNewRoundUrl = (partyId: string,) => {
 
 export const startNewRound = async (partyId: string, options?: RequestInit): Promise<startNewRoundResponse> => {
   
-  const res = await fetch(getStartNewRoundUrl(partyId),
+  return customInstance<startNewRoundResponse>(getStartNewRoundUrl(partyId),
   {      
     ...options,
     method: 'POST'
     
     
   }
-)
-
-  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
-  
-  const data: startNewRoundResponse['data'] = body ? JSON.parse(body) : {}
-  return { data, status: res.status, headers: res.headers } as startNewRoundResponse
-}
+);}
 
 
 export type toggleReadyResponse200 = {
@@ -645,7 +592,7 @@ export const getToggleReadyUrl = (partyId: string,) => {
 export const toggleReady = async (partyId: string,
     setReadyRequest: SetReadyRequest, options?: RequestInit): Promise<toggleReadyResponse> => {
   
-  const res = await fetch(getToggleReadyUrl(partyId),
+  return customInstance<toggleReadyResponse>(getToggleReadyUrl(partyId),
   {      
     ...options,
     method: 'POST',
@@ -653,13 +600,7 @@ export const toggleReady = async (partyId: string,
     body: JSON.stringify(
       setReadyRequest,)
   }
-)
-
-  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
-  
-  const data: toggleReadyResponse['data'] = body ? JSON.parse(body) : {}
-  return { data, status: res.status, headers: res.headers } as toggleReadyResponse
-}
+);}
 
 
 /**
@@ -719,7 +660,7 @@ export const getTransferLeadershipUrl = (partyId: string,) => {
 export const transferLeadership = async (partyId: string,
     transferLeadershipRequest: TransferLeadershipRequest, options?: RequestInit): Promise<transferLeadershipResponse> => {
   
-  const res = await fetch(getTransferLeadershipUrl(partyId),
+  return customInstance<transferLeadershipResponse>(getTransferLeadershipUrl(partyId),
   {      
     ...options,
     method: 'POST',
@@ -727,12 +668,6 @@ export const transferLeadership = async (partyId: string,
     body: JSON.stringify(
       transferLeadershipRequest,)
   }
-)
-
-  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
-  
-  const data: transferLeadershipResponse['data'] = body ? JSON.parse(body) : {}
-  return { data, status: res.status, headers: res.headers } as transferLeadershipResponse
-}
+);}
 
 

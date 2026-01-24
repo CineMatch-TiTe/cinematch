@@ -9,15 +9,16 @@ export default defineConfig({
       schemas: 'src/model',
       client: 'fetch',
       mock: false,
+      override: {
+        mutator: {
+          path: './src/lib/orval-client.ts',
+          name: 'customInstance',
+          default: true,
+        },
+      },
     },
     input: {
       target: './openapi.json',
-      override: {
-        mutator: {
-          path: 'src/lib/orval-client.ts',
-          name: 'customInstance',
-        },
-      },
     },
   },
 });

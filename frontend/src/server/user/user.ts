@@ -12,6 +12,7 @@ import type {
   RenameUserRequest
 } from '../../model';
 
+import customInstance from '../../lib/orval-client';
 
 /**
  * Returns the currently authenticated user's profile information
@@ -59,20 +60,14 @@ export const getGetCurrentUserUrl = () => {
 
 export const getCurrentUser = async ( options?: RequestInit): Promise<getCurrentUserResponse> => {
   
-  const res = await fetch(getGetCurrentUserUrl(),
+  return customInstance<getCurrentUserResponse>(getGetCurrentUserUrl(),
   {      
     ...options,
     method: 'GET'
     
     
   }
-)
-
-  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
-  
-  const data: getCurrentUserResponse['data'] = body ? JSON.parse(body) : {}
-  return { data, status: res.status, headers: res.headers } as getCurrentUserResponse
-}
+);}
 
 
 /**
@@ -125,7 +120,7 @@ export const getLoginGuestUrl = () => {
 
 export const loginGuest = async (guestUserRequest: GuestUserRequest, options?: RequestInit): Promise<loginGuestResponse> => {
   
-  const res = await fetch(getLoginGuestUrl(),
+  return customInstance<loginGuestResponse>(getLoginGuestUrl(),
   {      
     ...options,
     method: 'POST',
@@ -133,13 +128,7 @@ export const loginGuest = async (guestUserRequest: GuestUserRequest, options?: R
     body: JSON.stringify(
       guestUserRequest,)
   }
-)
-
-  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
-  
-  const data: loginGuestResponse['data'] = body ? JSON.parse(body) : {}
-  return { data, status: res.status, headers: res.headers } as loginGuestResponse
-}
+);}
 
 
 /**
@@ -183,20 +172,14 @@ export const getLogoutUserUrl = () => {
 
 export const logoutUser = async ( options?: RequestInit): Promise<logoutUserResponse> => {
   
-  const res = await fetch(getLogoutUserUrl(),
+  return customInstance<logoutUserResponse>(getLogoutUserUrl(),
   {      
     ...options,
     method: 'POST'
     
     
   }
-)
-
-  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
-  
-  const data: logoutUserResponse['data'] = body ? JSON.parse(body) : {}
-  return { data, status: res.status, headers: res.headers } as logoutUserResponse
-}
+);}
 
 
 /**
@@ -257,7 +240,7 @@ export const getRenameUserUrl = (userId: string,) => {
 export const renameUser = async (userId: string,
     renameUserRequest: RenameUserRequest, options?: RequestInit): Promise<renameUserResponse> => {
   
-  const res = await fetch(getRenameUserUrl(userId),
+  return customInstance<renameUserResponse>(getRenameUserUrl(userId),
   {      
     ...options,
     method: 'PATCH',
@@ -265,12 +248,6 @@ export const renameUser = async (userId: string,
     body: JSON.stringify(
       renameUserRequest,)
   }
-)
-
-  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
-  
-  const data: renameUserResponse['data'] = body ? JSON.parse(body) : {}
-  return { data, status: res.status, headers: res.headers } as renameUserResponse
-}
+);}
 
 
