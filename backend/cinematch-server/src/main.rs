@@ -26,6 +26,7 @@ use actix_wsb::Broadcaster;
 
 // Database
 use cinematch_api::ApiDoc;
+use cinematch_common::vote_store::VoteStore;
 use cinematch_db::Database;
 
 // use cinematch_recommendation_engine::configure_recommendation_routes;
@@ -57,6 +58,9 @@ async fn main() -> std::io::Result<()> {
     }
 
     let data = web::Data::new(db_pool);
+
+    let vote_store = VoteStore::new();
+    let vote_store_data = web::Data::new(vote_store);
 
     let server_host = std::env::var("SERVER_HOST").unwrap_or_else(|_| "0.0.0.0".to_string());
     let server_port = std::env::var("SERVER_PORT").unwrap_or_else(|_| "8080".to_string());
@@ -123,8 +127,9 @@ async fn main() -> std::io::Result<()> {
                 )
             })
             .map(|app| app.wrap(Logger::default()))
-            .app_data(data.clone())
-            .app_data(rooms_data.clone())
+            .app_data(data.clone()) // database pool
+            .app_data(rooms_data.clone()) // websocket rooms broadcaster
+            .app_data(vote_store_data.clone()) // vote store
             // /api/user, /api/party, /api/ws, etc
             .service(
                 utoipa_actix_web::scope("/api/user")

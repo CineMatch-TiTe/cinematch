@@ -12,6 +12,7 @@ use utoipa::ToSchema;
 use uuid::Uuid;
 
 // Re-export types that are used in responses
+pub use super::VoteStore;
 pub use crate::AppState;
 pub use cinematch_common::ErrorResponse;
 pub use cinematch_common::extract_user_id;

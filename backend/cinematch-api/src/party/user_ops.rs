@@ -1,6 +1,6 @@
 use super::{
     CreatePartyResponse, DbError, ErrorResponse, MemberInfo, PartyMembersResponse, PartyState,
-    ReadyStateResponse, SetReadyRequest, extract_user_id,
+    ReadyStateResponse, SetReadyRequest, VoteStore, extract_user_id,
 };
 use actix_identity::Identity;
 use actix_web::{HttpResponse, get, post, web};
@@ -323,4 +323,39 @@ pub async fn set_ready(
                 .json(ErrorResponse::new(format!("Failed to toggle ready: {}", e)))
         }
     }
+}
+
+pub async fn vote_movie(
+    db: AppState,
+    user: Identity,
+    party_id: Uuid,
+    movie_id: Uuid,
+    vote_store: VoteStore,
+) -> HttpResponse {
+    let user_id = extract_user_id!(user);
+
+    trace!("POST /{}/vote/{} - user_id={}", party_id, movie_id, user_id);
+
+    // Verify user is a member
+    match db.is_party_member(party_id, user_id).await {
+        Ok(false) => {
+            trace!("User {} not member of party {}", user_id, party_id);
+            return HttpResponse::BadRequest()
+                .json(ErrorResponse::new("Not a member of this party"));
+        }
+        Err(e) => {
+            error!("Failed to check membership: {}", e);
+            return HttpResponse::InternalServerError()
+                .json(ErrorResponse::new("Failed to check membership"));
+        }
+        Ok(true) => {}
+    }
+    debug!(
+        "Auth passed - recording vote for user {} in party {} for movie {}",
+        user_id, party_id, movie_id
+    );
+
+    // add to the vote store
+
+    HttpResponse::Ok().finish()
 }
