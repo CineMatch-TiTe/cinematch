@@ -11,7 +11,7 @@ const initialState = {
   errors: undefined
 }
 
-export function GuestLoginForm() {
+export function GuestLoginForm({ initialJoinCode }: Readonly<{ initialJoinCode?: string }>) {
   const [state, formAction, isPending] = useActionState(guestLoginAction, initialState)
 
   return (
@@ -40,11 +40,13 @@ export function GuestLoginForm() {
             <Input
               name="joinCode"
               placeholder="Join code"
-              defaultValue=""
+              defaultValue={initialJoinCode || ''}
+              disabled={!!initialJoinCode}
               className={`pl-10 bg-zinc-950/50 border-zinc-700 text-zinc-100 placeholder:text-zinc-500 focus-visible:ring-red-600 focus-visible:border-red-600 ${
                 state?.errors?.joinCode ? 'border-red-500 focus-visible:ring-red-500' : ''
-              }`}
+              } ${initialJoinCode ? 'opacity-50 cursor-not-allowed' : ''}`}
             />
+            {initialJoinCode && <input type="hidden" name="joinCode" value={initialJoinCode} />}
           </div>
           {state?.errors?.joinCode && (
             <p className="text-xs text-red-500 pl-1">{state.errors.joinCode[0]}</p>

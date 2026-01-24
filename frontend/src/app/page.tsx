@@ -2,11 +2,18 @@ import Link from 'next/link'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { GuestLoginForm } from '@/components/forms/GuestLoginForm'
 
-export default function HomeRoute() {
+export default async function HomeRoute({
+  searchParams
+}: Readonly<{
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>
+}>) {
+  const { partyCode } = await searchParams
+  const initialJoinCode = Array.isArray(partyCode) ? partyCode[0] : partyCode
+
   return (
     <div className="flex min-h-screen items-center justify-center bg-zinc-950 font-sans text-zinc-100 selection:bg-red-500/30">
       <div className="fixed inset-0 z-0 pointer-events-none">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-zinc-800/20 via-zinc-950 to-zinc-950" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,var(--tw-gradient-stops))] from-zinc-800/20 via-zinc-950 to-zinc-950" />
         <div className="absolute top-0 left-0 w-full h-full bg-[url('https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?q=80&w=2070&auto=format&fit=crop')] bg-cover bg-center opacity-20 mix-blend-overlay" />
       </div>
 
@@ -21,7 +28,7 @@ export default function HomeRoute() {
             <CardTitle className="text-lg font-medium text-zinc-200">Join to party</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <GuestLoginForm />
+            <GuestLoginForm initialJoinCode={initialJoinCode} />
             <div className="pt-2 text-center">
               <Link
                 href="/create-party"
