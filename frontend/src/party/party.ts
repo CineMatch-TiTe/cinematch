@@ -4,11 +4,17 @@
  * cinematch-api
  * OpenAPI spec version: 0.1.0
  */
-import useSwr from 'swr'
-import type { Arguments, Key, SWRConfiguration } from 'swr'
+import useSwr from 'swr';
+import type {
+  Arguments,
+  Key,
+  SWRConfiguration
+} from 'swr';
 
-import useSWRMutation from 'swr/mutation'
-import type { SWRMutationConfiguration } from 'swr/mutation'
+import useSWRMutation from 'swr/mutation';
+import type {
+  SWRMutationConfiguration
+} from 'swr/mutation';
 
 import type {
   CreatePartyResponse,
@@ -20,8 +26,13 @@ import type {
   PhaseAdvanceResponse,
   SetReadyRequest,
   TransferLeadershipRequest
-} from '.././model'
+} from '.././model';
 
+
+
+  
+  
+  
 export type createPartyResponse201 = {
   data: CreatePartyResponse
   status: 201
@@ -41,59 +52,61 @@ export type createPartyResponse500 = {
   data: ErrorResponse
   status: 500
 }
+    
+export type createPartyResponseSuccess = (createPartyResponse201) & {
+  headers: Headers;
+};
+export type createPartyResponseError = (createPartyResponse401 | createPartyResponse404 | createPartyResponse500) & {
+  headers: Headers;
+};
 
-export type createPartyResponseSuccess = createPartyResponse201 & {
-  headers: Headers
-}
-export type createPartyResponseError = (
-  | createPartyResponse401
-  | createPartyResponse404
-  | createPartyResponse500
-) & {
-  headers: Headers
-}
-
-export type createPartyResponse = createPartyResponseSuccess | createPartyResponseError
+export type createPartyResponse = (createPartyResponseSuccess | createPartyResponseError)
 
 export const getCreatePartyUrl = () => {
+
+
+  
+
   return `/api/party`
 }
 
-export const createParty = async (options?: RequestInit): Promise<createPartyResponse> => {
-  const res = await fetch(getCreatePartyUrl(), {
+export const createParty = async ( options?: RequestInit): Promise<createPartyResponse> => {
+  
+  const res = await fetch(getCreatePartyUrl(),
+  {      
     ...options,
     method: 'POST'
-  })
+    
+    
+  }
+)
 
-  const body = [204, 205, 304].includes(res.status) ? null : await res.text()
-
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+  
   const data: createPartyResponse['data'] = body ? JSON.parse(body) : {}
   return { data, status: res.status, headers: res.headers } as createPartyResponse
 }
 
-export const getCreatePartyMutationFetcher = (options?: RequestInit) => {
+
+
+
+export const getCreatePartyMutationFetcher = ( options?: RequestInit) => {
   return (_: Key, __: { arg: Arguments }) => {
-    return createParty(options)
+    return createParty(options);
   }
 }
-export const getCreatePartyMutationKey = () => [`/api/party`] as const
+export const getCreatePartyMutationKey = () => [`/api/party`] as const;
 
 export type CreatePartyMutationResult = NonNullable<Awaited<ReturnType<typeof createParty>>>
 
-export const useCreateParty = <TError = Promise<ErrorResponse>>(options?: {
-  swr?: SWRMutationConfiguration<
-    Awaited<ReturnType<typeof createParty>>,
-    TError,
-    Key,
-    Arguments,
-    Awaited<ReturnType<typeof createParty>>
-  > & { swrKey?: string }
-  fetch?: RequestInit
-}) => {
-  const { swr: swrOptions, fetch: fetchOptions } = options ?? {}
+export const useCreateParty = <TError = Promise<ErrorResponse | ErrorResponse | ErrorResponse>>(
+   options?: { swr?:SWRMutationConfiguration<Awaited<ReturnType<typeof createParty>>, TError, Key, Arguments, Awaited<ReturnType<typeof createParty>>> & { swrKey?: string }, fetch?: RequestInit}
+) => {
 
-  const swrKey = swrOptions?.swrKey ?? getCreatePartyMutationKey()
-  const swrFn = getCreatePartyMutationFetcher(fetchOptions)
+  const {swr: swrOptions, fetch: fetchOptions} = options ?? {}
+
+  const swrKey = swrOptions?.swrKey ?? getCreatePartyMutationKey();
+  const swrFn = getCreatePartyMutationFetcher(fetchOptions);
 
   const query = useSWRMutation(swrKey, swrFn, swrOptions)
 
@@ -126,66 +139,61 @@ export type joinPartyResponse500 = {
   data: ErrorResponse
   status: 500
 }
+    
+export type joinPartyResponseSuccess = (joinPartyResponse200) & {
+  headers: Headers;
+};
+export type joinPartyResponseError = (joinPartyResponse400 | joinPartyResponse401 | joinPartyResponse404 | joinPartyResponse500) & {
+  headers: Headers;
+};
 
-export type joinPartyResponseSuccess = joinPartyResponse200 & {
-  headers: Headers
-}
-export type joinPartyResponseError = (
-  | joinPartyResponse400
-  | joinPartyResponse401
-  | joinPartyResponse404
-  | joinPartyResponse500
-) & {
-  headers: Headers
-}
+export type joinPartyResponse = (joinPartyResponseSuccess | joinPartyResponseError)
 
-export type joinPartyResponse = joinPartyResponseSuccess | joinPartyResponseError
+export const getJoinPartyUrl = (code: string,) => {
 
-export const getJoinPartyUrl = (code: string) => {
+
+  
+
   return `/api/party/join/${code}`
 }
 
-export const joinParty = async (
-  code: string,
-  options?: RequestInit
-): Promise<joinPartyResponse> => {
-  const res = await fetch(getJoinPartyUrl(code), {
+export const joinParty = async (code: string, options?: RequestInit): Promise<joinPartyResponse> => {
+  
+  const res = await fetch(getJoinPartyUrl(code),
+  {      
     ...options,
     method: 'POST'
-  })
+    
+    
+  }
+)
 
-  const body = [204, 205, 304].includes(res.status) ? null : await res.text()
-
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+  
   const data: joinPartyResponse['data'] = body ? JSON.parse(body) : {}
   return { data, status: res.status, headers: res.headers } as joinPartyResponse
 }
 
+
+
+
 export const getJoinPartyMutationFetcher = (code: string, options?: RequestInit) => {
   return (_: Key, __: { arg: Arguments }) => {
-    return joinParty(code, options)
+    return joinParty(code, options);
   }
 }
-export const getJoinPartyMutationKey = (code: string) => [`/api/party/join/${code}`] as const
+export const getJoinPartyMutationKey = (code: string,) => [`/api/party/join/${code}`] as const;
 
 export type JoinPartyMutationResult = NonNullable<Awaited<ReturnType<typeof joinParty>>>
 
-export const useJoinParty = <TError = Promise<ErrorResponse>>(
-  code: string,
-  options?: {
-    swr?: SWRMutationConfiguration<
-      Awaited<ReturnType<typeof joinParty>>,
-      TError,
-      Key,
-      Arguments,
-      Awaited<ReturnType<typeof joinParty>>
-    > & { swrKey?: string }
-    fetch?: RequestInit
-  }
+export const useJoinParty = <TError = Promise<ErrorResponse | ErrorResponse | ErrorResponse | ErrorResponse>>(
+  code: string, options?: { swr?:SWRMutationConfiguration<Awaited<ReturnType<typeof joinParty>>, TError, Key, Arguments, Awaited<ReturnType<typeof joinParty>>> & { swrKey?: string }, fetch?: RequestInit}
 ) => {
-  const { swr: swrOptions, fetch: fetchOptions } = options ?? {}
 
-  const swrKey = swrOptions?.swrKey ?? getJoinPartyMutationKey(code)
-  const swrFn = getJoinPartyMutationFetcher(code, fetchOptions)
+  const {swr: swrOptions, fetch: fetchOptions} = options ?? {}
+
+  const swrKey = swrOptions?.swrKey ?? getJoinPartyMutationKey(code);
+  const swrFn = getJoinPartyMutationFetcher(code, fetchOptions);
 
   const query = useSWRMutation(swrKey, swrFn, swrOptions)
 
@@ -218,58 +226,55 @@ export type getPartyResponse500 = {
   data: ErrorResponse
   status: 500
 }
+    
+export type getPartyResponseSuccess = (getPartyResponse200) & {
+  headers: Headers;
+};
+export type getPartyResponseError = (getPartyResponse401 | getPartyResponse403 | getPartyResponse404 | getPartyResponse500) & {
+  headers: Headers;
+};
 
-export type getPartyResponseSuccess = getPartyResponse200 & {
-  headers: Headers
-}
-export type getPartyResponseError = (
-  | getPartyResponse401
-  | getPartyResponse403
-  | getPartyResponse404
-  | getPartyResponse500
-) & {
-  headers: Headers
-}
+export type getPartyResponse = (getPartyResponseSuccess | getPartyResponseError)
 
-export type getPartyResponse = getPartyResponseSuccess | getPartyResponseError
+export const getGetPartyUrl = (partyId: string,) => {
 
-export const getGetPartyUrl = (partyId: string) => {
+
+  
+
   return `/api/party/${partyId}`
 }
 
-export const getParty = async (
-  partyId: string,
-  options?: RequestInit
-): Promise<getPartyResponse> => {
-  const res = await fetch(getGetPartyUrl(partyId), {
+export const getParty = async (partyId: string, options?: RequestInit): Promise<getPartyResponse> => {
+  
+  const res = await fetch(getGetPartyUrl(partyId),
+  {      
     ...options,
     method: 'GET'
-  })
+    
+    
+  }
+)
 
-  const body = [204, 205, 304].includes(res.status) ? null : await res.text()
-
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+  
   const data: getPartyResponse['data'] = body ? JSON.parse(body) : {}
   return { data, status: res.status, headers: res.headers } as getPartyResponse
 }
 
-export const getGetPartyKey = (partyId: string) => [`/api/party/${partyId}`] as const
+
+
+
+export const getGetPartyKey = (partyId: string,) => [`/api/party/${partyId}`] as const;
 
 export type GetPartyQueryResult = NonNullable<Awaited<ReturnType<typeof getParty>>>
 
-export const useGetParty = <TError = Promise<ErrorResponse>>(
-  partyId: string,
-  options?: {
-    swr?: SWRConfiguration<Awaited<ReturnType<typeof getParty>>, TError> & {
-      swrKey?: Key
-      enabled?: boolean
-    }
-    fetch?: RequestInit
-  }
+export const useGetParty = <TError = Promise<ErrorResponse | ErrorResponse | ErrorResponse | ErrorResponse>>(
+  partyId: string, options?: { swr?:SWRConfiguration<Awaited<ReturnType<typeof getParty>>, TError> & { swrKey?: Key, enabled?: boolean }, fetch?: RequestInit }
 ) => {
-  const { swr: swrOptions, fetch: fetchOptions } = options ?? {}
+  const {swr: swrOptions, fetch: fetchOptions} = options ?? {}
 
-  const isEnabled = swrOptions?.enabled !== false && !!partyId
-  const swrKey = swrOptions?.swrKey ?? (() => (isEnabled ? getGetPartyKey(partyId) : null))
+  const isEnabled = swrOptions?.enabled !== false && !!(partyId)
+  const swrKey = swrOptions?.swrKey ?? (() => isEnabled ? getGetPartyKey(partyId) : null);
   const swrFn = () => getParty(partyId, fetchOptions)
 
   const query = useSwr<Awaited<ReturnType<typeof swrFn>>, TError>(swrKey, swrFn, swrOptions)
@@ -308,68 +313,61 @@ export type advancePhaseResponse500 = {
   data: ErrorResponse
   status: 500
 }
+    
+export type advancePhaseResponseSuccess = (advancePhaseResponse200) & {
+  headers: Headers;
+};
+export type advancePhaseResponseError = (advancePhaseResponse400 | advancePhaseResponse401 | advancePhaseResponse403 | advancePhaseResponse404 | advancePhaseResponse500) & {
+  headers: Headers;
+};
 
-export type advancePhaseResponseSuccess = advancePhaseResponse200 & {
-  headers: Headers
-}
-export type advancePhaseResponseError = (
-  | advancePhaseResponse400
-  | advancePhaseResponse401
-  | advancePhaseResponse403
-  | advancePhaseResponse404
-  | advancePhaseResponse500
-) & {
-  headers: Headers
-}
+export type advancePhaseResponse = (advancePhaseResponseSuccess | advancePhaseResponseError)
 
-export type advancePhaseResponse = advancePhaseResponseSuccess | advancePhaseResponseError
+export const getAdvancePhaseUrl = (partyId: string,) => {
 
-export const getAdvancePhaseUrl = (partyId: string) => {
+
+  
+
   return `/api/party/${partyId}/advance`
 }
 
-export const advancePhase = async (
-  partyId: string,
-  options?: RequestInit
-): Promise<advancePhaseResponse> => {
-  const res = await fetch(getAdvancePhaseUrl(partyId), {
+export const advancePhase = async (partyId: string, options?: RequestInit): Promise<advancePhaseResponse> => {
+  
+  const res = await fetch(getAdvancePhaseUrl(partyId),
+  {      
     ...options,
     method: 'POST'
-  })
+    
+    
+  }
+)
 
-  const body = [204, 205, 304].includes(res.status) ? null : await res.text()
-
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+  
   const data: advancePhaseResponse['data'] = body ? JSON.parse(body) : {}
   return { data, status: res.status, headers: res.headers } as advancePhaseResponse
 }
 
+
+
+
 export const getAdvancePhaseMutationFetcher = (partyId: string, options?: RequestInit) => {
   return (_: Key, __: { arg: Arguments }) => {
-    return advancePhase(partyId, options)
+    return advancePhase(partyId, options);
   }
 }
-export const getAdvancePhaseMutationKey = (partyId: string) =>
-  [`/api/party/${partyId}/advance`] as const
+export const getAdvancePhaseMutationKey = (partyId: string,) => [`/api/party/${partyId}/advance`] as const;
 
 export type AdvancePhaseMutationResult = NonNullable<Awaited<ReturnType<typeof advancePhase>>>
 
-export const useAdvancePhase = <TError = Promise<ErrorResponse>>(
-  partyId: string,
-  options?: {
-    swr?: SWRMutationConfiguration<
-      Awaited<ReturnType<typeof advancePhase>>,
-      TError,
-      Key,
-      Arguments,
-      Awaited<ReturnType<typeof advancePhase>>
-    > & { swrKey?: string }
-    fetch?: RequestInit
-  }
+export const useAdvancePhase = <TError = Promise<ErrorResponse | ErrorResponse | ErrorResponse | ErrorResponse | ErrorResponse>>(
+  partyId: string, options?: { swr?:SWRMutationConfiguration<Awaited<ReturnType<typeof advancePhase>>, TError, Key, Arguments, Awaited<ReturnType<typeof advancePhase>>> & { swrKey?: string }, fetch?: RequestInit}
 ) => {
-  const { swr: swrOptions, fetch: fetchOptions } = options ?? {}
 
-  const swrKey = swrOptions?.swrKey ?? getAdvancePhaseMutationKey(partyId)
-  const swrFn = getAdvancePhaseMutationFetcher(partyId, fetchOptions)
+  const {swr: swrOptions, fetch: fetchOptions} = options ?? {}
+
+  const swrKey = swrOptions?.swrKey ?? getAdvancePhaseMutationKey(partyId);
+  const swrFn = getAdvancePhaseMutationFetcher(partyId, fetchOptions);
 
   const query = useSWRMutation(swrKey, swrFn, swrOptions)
 
@@ -409,70 +407,64 @@ export type disbandPartyResponse500 = {
   data: ErrorResponse
   status: 500
 }
+    
+export type disbandPartyResponseSuccess = (disbandPartyResponse200) & {
+  headers: Headers;
+};
+export type disbandPartyResponseError = (disbandPartyResponse401 | disbandPartyResponse403 | disbandPartyResponse404 | disbandPartyResponse500) & {
+  headers: Headers;
+};
 
-export type disbandPartyResponseSuccess = disbandPartyResponse200 & {
-  headers: Headers
-}
-export type disbandPartyResponseError = (
-  | disbandPartyResponse401
-  | disbandPartyResponse403
-  | disbandPartyResponse404
-  | disbandPartyResponse500
-) & {
-  headers: Headers
-}
+export type disbandPartyResponse = (disbandPartyResponseSuccess | disbandPartyResponseError)
 
-export type disbandPartyResponse = disbandPartyResponseSuccess | disbandPartyResponseError
+export const getDisbandPartyUrl = (partyId: string,) => {
 
-export const getDisbandPartyUrl = (partyId: string) => {
+
+  
+
   return `/api/party/${partyId}/disband`
 }
 
-export const disbandParty = async (
-  partyId: string,
-  options?: RequestInit
-): Promise<disbandPartyResponse> => {
-  const res = await fetch(getDisbandPartyUrl(partyId), {
+export const disbandParty = async (partyId: string, options?: RequestInit): Promise<disbandPartyResponse> => {
+  
+  const res = await fetch(getDisbandPartyUrl(partyId),
+  {      
     ...options,
     method: 'POST'
-  })
+    
+    
+  }
+)
 
-  const body = [204, 205, 304].includes(res.status) ? null : await res.text()
-
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+  
   const data: disbandPartyResponse['data'] = body ? JSON.parse(body) : {}
   return { data, status: res.status, headers: res.headers } as disbandPartyResponse
 }
 
+
+
+
 export const getDisbandPartyMutationFetcher = (partyId: string, options?: RequestInit) => {
   return (_: Key, __: { arg: Arguments }) => {
-    return disbandParty(partyId, options)
+    return disbandParty(partyId, options);
   }
 }
-export const getDisbandPartyMutationKey = (partyId: string) =>
-  [`/api/party/${partyId}/disband`] as const
+export const getDisbandPartyMutationKey = (partyId: string,) => [`/api/party/${partyId}/disband`] as const;
 
 export type DisbandPartyMutationResult = NonNullable<Awaited<ReturnType<typeof disbandParty>>>
 
 /**
  * @summary Disband party
  */
-export const useDisbandParty = <TError = Promise<ErrorResponse>>(
-  partyId: string,
-  options?: {
-    swr?: SWRMutationConfiguration<
-      Awaited<ReturnType<typeof disbandParty>>,
-      TError,
-      Key,
-      Arguments,
-      Awaited<ReturnType<typeof disbandParty>>
-    > & { swrKey?: string }
-    fetch?: RequestInit
-  }
+export const useDisbandParty = <TError = Promise<ErrorResponse | ErrorResponse | ErrorResponse | ErrorResponse>>(
+  partyId: string, options?: { swr?:SWRMutationConfiguration<Awaited<ReturnType<typeof disbandParty>>, TError, Key, Arguments, Awaited<ReturnType<typeof disbandParty>>> & { swrKey?: string }, fetch?: RequestInit}
 ) => {
-  const { swr: swrOptions, fetch: fetchOptions } = options ?? {}
 
-  const swrKey = swrOptions?.swrKey ?? getDisbandPartyMutationKey(partyId)
-  const swrFn = getDisbandPartyMutationFetcher(partyId, fetchOptions)
+  const {swr: swrOptions, fetch: fetchOptions} = options ?? {}
+
+  const swrKey = swrOptions?.swrKey ?? getDisbandPartyMutationKey(partyId);
+  const swrFn = getDisbandPartyMutationFetcher(partyId, fetchOptions);
 
   const query = useSWRMutation(swrKey, swrFn, swrOptions)
 
@@ -517,73 +509,66 @@ export type kickMemberResponse500 = {
   data: ErrorResponse
   status: 500
 }
+    
+export type kickMemberResponseSuccess = (kickMemberResponse200) & {
+  headers: Headers;
+};
+export type kickMemberResponseError = (kickMemberResponse400 | kickMemberResponse401 | kickMemberResponse403 | kickMemberResponse404 | kickMemberResponse500) & {
+  headers: Headers;
+};
 
-export type kickMemberResponseSuccess = kickMemberResponse200 & {
-  headers: Headers
-}
-export type kickMemberResponseError = (
-  | kickMemberResponse400
-  | kickMemberResponse401
-  | kickMemberResponse403
-  | kickMemberResponse404
-  | kickMemberResponse500
-) & {
-  headers: Headers
-}
+export type kickMemberResponse = (kickMemberResponseSuccess | kickMemberResponseError)
 
-export type kickMemberResponse = kickMemberResponseSuccess | kickMemberResponseError
+export const getKickMemberUrl = (partyId: string,) => {
 
-export const getKickMemberUrl = (partyId: string) => {
+
+  
+
   return `/api/party/${partyId}/kick`
 }
 
-export const kickMember = async (
-  partyId: string,
-  kickMemberRequest: KickMemberRequest,
-  options?: RequestInit
-): Promise<kickMemberResponse> => {
-  const res = await fetch(getKickMemberUrl(partyId), {
+export const kickMember = async (partyId: string,
+    kickMemberRequest: KickMemberRequest, options?: RequestInit): Promise<kickMemberResponse> => {
+  
+  const res = await fetch(getKickMemberUrl(partyId),
+  {      
     ...options,
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...options?.headers },
-    body: JSON.stringify(kickMemberRequest)
-  })
+    body: JSON.stringify(
+      kickMemberRequest,)
+  }
+)
 
-  const body = [204, 205, 304].includes(res.status) ? null : await res.text()
-
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+  
   const data: kickMemberResponse['data'] = body ? JSON.parse(body) : {}
   return { data, status: res.status, headers: res.headers } as kickMemberResponse
 }
 
+
+
+
 export const getKickMemberMutationFetcher = (partyId: string, options?: RequestInit) => {
   return (_: Key, { arg }: { arg: KickMemberRequest }) => {
-    return kickMember(partyId, arg, options)
+    return kickMember(partyId, arg, options);
   }
 }
-export const getKickMemberMutationKey = (partyId: string) => [`/api/party/${partyId}/kick`] as const
+export const getKickMemberMutationKey = (partyId: string,) => [`/api/party/${partyId}/kick`] as const;
 
 export type KickMemberMutationResult = NonNullable<Awaited<ReturnType<typeof kickMember>>>
 
 /**
  * @summary Kick a member from the party
  */
-export const useKickMember = <TError = Promise<ErrorResponse>>(
-  partyId: string,
-  options?: {
-    swr?: SWRMutationConfiguration<
-      Awaited<ReturnType<typeof kickMember>>,
-      TError,
-      Key,
-      KickMemberRequest,
-      Awaited<ReturnType<typeof kickMember>>
-    > & { swrKey?: string }
-    fetch?: RequestInit
-  }
+export const useKickMember = <TError = Promise<ErrorResponse | ErrorResponse | ErrorResponse | ErrorResponse | ErrorResponse>>(
+  partyId: string, options?: { swr?:SWRMutationConfiguration<Awaited<ReturnType<typeof kickMember>>, TError, Key, KickMemberRequest, Awaited<ReturnType<typeof kickMember>>> & { swrKey?: string }, fetch?: RequestInit}
 ) => {
-  const { swr: swrOptions, fetch: fetchOptions } = options ?? {}
 
-  const swrKey = swrOptions?.swrKey ?? getKickMemberMutationKey(partyId)
-  const swrFn = getKickMemberMutationFetcher(partyId, fetchOptions)
+  const {swr: swrOptions, fetch: fetchOptions} = options ?? {}
+
+  const swrKey = swrOptions?.swrKey ?? getKickMemberMutationKey(partyId);
+  const swrFn = getKickMemberMutationFetcher(partyId, fetchOptions);
 
   const query = useSWRMutation(swrKey, swrFn, swrOptions)
 
@@ -624,70 +609,64 @@ export type leavePartyResponse500 = {
   data: ErrorResponse
   status: 500
 }
+    
+export type leavePartyResponseSuccess = (leavePartyResponse200) & {
+  headers: Headers;
+};
+export type leavePartyResponseError = (leavePartyResponse400 | leavePartyResponse401 | leavePartyResponse404 | leavePartyResponse500) & {
+  headers: Headers;
+};
 
-export type leavePartyResponseSuccess = leavePartyResponse200 & {
-  headers: Headers
-}
-export type leavePartyResponseError = (
-  | leavePartyResponse400
-  | leavePartyResponse401
-  | leavePartyResponse404
-  | leavePartyResponse500
-) & {
-  headers: Headers
-}
+export type leavePartyResponse = (leavePartyResponseSuccess | leavePartyResponseError)
 
-export type leavePartyResponse = leavePartyResponseSuccess | leavePartyResponseError
+export const getLeavePartyUrl = (partyId: string,) => {
 
-export const getLeavePartyUrl = (partyId: string) => {
+
+  
+
   return `/api/party/${partyId}/leave`
 }
 
-export const leaveParty = async (
-  partyId: string,
-  options?: RequestInit
-): Promise<leavePartyResponse> => {
-  const res = await fetch(getLeavePartyUrl(partyId), {
+export const leaveParty = async (partyId: string, options?: RequestInit): Promise<leavePartyResponse> => {
+  
+  const res = await fetch(getLeavePartyUrl(partyId),
+  {      
     ...options,
     method: 'POST'
-  })
+    
+    
+  }
+)
 
-  const body = [204, 205, 304].includes(res.status) ? null : await res.text()
-
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+  
   const data: leavePartyResponse['data'] = body ? JSON.parse(body) : {}
   return { data, status: res.status, headers: res.headers } as leavePartyResponse
 }
 
+
+
+
 export const getLeavePartyMutationFetcher = (partyId: string, options?: RequestInit) => {
   return (_: Key, __: { arg: Arguments }) => {
-    return leaveParty(partyId, options)
+    return leaveParty(partyId, options);
   }
 }
-export const getLeavePartyMutationKey = (partyId: string) =>
-  [`/api/party/${partyId}/leave`] as const
+export const getLeavePartyMutationKey = (partyId: string,) => [`/api/party/${partyId}/leave`] as const;
 
 export type LeavePartyMutationResult = NonNullable<Awaited<ReturnType<typeof leaveParty>>>
 
 /**
  * @summary Leave a party
  */
-export const useLeaveParty = <TError = Promise<ErrorResponse>>(
-  partyId: string,
-  options?: {
-    swr?: SWRMutationConfiguration<
-      Awaited<ReturnType<typeof leaveParty>>,
-      TError,
-      Key,
-      Arguments,
-      Awaited<ReturnType<typeof leaveParty>>
-    > & { swrKey?: string }
-    fetch?: RequestInit
-  }
+export const useLeaveParty = <TError = Promise<ErrorResponse | ErrorResponse | ErrorResponse | ErrorResponse>>(
+  partyId: string, options?: { swr?:SWRMutationConfiguration<Awaited<ReturnType<typeof leaveParty>>, TError, Key, Arguments, Awaited<ReturnType<typeof leaveParty>>> & { swrKey?: string }, fetch?: RequestInit}
 ) => {
-  const { swr: swrOptions, fetch: fetchOptions } = options ?? {}
 
-  const swrKey = swrOptions?.swrKey ?? getLeavePartyMutationKey(partyId)
-  const swrFn = getLeavePartyMutationFetcher(partyId, fetchOptions)
+  const {swr: swrOptions, fetch: fetchOptions} = options ?? {}
+
+  const swrKey = swrOptions?.swrKey ?? getLeavePartyMutationKey(partyId);
+  const swrFn = getLeavePartyMutationFetcher(partyId, fetchOptions);
 
   const query = useSWRMutation(swrKey, swrFn, swrOptions)
 
@@ -720,58 +699,55 @@ export type getPartyMembersResponse500 = {
   data: ErrorResponse
   status: 500
 }
+    
+export type getPartyMembersResponseSuccess = (getPartyMembersResponse200) & {
+  headers: Headers;
+};
+export type getPartyMembersResponseError = (getPartyMembersResponse401 | getPartyMembersResponse403 | getPartyMembersResponse404 | getPartyMembersResponse500) & {
+  headers: Headers;
+};
 
-export type getPartyMembersResponseSuccess = getPartyMembersResponse200 & {
-  headers: Headers
-}
-export type getPartyMembersResponseError = (
-  | getPartyMembersResponse401
-  | getPartyMembersResponse403
-  | getPartyMembersResponse404
-  | getPartyMembersResponse500
-) & {
-  headers: Headers
-}
+export type getPartyMembersResponse = (getPartyMembersResponseSuccess | getPartyMembersResponseError)
 
-export type getPartyMembersResponse = getPartyMembersResponseSuccess | getPartyMembersResponseError
+export const getGetPartyMembersUrl = (partyId: string,) => {
 
-export const getGetPartyMembersUrl = (partyId: string) => {
+
+  
+
   return `/api/party/${partyId}/members`
 }
 
-export const getPartyMembers = async (
-  partyId: string,
-  options?: RequestInit
-): Promise<getPartyMembersResponse> => {
-  const res = await fetch(getGetPartyMembersUrl(partyId), {
+export const getPartyMembers = async (partyId: string, options?: RequestInit): Promise<getPartyMembersResponse> => {
+  
+  const res = await fetch(getGetPartyMembersUrl(partyId),
+  {      
     ...options,
     method: 'GET'
-  })
+    
+    
+  }
+)
 
-  const body = [204, 205, 304].includes(res.status) ? null : await res.text()
-
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+  
   const data: getPartyMembersResponse['data'] = body ? JSON.parse(body) : {}
   return { data, status: res.status, headers: res.headers } as getPartyMembersResponse
 }
 
-export const getGetPartyMembersKey = (partyId: string) => [`/api/party/${partyId}/members`] as const
+
+
+
+export const getGetPartyMembersKey = (partyId: string,) => [`/api/party/${partyId}/members`] as const;
 
 export type GetPartyMembersQueryResult = NonNullable<Awaited<ReturnType<typeof getPartyMembers>>>
 
-export const useGetPartyMembers = <TError = Promise<ErrorResponse>>(
-  partyId: string,
-  options?: {
-    swr?: SWRConfiguration<Awaited<ReturnType<typeof getPartyMembers>>, TError> & {
-      swrKey?: Key
-      enabled?: boolean
-    }
-    fetch?: RequestInit
-  }
+export const useGetPartyMembers = <TError = Promise<ErrorResponse | ErrorResponse | ErrorResponse | ErrorResponse>>(
+  partyId: string, options?: { swr?:SWRConfiguration<Awaited<ReturnType<typeof getPartyMembers>>, TError> & { swrKey?: Key, enabled?: boolean }, fetch?: RequestInit }
 ) => {
-  const { swr: swrOptions, fetch: fetchOptions } = options ?? {}
+  const {swr: swrOptions, fetch: fetchOptions} = options ?? {}
 
-  const isEnabled = swrOptions?.enabled !== false && !!partyId
-  const swrKey = swrOptions?.swrKey ?? (() => (isEnabled ? getGetPartyMembersKey(partyId) : null))
+  const isEnabled = swrOptions?.enabled !== false && !!(partyId)
+  const swrKey = swrOptions?.swrKey ?? (() => isEnabled ? getGetPartyMembersKey(partyId) : null);
   const swrFn = () => getPartyMembers(partyId, fetchOptions)
 
   const query = useSwr<Awaited<ReturnType<typeof swrFn>>, TError>(swrKey, swrFn, swrOptions)
@@ -819,71 +795,64 @@ export type startNewRoundResponse500 = {
   data: ErrorResponse
   status: 500
 }
+    
+export type startNewRoundResponseSuccess = (startNewRoundResponse200) & {
+  headers: Headers;
+};
+export type startNewRoundResponseError = (startNewRoundResponse400 | startNewRoundResponse401 | startNewRoundResponse403 | startNewRoundResponse404 | startNewRoundResponse500) & {
+  headers: Headers;
+};
 
-export type startNewRoundResponseSuccess = startNewRoundResponse200 & {
-  headers: Headers
-}
-export type startNewRoundResponseError = (
-  | startNewRoundResponse400
-  | startNewRoundResponse401
-  | startNewRoundResponse403
-  | startNewRoundResponse404
-  | startNewRoundResponse500
-) & {
-  headers: Headers
-}
+export type startNewRoundResponse = (startNewRoundResponseSuccess | startNewRoundResponseError)
 
-export type startNewRoundResponse = startNewRoundResponseSuccess | startNewRoundResponseError
+export const getStartNewRoundUrl = (partyId: string,) => {
 
-export const getStartNewRoundUrl = (partyId: string) => {
+
+  
+
   return `/api/party/${partyId}/new-round`
 }
 
-export const startNewRound = async (
-  partyId: string,
-  options?: RequestInit
-): Promise<startNewRoundResponse> => {
-  const res = await fetch(getStartNewRoundUrl(partyId), {
+export const startNewRound = async (partyId: string, options?: RequestInit): Promise<startNewRoundResponse> => {
+  
+  const res = await fetch(getStartNewRoundUrl(partyId),
+  {      
     ...options,
     method: 'POST'
-  })
+    
+    
+  }
+)
 
-  const body = [204, 205, 304].includes(res.status) ? null : await res.text()
-
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+  
   const data: startNewRoundResponse['data'] = body ? JSON.parse(body) : {}
   return { data, status: res.status, headers: res.headers } as startNewRoundResponse
 }
 
+
+
+
 export const getStartNewRoundMutationFetcher = (partyId: string, options?: RequestInit) => {
   return (_: Key, __: { arg: Arguments }) => {
-    return startNewRound(partyId, options)
+    return startNewRound(partyId, options);
   }
 }
-export const getStartNewRoundMutationKey = (partyId: string) =>
-  [`/api/party/${partyId}/new-round`] as const
+export const getStartNewRoundMutationKey = (partyId: string,) => [`/api/party/${partyId}/new-round`] as const;
 
 export type StartNewRoundMutationResult = NonNullable<Awaited<ReturnType<typeof startNewRound>>>
 
 /**
  * @summary Start a new movie round
  */
-export const useStartNewRound = <TError = Promise<ErrorResponse>>(
-  partyId: string,
-  options?: {
-    swr?: SWRMutationConfiguration<
-      Awaited<ReturnType<typeof startNewRound>>,
-      TError,
-      Key,
-      Arguments,
-      Awaited<ReturnType<typeof startNewRound>>
-    > & { swrKey?: string }
-    fetch?: RequestInit
-  }
+export const useStartNewRound = <TError = Promise<ErrorResponse | ErrorResponse | ErrorResponse | ErrorResponse | ErrorResponse>>(
+  partyId: string, options?: { swr?:SWRMutationConfiguration<Awaited<ReturnType<typeof startNewRound>>, TError, Key, Arguments, Awaited<ReturnType<typeof startNewRound>>> & { swrKey?: string }, fetch?: RequestInit}
 ) => {
-  const { swr: swrOptions, fetch: fetchOptions } = options ?? {}
 
-  const swrKey = swrOptions?.swrKey ?? getStartNewRoundMutationKey(partyId)
-  const swrFn = getStartNewRoundMutationFetcher(partyId, fetchOptions)
+  const {swr: swrOptions, fetch: fetchOptions} = options ?? {}
+
+  const swrKey = swrOptions?.swrKey ?? getStartNewRoundMutationKey(partyId);
+  const swrFn = getStartNewRoundMutationFetcher(partyId, fetchOptions);
 
   const query = useSWRMutation(swrKey, swrFn, swrOptions)
 
@@ -916,70 +885,63 @@ export type toggleReadyResponse500 = {
   data: ErrorResponse
   status: 500
 }
+    
+export type toggleReadyResponseSuccess = (toggleReadyResponse200) & {
+  headers: Headers;
+};
+export type toggleReadyResponseError = (toggleReadyResponse400 | toggleReadyResponse401 | toggleReadyResponse404 | toggleReadyResponse500) & {
+  headers: Headers;
+};
 
-export type toggleReadyResponseSuccess = toggleReadyResponse200 & {
-  headers: Headers
-}
-export type toggleReadyResponseError = (
-  | toggleReadyResponse400
-  | toggleReadyResponse401
-  | toggleReadyResponse404
-  | toggleReadyResponse500
-) & {
-  headers: Headers
-}
+export type toggleReadyResponse = (toggleReadyResponseSuccess | toggleReadyResponseError)
 
-export type toggleReadyResponse = toggleReadyResponseSuccess | toggleReadyResponseError
+export const getToggleReadyUrl = (partyId: string,) => {
 
-export const getToggleReadyUrl = (partyId: string) => {
+
+  
+
   return `/api/party/${partyId}/ready`
 }
 
-export const toggleReady = async (
-  partyId: string,
-  setReadyRequest: SetReadyRequest,
-  options?: RequestInit
-): Promise<toggleReadyResponse> => {
-  const res = await fetch(getToggleReadyUrl(partyId), {
+export const toggleReady = async (partyId: string,
+    setReadyRequest: SetReadyRequest, options?: RequestInit): Promise<toggleReadyResponse> => {
+  
+  const res = await fetch(getToggleReadyUrl(partyId),
+  {      
     ...options,
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...options?.headers },
-    body: JSON.stringify(setReadyRequest)
-  })
+    body: JSON.stringify(
+      setReadyRequest,)
+  }
+)
 
-  const body = [204, 205, 304].includes(res.status) ? null : await res.text()
-
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+  
   const data: toggleReadyResponse['data'] = body ? JSON.parse(body) : {}
   return { data, status: res.status, headers: res.headers } as toggleReadyResponse
 }
 
+
+
+
 export const getToggleReadyMutationFetcher = (partyId: string, options?: RequestInit) => {
   return (_: Key, { arg }: { arg: SetReadyRequest }) => {
-    return toggleReady(partyId, arg, options)
+    return toggleReady(partyId, arg, options);
   }
 }
-export const getToggleReadyMutationKey = (partyId: string) =>
-  [`/api/party/${partyId}/ready`] as const
+export const getToggleReadyMutationKey = (partyId: string,) => [`/api/party/${partyId}/ready`] as const;
 
 export type ToggleReadyMutationResult = NonNullable<Awaited<ReturnType<typeof toggleReady>>>
 
-export const useToggleReady = <TError = Promise<void | ErrorResponse | void>>(
-  partyId: string,
-  options?: {
-    swr?: SWRMutationConfiguration<
-      Awaited<ReturnType<typeof toggleReady>>,
-      TError,
-      Key,
-      SetReadyRequest,
-      Awaited<ReturnType<typeof toggleReady>>
-    > & { swrKey?: string }
-    fetch?: RequestInit
-  }
+export const useToggleReady = <TError = Promise<void | ErrorResponse | void | ErrorResponse>>(
+  partyId: string, options?: { swr?:SWRMutationConfiguration<Awaited<ReturnType<typeof toggleReady>>, TError, Key, SetReadyRequest, Awaited<ReturnType<typeof toggleReady>>> & { swrKey?: string }, fetch?: RequestInit}
 ) => {
-  const { swr: swrOptions, fetch: fetchOptions } = options ?? {}
 
-  const swrKey = swrOptions?.swrKey ?? getToggleReadyMutationKey(partyId)
-  const swrFn = getToggleReadyMutationFetcher(partyId, fetchOptions)
+  const {swr: swrOptions, fetch: fetchOptions} = options ?? {}
+
+  const swrKey = swrOptions?.swrKey ?? getToggleReadyMutationKey(partyId);
+  const swrFn = getToggleReadyMutationFetcher(partyId, fetchOptions);
 
   const query = useSWRMutation(swrKey, swrFn, swrOptions)
 
@@ -1024,78 +986,66 @@ export type transferLeadershipResponse500 = {
   data: ErrorResponse
   status: 500
 }
+    
+export type transferLeadershipResponseSuccess = (transferLeadershipResponse200) & {
+  headers: Headers;
+};
+export type transferLeadershipResponseError = (transferLeadershipResponse400 | transferLeadershipResponse401 | transferLeadershipResponse403 | transferLeadershipResponse404 | transferLeadershipResponse500) & {
+  headers: Headers;
+};
 
-export type transferLeadershipResponseSuccess = transferLeadershipResponse200 & {
-  headers: Headers
-}
-export type transferLeadershipResponseError = (
-  | transferLeadershipResponse400
-  | transferLeadershipResponse401
-  | transferLeadershipResponse403
-  | transferLeadershipResponse404
-  | transferLeadershipResponse500
-) & {
-  headers: Headers
-}
+export type transferLeadershipResponse = (transferLeadershipResponseSuccess | transferLeadershipResponseError)
 
-export type transferLeadershipResponse =
-  | transferLeadershipResponseSuccess
-  | transferLeadershipResponseError
+export const getTransferLeadershipUrl = (partyId: string,) => {
 
-export const getTransferLeadershipUrl = (partyId: string) => {
+
+  
+
   return `/api/party/${partyId}/transfer-leadership`
 }
 
-export const transferLeadership = async (
-  partyId: string,
-  transferLeadershipRequest: TransferLeadershipRequest,
-  options?: RequestInit
-): Promise<transferLeadershipResponse> => {
-  const res = await fetch(getTransferLeadershipUrl(partyId), {
+export const transferLeadership = async (partyId: string,
+    transferLeadershipRequest: TransferLeadershipRequest, options?: RequestInit): Promise<transferLeadershipResponse> => {
+  
+  const res = await fetch(getTransferLeadershipUrl(partyId),
+  {      
     ...options,
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...options?.headers },
-    body: JSON.stringify(transferLeadershipRequest)
-  })
+    body: JSON.stringify(
+      transferLeadershipRequest,)
+  }
+)
 
-  const body = [204, 205, 304].includes(res.status) ? null : await res.text()
-
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+  
   const data: transferLeadershipResponse['data'] = body ? JSON.parse(body) : {}
   return { data, status: res.status, headers: res.headers } as transferLeadershipResponse
 }
 
+
+
+
 export const getTransferLeadershipMutationFetcher = (partyId: string, options?: RequestInit) => {
   return (_: Key, { arg }: { arg: TransferLeadershipRequest }) => {
-    return transferLeadership(partyId, arg, options)
+    return transferLeadership(partyId, arg, options);
   }
 }
-export const getTransferLeadershipMutationKey = (partyId: string) =>
-  [`/api/party/${partyId}/transfer-leadership`] as const
+export const getTransferLeadershipMutationKey = (partyId: string,) => [`/api/party/${partyId}/transfer-leadership`] as const;
 
-export type TransferLeadershipMutationResult = NonNullable<
-  Awaited<ReturnType<typeof transferLeadership>>
->
+export type TransferLeadershipMutationResult = NonNullable<Awaited<ReturnType<typeof transferLeadership>>>
 
 /**
  * @summary Transfer party leadership
  */
-export const useTransferLeadership = <TError = Promise<ErrorResponse>>(
-  partyId: string,
-  options?: {
-    swr?: SWRMutationConfiguration<
-      Awaited<ReturnType<typeof transferLeadership>>,
-      TError,
-      Key,
-      TransferLeadershipRequest,
-      Awaited<ReturnType<typeof transferLeadership>>
-    > & { swrKey?: string }
-    fetch?: RequestInit
-  }
+export const useTransferLeadership = <TError = Promise<ErrorResponse | ErrorResponse | ErrorResponse | ErrorResponse | ErrorResponse>>(
+  partyId: string, options?: { swr?:SWRMutationConfiguration<Awaited<ReturnType<typeof transferLeadership>>, TError, Key, TransferLeadershipRequest, Awaited<ReturnType<typeof transferLeadership>>> & { swrKey?: string }, fetch?: RequestInit}
 ) => {
-  const { swr: swrOptions, fetch: fetchOptions } = options ?? {}
 
-  const swrKey = swrOptions?.swrKey ?? getTransferLeadershipMutationKey(partyId)
-  const swrFn = getTransferLeadershipMutationFetcher(partyId, fetchOptions)
+  const {swr: swrOptions, fetch: fetchOptions} = options ?? {}
+
+  const swrKey = swrOptions?.swrKey ?? getTransferLeadershipMutationKey(partyId);
+  const swrFn = getTransferLeadershipMutationFetcher(partyId, fetchOptions);
 
   const query = useSWRMutation(swrKey, swrFn, swrOptions)
 

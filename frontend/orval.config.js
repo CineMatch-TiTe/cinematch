@@ -11,6 +11,12 @@ export default defineConfig({
     },
     input: {
       target: './openapi.json',
+      override: {
+        mutator: {
+          path: 'src/lib/orval-client.ts',
+          name: 'customInstance',
+        },
+      },
     },
   },
 });
