@@ -4,7 +4,7 @@ import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { z } from 'zod'
 import { loginGuest } from '@/server/user/user'
-import { joinParty } from '@/server/party/party'
+import { joinParty, createParty } from '@/server/party/party'
 
 const usernameSchema = z
   .string()
@@ -46,22 +46,9 @@ export async function guestLoginAction(prevState: unknown, formData: FormData) {
     })
 
     if (response.status === 201) {
-      // Forward 'set-cookie' if present in headers, though usually the `fetch` in Server Component environment
-      // doesn't automatically forward cookies to the client unless we explicitly set them.
-      // Orval returns `headers`. We need to extract the cookie.
-
-      // Note: Orval's generated client with our custom instance returns `headers` as a Headers object.
       const setCookieHeader = response.headers.get('set-cookie')
 
       if (setCookieHeader) {
-        // Simple parsing to forward the cookie.
-        // set-cookie can contain multiple cookies but usually we just want the session token.
-        // Next.js `cookies().set` is the way to set it.
-        // However, parsing `Set-Cookie` string to `cookies().set(...)` arguments can be non-trivial if complex.
-        // For simple session, we can try to extract name and value.
-
-        // Allow basic forwarding.
-        // A more robust app might split by ';' and extract key=value.
         const [cookiePart] = setCookieHeader.split(';')
         const [name, value] = cookiePart.split('=')
         if (name && value) {
@@ -101,4 +88,80 @@ export async function guestLoginAction(prevState: unknown, formData: FormData) {
 
   // Redirect on success (outside try-catch to avoid catching the redirect() error which is intended behavior in Next.js)
   redirect(`/preferences?joinCode=${encodeURIComponent(result.data.joinCode)}`)
+}
+
+const createPartyFormSchema = z.object({
+  username: usernameSchema
+})
+
+export async function createPartyAction(prevState: unknown, formData: FormData) {
+  const username = formData.get('username') as string
+
+  // Validate inputs
+  const result = createPartyFormSchema.safeParse({ username })
+
+  if (!result.success) {
+    return {
+      errors: result.error.flatten().fieldErrors,
+      message: 'Validation failed'
+    }
+  }
+
+  let fullPartyId = ''
+  let joinCode = ''
+
+  try {
+    const loginResponse = await loginGuest({
+      username: result.data.username
+    })
+
+    if (loginResponse.status === 201) {
+      const setCookieHeader = loginResponse.headers.get('set-cookie')
+
+      if (setCookieHeader) {
+        const [cookiePart] = setCookieHeader.split(';')
+        const [name, value] = cookiePart.split('=')
+
+        if (name && value) {
+          const cookieString = `${name.trim()}=${value.trim()}`
+
+          // Create the party
+          const createResponse = await createParty({
+            headers: {
+              Cookie: cookieString
+            }
+          })
+
+          if (createResponse.status === 201) {
+            const cookieStore = await cookies()
+            cookieStore.set(name.trim(), value.trim(), {
+              httpOnly: true,
+              sameSite: 'lax',
+              path: '/'
+            })
+
+            fullPartyId = createResponse.data.party_id
+            joinCode = createResponse.data.code
+          } else {
+            return {
+              message: 'Login successful, but failed to create party.'
+            }
+          }
+        }
+      }
+    } else {
+      return {
+        message: 'Login failed. Please try again.'
+      }
+    }
+  } catch (error) {
+    console.error('Create Party Error', error)
+    return {
+      message: 'An unexpected error occurred'
+    }
+  }
+
+  if (joinCode) {
+    redirect(`/preferences?joinCode=${encodeURIComponent(joinCode)}`)
+  }
 }
