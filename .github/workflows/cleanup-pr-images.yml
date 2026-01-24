@@ -14,23 +14,25 @@ jobs:
       - name: Set lowercase image name
         run: echo "IMAGE_NAME=$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')-backend" >> $GITHUB_ENV
 
-      - name: Delete PR image from GHCR
+      - name: Delete PR tag from GHCR using GitHub API
         env:
-          REGISTRY: ghcr.io
-          IMAGE_NAME: ${{ env.IMAGE_NAME }}
-          PR_NUM: ${{ github.event.pull_request.number }}
+          GHCR_REPO: ${{ github.repository_owner }}/$(echo '${{ github.repository }}' | cut -d'/' -f2)-backend
+          PR_TAG: pr-${{ github.event.pull_request.number }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          IMAGE_REF="$REGISTRY/$IMAGE_NAME:pr-$PR_NUM"
-          echo "Deleting $IMAGE_REF"
-          # Get the image digest for the PR tag
-          DIGEST=$(curl -s -H "Authorization: Bearer $GITHUB_TOKEN" \
-            "https://ghcr.io/v2/${IMAGE_NAME}/manifests/pr-$PR_NUM" \
-            -I | grep Docker-Content-Digest | awk '{print $2}' | tr -d '\r')
-          if [ -n "$DIGEST" ]; then
+          echo "Looking for GHCR package versions with tag $PR_TAG in $GHCR_REPO"
+          # List all package versions
+          versions=$(curl -s -H "Authorization: Bearer $GITHUB_TOKEN" \
+            "https://api.github.com/orgs/${{ github.repository_owner }}/packages/container/$(echo '${{ github.repository }}' | cut -d'/' -f2)-backend/versions?per_page=100")
+          # Find the version ID with the PR tag
+          version_id=$(echo "$versions" | jq -r ".[] | select(.metadata.container.tags[]? == \"$PR_TAG\") | .id" | head -n1)
+          if [ -n "$version_id" ]; then
+            echo "Deleting version ID $version_id with tag $PR_TAG"
             curl -X DELETE -H "Authorization: Bearer $GITHUB_TOKEN" \
-              "https://ghcr.io/v2/${IMAGE_NAME}/manifests/$DIGEST"
-            echo "Deleted image $IMAGE_REF ($DIGEST)"
+              "https://api.github.com/orgs/${{ github.repository_owner }}/packages/container/$(echo '${{ github.repository }}' | cut -d'/' -f2)-backend/versions/$version_id"
+            echo "Deleted tag $PR_TAG from GHCR"
           else
-            echo "No image found for $IMAGE_REF"
+            echo "No version found with tag $PR_TAG"
           fi
+        shell: bash
+        # jq is preinstalled on GitHub-hosted runners
