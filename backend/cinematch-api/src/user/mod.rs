@@ -10,17 +10,19 @@ use uuid::Uuid;
 // User Responses
 // ============================================================================
 
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+pub struct GuestUserRequest {
+    /// Desired username for the guest user (optional)
+    pub username: Option<String>,
+}
+
 /// Response when creating a guest user
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct GuestLoginResponse {
     /// The newly created user ID
     pub user_id: Uuid,
-    /// The auto-generated username
+    /// The username
     pub username: String,
-    /// Whether this is a guest/oneshot user
-    pub is_guest: bool,
-    /// When the user was created
-    pub created_at: DateTime<Utc>,
 }
 
 /// Response with user details

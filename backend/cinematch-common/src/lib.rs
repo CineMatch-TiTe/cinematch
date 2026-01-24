@@ -1,3 +1,28 @@
+pub const NAME_MIN_LENGTH: usize = 3;
+pub const NAME_MAX_LENGTH: usize = 32;
+
+#[macro_export]
+macro_rules! extract_and_validate_username {
+    ($input:expr) => {{
+        let name = $input
+            .trim()
+            .chars()
+            .filter(|c| !c.is_control())
+            .collect::<String>();
+        if name.len() < cinematch_common::NAME_MIN_LENGTH
+            || name.len() > cinematch_common::NAME_MAX_LENGTH
+        {
+            use ::actix_web::HttpResponse;
+            return HttpResponse::BadRequest().json($crate::ErrorResponse::new(format!(
+                "Username must be between {} and {} characters",
+                cinematch_common::NAME_MIN_LENGTH,
+                cinematch_common::NAME_MAX_LENGTH
+            )));
+        }
+        name
+    }};
+}
+
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
