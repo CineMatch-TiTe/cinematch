@@ -1,13 +1,14 @@
 import { defineConfig } from 'orval';
 
 export default defineConfig({
-  partyApi: {
+
+  serverApi: {
     output: {
       mode: 'tags-split',
-      target: 'src/party-api.ts',
+      target: 'src/server/api.ts',
       schemas: 'src/model',
-      client: 'swr',
-      mock: true,
+      client: 'fetch',
+      mock: false,
     },
     input: {
       target: './openapi.json',

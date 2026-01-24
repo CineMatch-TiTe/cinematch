@@ -4,31 +4,15 @@
  * cinematch-api
  * OpenAPI spec version: 0.1.0
  */
-import useSwr from 'swr';
-import type {
-  Arguments,
-  Key,
-  SWRConfiguration
-} from 'swr';
-
-import useSWRMutation from 'swr/mutation';
-import type {
-  SWRMutationConfiguration
-} from 'swr/mutation';
-
 import type {
   CurrentUserResponse,
   ErrorResponse,
   GuestLoginResponse,
   GuestUserRequest,
   RenameUserRequest
-} from '.././model';
+} from '../../model';
 
 
-
-  
-  
-  
 /**
  * Returns the currently authenticated user's profile information
 along with JWT token validity details.
@@ -91,31 +75,6 @@ export const getCurrentUser = async ( options?: RequestInit): Promise<getCurrent
 }
 
 
-
-
-export const getGetCurrentUserKey = () => [`/api/user`] as const;
-
-export type GetCurrentUserQueryResult = NonNullable<Awaited<ReturnType<typeof getCurrentUser>>>
-
-/**
- * @summary Get current user info
- */
-export const useGetCurrentUser = <TError = Promise<ErrorResponse | ErrorResponse | ErrorResponse>>(
-   options?: { swr?:SWRConfiguration<Awaited<ReturnType<typeof getCurrentUser>>, TError> & { swrKey?: Key, enabled?: boolean }, fetch?: RequestInit }
-) => {
-  const {swr: swrOptions, fetch: fetchOptions} = options ?? {}
-
-  const isEnabled = swrOptions?.enabled !== false
-  const swrKey = swrOptions?.swrKey ?? (() => isEnabled ? getGetCurrentUserKey() : null);
-  const swrFn = () => getCurrentUser(fetchOptions)
-
-  const query = useSwr<Awaited<ReturnType<typeof swrFn>>, TError>(swrKey, swrFn, swrOptions)
-
-  return {
-    swrKey,
-    ...query
-  }
-}
 /**
  * Creates a new temporary (oneshot) user with an auto-generated username.
 This user can join parties but will be ephemeral to that party's lifetime.
@@ -183,36 +142,6 @@ export const loginGuest = async (guestUserRequest: GuestUserRequest, options?: R
 }
 
 
-
-
-export const getLoginGuestMutationFetcher = ( options?: RequestInit) => {
-  return (_: Key, { arg }: { arg: GuestUserRequest }) => {
-    return loginGuest(arg, options);
-  }
-}
-export const getLoginGuestMutationKey = () => [`/api/user/login/guest`] as const;
-
-export type LoginGuestMutationResult = NonNullable<Awaited<ReturnType<typeof loginGuest>>>
-
-/**
- * @summary Create a guest user
- */
-export const useLoginGuest = <TError = Promise<ErrorResponse | ErrorResponse | ErrorResponse>>(
-   options?: { swr?:SWRMutationConfiguration<Awaited<ReturnType<typeof loginGuest>>, TError, Key, GuestUserRequest, Awaited<ReturnType<typeof loginGuest>>> & { swrKey?: string }, fetch?: RequestInit}
-) => {
-
-  const {swr: swrOptions, fetch: fetchOptions} = options ?? {}
-
-  const swrKey = swrOptions?.swrKey ?? getLoginGuestMutationKey();
-  const swrFn = getLoginGuestMutationFetcher(fetchOptions);
-
-  const query = useSWRMutation(swrKey, swrFn, swrOptions)
-
-  return {
-    swrKey,
-    ...query
-  }
-}
 /**
  * Clears authentication cookies by setting them to expire.
 This effectively logs out the user on the client side.
@@ -270,36 +199,6 @@ export const logoutUser = async ( options?: RequestInit): Promise<logoutUserResp
 }
 
 
-
-
-export const getLogoutUserMutationFetcher = ( options?: RequestInit) => {
-  return (_: Key, __: { arg: Arguments }) => {
-    return logoutUser(options);
-  }
-}
-export const getLogoutUserMutationKey = () => [`/api/user/logout`] as const;
-
-export type LogoutUserMutationResult = NonNullable<Awaited<ReturnType<typeof logoutUser>>>
-
-/**
- * @summary Logout user
- */
-export const useLogoutUser = <TError = Promise<ErrorResponse>>(
-   options?: { swr?:SWRMutationConfiguration<Awaited<ReturnType<typeof logoutUser>>, TError, Key, Arguments, Awaited<ReturnType<typeof logoutUser>>> & { swrKey?: string }, fetch?: RequestInit}
-) => {
-
-  const {swr: swrOptions, fetch: fetchOptions} = options ?? {}
-
-  const swrKey = swrOptions?.swrKey ?? getLogoutUserMutationKey();
-  const swrFn = getLogoutUserMutationFetcher(fetchOptions);
-
-  const query = useSWRMutation(swrKey, swrFn, swrOptions)
-
-  return {
-    swrKey,
-    ...query
-  }
-}
 /**
  * Updates the username for a user. Username can be 3-32 characters.
 
@@ -375,33 +274,3 @@ export const renameUser = async (userId: string,
 }
 
 
-
-
-export const getRenameUserMutationFetcher = (userId: string, options?: RequestInit) => {
-  return (_: Key, { arg }: { arg: RenameUserRequest }) => {
-    return renameUser(userId, arg, options);
-  }
-}
-export const getRenameUserMutationKey = (userId: string,) => [`/api/user/rename/${userId}`] as const;
-
-export type RenameUserMutationResult = NonNullable<Awaited<ReturnType<typeof renameUser>>>
-
-/**
- * @summary Rename a user
- */
-export const useRenameUser = <TError = Promise<ErrorResponse | void | void | void | ErrorResponse>>(
-  userId: string, options?: { swr?:SWRMutationConfiguration<Awaited<ReturnType<typeof renameUser>>, TError, Key, RenameUserRequest, Awaited<ReturnType<typeof renameUser>>> & { swrKey?: string }, fetch?: RequestInit}
-) => {
-
-  const {swr: swrOptions, fetch: fetchOptions} = options ?? {}
-
-  const swrKey = swrOptions?.swrKey ?? getRenameUserMutationKey(userId);
-  const swrFn = getRenameUserMutationFetcher(userId, fetchOptions);
-
-  const query = useSWRMutation(swrKey, swrFn, swrOptions)
-
-  return {
-    swrKey,
-    ...query
-  }
-}

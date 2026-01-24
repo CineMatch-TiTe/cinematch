@@ -4,18 +4,6 @@
  * cinematch-api
  * OpenAPI spec version: 0.1.0
  */
-import useSwr from 'swr';
-import type {
-  Arguments,
-  Key,
-  SWRConfiguration
-} from 'swr';
-
-import useSWRMutation from 'swr/mutation';
-import type {
-  SWRMutationConfiguration
-} from 'swr/mutation';
-
 import type {
   CreatePartyResponse,
   ErrorResponse,
@@ -26,13 +14,9 @@ import type {
   PhaseAdvanceResponse,
   SetReadyRequest,
   TransferLeadershipRequest
-} from '.././model';
+} from '../../model';
 
 
-
-  
-  
-  
 export type createPartyResponse201 = {
   data: CreatePartyResponse
   status: 201
@@ -88,33 +72,6 @@ export const createParty = async ( options?: RequestInit): Promise<createPartyRe
 }
 
 
-
-
-export const getCreatePartyMutationFetcher = ( options?: RequestInit) => {
-  return (_: Key, __: { arg: Arguments }) => {
-    return createParty(options);
-  }
-}
-export const getCreatePartyMutationKey = () => [`/api/party`] as const;
-
-export type CreatePartyMutationResult = NonNullable<Awaited<ReturnType<typeof createParty>>>
-
-export const useCreateParty = <TError = Promise<ErrorResponse | ErrorResponse | ErrorResponse>>(
-   options?: { swr?:SWRMutationConfiguration<Awaited<ReturnType<typeof createParty>>, TError, Key, Arguments, Awaited<ReturnType<typeof createParty>>> & { swrKey?: string }, fetch?: RequestInit}
-) => {
-
-  const {swr: swrOptions, fetch: fetchOptions} = options ?? {}
-
-  const swrKey = swrOptions?.swrKey ?? getCreatePartyMutationKey();
-  const swrFn = getCreatePartyMutationFetcher(fetchOptions);
-
-  const query = useSWRMutation(swrKey, swrFn, swrOptions)
-
-  return {
-    swrKey,
-    ...query
-  }
-}
 export type joinPartyResponse200 = {
   data: CreatePartyResponse
   status: 200
@@ -175,33 +132,6 @@ export const joinParty = async (code: string, options?: RequestInit): Promise<jo
 }
 
 
-
-
-export const getJoinPartyMutationFetcher = (code: string, options?: RequestInit) => {
-  return (_: Key, __: { arg: Arguments }) => {
-    return joinParty(code, options);
-  }
-}
-export const getJoinPartyMutationKey = (code: string,) => [`/api/party/join/${code}`] as const;
-
-export type JoinPartyMutationResult = NonNullable<Awaited<ReturnType<typeof joinParty>>>
-
-export const useJoinParty = <TError = Promise<ErrorResponse | ErrorResponse | ErrorResponse | ErrorResponse>>(
-  code: string, options?: { swr?:SWRMutationConfiguration<Awaited<ReturnType<typeof joinParty>>, TError, Key, Arguments, Awaited<ReturnType<typeof joinParty>>> & { swrKey?: string }, fetch?: RequestInit}
-) => {
-
-  const {swr: swrOptions, fetch: fetchOptions} = options ?? {}
-
-  const swrKey = swrOptions?.swrKey ?? getJoinPartyMutationKey(code);
-  const swrFn = getJoinPartyMutationFetcher(code, fetchOptions);
-
-  const query = useSWRMutation(swrKey, swrFn, swrOptions)
-
-  return {
-    swrKey,
-    ...query
-  }
-}
 export type getPartyResponse200 = {
   data: PartyResponse
   status: 200
@@ -262,28 +192,6 @@ export const getParty = async (partyId: string, options?: RequestInit): Promise<
 }
 
 
-
-
-export const getGetPartyKey = (partyId: string,) => [`/api/party/${partyId}`] as const;
-
-export type GetPartyQueryResult = NonNullable<Awaited<ReturnType<typeof getParty>>>
-
-export const useGetParty = <TError = Promise<ErrorResponse | ErrorResponse | ErrorResponse | ErrorResponse>>(
-  partyId: string, options?: { swr?:SWRConfiguration<Awaited<ReturnType<typeof getParty>>, TError> & { swrKey?: Key, enabled?: boolean }, fetch?: RequestInit }
-) => {
-  const {swr: swrOptions, fetch: fetchOptions} = options ?? {}
-
-  const isEnabled = swrOptions?.enabled !== false && !!(partyId)
-  const swrKey = swrOptions?.swrKey ?? (() => isEnabled ? getGetPartyKey(partyId) : null);
-  const swrFn = () => getParty(partyId, fetchOptions)
-
-  const query = useSwr<Awaited<ReturnType<typeof swrFn>>, TError>(swrKey, swrFn, swrOptions)
-
-  return {
-    swrKey,
-    ...query
-  }
-}
 export type advancePhaseResponse200 = {
   data: PhaseAdvanceResponse
   status: 200
@@ -349,33 +257,6 @@ export const advancePhase = async (partyId: string, options?: RequestInit): Prom
 }
 
 
-
-
-export const getAdvancePhaseMutationFetcher = (partyId: string, options?: RequestInit) => {
-  return (_: Key, __: { arg: Arguments }) => {
-    return advancePhase(partyId, options);
-  }
-}
-export const getAdvancePhaseMutationKey = (partyId: string,) => [`/api/party/${partyId}/advance`] as const;
-
-export type AdvancePhaseMutationResult = NonNullable<Awaited<ReturnType<typeof advancePhase>>>
-
-export const useAdvancePhase = <TError = Promise<ErrorResponse | ErrorResponse | ErrorResponse | ErrorResponse | ErrorResponse>>(
-  partyId: string, options?: { swr?:SWRMutationConfiguration<Awaited<ReturnType<typeof advancePhase>>, TError, Key, Arguments, Awaited<ReturnType<typeof advancePhase>>> & { swrKey?: string }, fetch?: RequestInit}
-) => {
-
-  const {swr: swrOptions, fetch: fetchOptions} = options ?? {}
-
-  const swrKey = swrOptions?.swrKey ?? getAdvancePhaseMutationKey(partyId);
-  const swrFn = getAdvancePhaseMutationFetcher(partyId, fetchOptions);
-
-  const query = useSWRMutation(swrKey, swrFn, swrOptions)
-
-  return {
-    swrKey,
-    ...query
-  }
-}
 /**
  * Disbands the party completely. Only the party leader can disband.
 This sets the party state to Disbanded and removes the join code.
@@ -443,36 +324,6 @@ export const disbandParty = async (partyId: string, options?: RequestInit): Prom
 }
 
 
-
-
-export const getDisbandPartyMutationFetcher = (partyId: string, options?: RequestInit) => {
-  return (_: Key, __: { arg: Arguments }) => {
-    return disbandParty(partyId, options);
-  }
-}
-export const getDisbandPartyMutationKey = (partyId: string,) => [`/api/party/${partyId}/disband`] as const;
-
-export type DisbandPartyMutationResult = NonNullable<Awaited<ReturnType<typeof disbandParty>>>
-
-/**
- * @summary Disband party
- */
-export const useDisbandParty = <TError = Promise<ErrorResponse | ErrorResponse | ErrorResponse | ErrorResponse>>(
-  partyId: string, options?: { swr?:SWRMutationConfiguration<Awaited<ReturnType<typeof disbandParty>>, TError, Key, Arguments, Awaited<ReturnType<typeof disbandParty>>> & { swrKey?: string }, fetch?: RequestInit}
-) => {
-
-  const {swr: swrOptions, fetch: fetchOptions} = options ?? {}
-
-  const swrKey = swrOptions?.swrKey ?? getDisbandPartyMutationKey(partyId);
-  const swrFn = getDisbandPartyMutationFetcher(partyId, fetchOptions);
-
-  const query = useSWRMutation(swrKey, swrFn, swrOptions)
-
-  return {
-    swrKey,
-    ...query
-  }
-}
 /**
  * Removes a member from the party. Only the party leader can kick members.
 The leader cannot kick themselves (use leave instead).
@@ -547,36 +398,6 @@ export const kickMember = async (partyId: string,
 }
 
 
-
-
-export const getKickMemberMutationFetcher = (partyId: string, options?: RequestInit) => {
-  return (_: Key, { arg }: { arg: KickMemberRequest }) => {
-    return kickMember(partyId, arg, options);
-  }
-}
-export const getKickMemberMutationKey = (partyId: string,) => [`/api/party/${partyId}/kick`] as const;
-
-export type KickMemberMutationResult = NonNullable<Awaited<ReturnType<typeof kickMember>>>
-
-/**
- * @summary Kick a member from the party
- */
-export const useKickMember = <TError = Promise<ErrorResponse | ErrorResponse | ErrorResponse | ErrorResponse | ErrorResponse>>(
-  partyId: string, options?: { swr?:SWRMutationConfiguration<Awaited<ReturnType<typeof kickMember>>, TError, Key, KickMemberRequest, Awaited<ReturnType<typeof kickMember>>> & { swrKey?: string }, fetch?: RequestInit}
-) => {
-
-  const {swr: swrOptions, fetch: fetchOptions} = options ?? {}
-
-  const swrKey = swrOptions?.swrKey ?? getKickMemberMutationKey(partyId);
-  const swrFn = getKickMemberMutationFetcher(partyId, fetchOptions);
-
-  const query = useSWRMutation(swrKey, swrFn, swrOptions)
-
-  return {
-    swrKey,
-    ...query
-  }
-}
 /**
  * Removes the requesting user from the party.
 If the leader leaves, leadership is transferred to the oldest member.
@@ -645,36 +466,6 @@ export const leaveParty = async (partyId: string, options?: RequestInit): Promis
 }
 
 
-
-
-export const getLeavePartyMutationFetcher = (partyId: string, options?: RequestInit) => {
-  return (_: Key, __: { arg: Arguments }) => {
-    return leaveParty(partyId, options);
-  }
-}
-export const getLeavePartyMutationKey = (partyId: string,) => [`/api/party/${partyId}/leave`] as const;
-
-export type LeavePartyMutationResult = NonNullable<Awaited<ReturnType<typeof leaveParty>>>
-
-/**
- * @summary Leave a party
- */
-export const useLeaveParty = <TError = Promise<ErrorResponse | ErrorResponse | ErrorResponse | ErrorResponse>>(
-  partyId: string, options?: { swr?:SWRMutationConfiguration<Awaited<ReturnType<typeof leaveParty>>, TError, Key, Arguments, Awaited<ReturnType<typeof leaveParty>>> & { swrKey?: string }, fetch?: RequestInit}
-) => {
-
-  const {swr: swrOptions, fetch: fetchOptions} = options ?? {}
-
-  const swrKey = swrOptions?.swrKey ?? getLeavePartyMutationKey(partyId);
-  const swrFn = getLeavePartyMutationFetcher(partyId, fetchOptions);
-
-  const query = useSWRMutation(swrKey, swrFn, swrOptions)
-
-  return {
-    swrKey,
-    ...query
-  }
-}
 export type getPartyMembersResponse200 = {
   data: PartyMembersResponse
   status: 200
@@ -735,28 +526,6 @@ export const getPartyMembers = async (partyId: string, options?: RequestInit): P
 }
 
 
-
-
-export const getGetPartyMembersKey = (partyId: string,) => [`/api/party/${partyId}/members`] as const;
-
-export type GetPartyMembersQueryResult = NonNullable<Awaited<ReturnType<typeof getPartyMembers>>>
-
-export const useGetPartyMembers = <TError = Promise<ErrorResponse | ErrorResponse | ErrorResponse | ErrorResponse>>(
-  partyId: string, options?: { swr?:SWRConfiguration<Awaited<ReturnType<typeof getPartyMembers>>, TError> & { swrKey?: Key, enabled?: boolean }, fetch?: RequestInit }
-) => {
-  const {swr: swrOptions, fetch: fetchOptions} = options ?? {}
-
-  const isEnabled = swrOptions?.enabled !== false && !!(partyId)
-  const swrKey = swrOptions?.swrKey ?? (() => isEnabled ? getGetPartyMembersKey(partyId) : null);
-  const swrFn = () => getPartyMembers(partyId, fetchOptions)
-
-  const query = useSwr<Awaited<ReturnType<typeof swrFn>>, TError>(swrKey, swrFn, swrOptions)
-
-  return {
-    swrKey,
-    ...query
-  }
-}
 /**
  * Starts a new movie round from the Review state.
 Only the party leader can start a new round.
@@ -831,36 +600,6 @@ export const startNewRound = async (partyId: string, options?: RequestInit): Pro
 }
 
 
-
-
-export const getStartNewRoundMutationFetcher = (partyId: string, options?: RequestInit) => {
-  return (_: Key, __: { arg: Arguments }) => {
-    return startNewRound(partyId, options);
-  }
-}
-export const getStartNewRoundMutationKey = (partyId: string,) => [`/api/party/${partyId}/new-round`] as const;
-
-export type StartNewRoundMutationResult = NonNullable<Awaited<ReturnType<typeof startNewRound>>>
-
-/**
- * @summary Start a new movie round
- */
-export const useStartNewRound = <TError = Promise<ErrorResponse | ErrorResponse | ErrorResponse | ErrorResponse | ErrorResponse>>(
-  partyId: string, options?: { swr?:SWRMutationConfiguration<Awaited<ReturnType<typeof startNewRound>>, TError, Key, Arguments, Awaited<ReturnType<typeof startNewRound>>> & { swrKey?: string }, fetch?: RequestInit}
-) => {
-
-  const {swr: swrOptions, fetch: fetchOptions} = options ?? {}
-
-  const swrKey = swrOptions?.swrKey ?? getStartNewRoundMutationKey(partyId);
-  const swrFn = getStartNewRoundMutationFetcher(partyId, fetchOptions);
-
-  const query = useSWRMutation(swrKey, swrFn, swrOptions)
-
-  return {
-    swrKey,
-    ...query
-  }
-}
 export type toggleReadyResponse200 = {
   data: void
   status: 200
@@ -923,33 +662,6 @@ export const toggleReady = async (partyId: string,
 }
 
 
-
-
-export const getToggleReadyMutationFetcher = (partyId: string, options?: RequestInit) => {
-  return (_: Key, { arg }: { arg: SetReadyRequest }) => {
-    return toggleReady(partyId, arg, options);
-  }
-}
-export const getToggleReadyMutationKey = (partyId: string,) => [`/api/party/${partyId}/ready`] as const;
-
-export type ToggleReadyMutationResult = NonNullable<Awaited<ReturnType<typeof toggleReady>>>
-
-export const useToggleReady = <TError = Promise<void | ErrorResponse | void | ErrorResponse>>(
-  partyId: string, options?: { swr?:SWRMutationConfiguration<Awaited<ReturnType<typeof toggleReady>>, TError, Key, SetReadyRequest, Awaited<ReturnType<typeof toggleReady>>> & { swrKey?: string }, fetch?: RequestInit}
-) => {
-
-  const {swr: swrOptions, fetch: fetchOptions} = options ?? {}
-
-  const swrKey = swrOptions?.swrKey ?? getToggleReadyMutationKey(partyId);
-  const swrFn = getToggleReadyMutationFetcher(partyId, fetchOptions);
-
-  const query = useSWRMutation(swrKey, swrFn, swrOptions)
-
-  return {
-    swrKey,
-    ...query
-  }
-}
 /**
  * Transfers leadership to another party member.
 Only the current leader can transfer leadership.
@@ -1024,33 +736,3 @@ export const transferLeadership = async (partyId: string,
 }
 
 
-
-
-export const getTransferLeadershipMutationFetcher = (partyId: string, options?: RequestInit) => {
-  return (_: Key, { arg }: { arg: TransferLeadershipRequest }) => {
-    return transferLeadership(partyId, arg, options);
-  }
-}
-export const getTransferLeadershipMutationKey = (partyId: string,) => [`/api/party/${partyId}/transfer-leadership`] as const;
-
-export type TransferLeadershipMutationResult = NonNullable<Awaited<ReturnType<typeof transferLeadership>>>
-
-/**
- * @summary Transfer party leadership
- */
-export const useTransferLeadership = <TError = Promise<ErrorResponse | ErrorResponse | ErrorResponse | ErrorResponse | ErrorResponse>>(
-  partyId: string, options?: { swr?:SWRMutationConfiguration<Awaited<ReturnType<typeof transferLeadership>>, TError, Key, TransferLeadershipRequest, Awaited<ReturnType<typeof transferLeadership>>> & { swrKey?: string }, fetch?: RequestInit}
-) => {
-
-  const {swr: swrOptions, fetch: fetchOptions} = options ?? {}
-
-  const swrKey = swrOptions?.swrKey ?? getTransferLeadershipMutationKey(partyId);
-  const swrFn = getTransferLeadershipMutationFetcher(partyId, fetchOptions);
-
-  const query = useSWRMutation(swrKey, swrFn, swrOptions)
-
-  return {
-    swrKey,
-    ...query
-  }
-}

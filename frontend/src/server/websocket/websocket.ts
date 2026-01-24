@@ -4,21 +4,11 @@
  * cinematch-api
  * OpenAPI spec version: 0.1.0
  */
-import useSwr from 'swr';
-import type {
-  Key,
-  SWRConfiguration
-} from 'swr';
-
 import type {
   ErrorResponse
-} from '.././model';
+} from '../../model';
 
 
-
-  
-  
-  
 export type websocketControllerResponse200 = {
   data: void
   status: 200
@@ -79,25 +69,3 @@ export const websocketController = async ( options?: RequestInit): Promise<webso
 }
 
 
-
-
-export const getWebsocketControllerKey = () => [`/api/ws`] as const;
-
-export type WebsocketControllerQueryResult = NonNullable<Awaited<ReturnType<typeof websocketController>>>
-
-export const useWebsocketController = <TError = Promise<void | void | void | ErrorResponse>>(
-   options?: { swr?:SWRConfiguration<Awaited<ReturnType<typeof websocketController>>, TError> & { swrKey?: Key, enabled?: boolean }, fetch?: RequestInit }
-) => {
-  const {swr: swrOptions, fetch: fetchOptions} = options ?? {}
-
-  const isEnabled = swrOptions?.enabled !== false
-  const swrKey = swrOptions?.swrKey ?? (() => isEnabled ? getWebsocketControllerKey() : null);
-  const swrFn = () => websocketController(fetchOptions)
-
-  const query = useSwr<Awaited<ReturnType<typeof swrFn>>, TError>(swrKey, swrFn, swrOptions)
-
-  return {
-    swrKey,
-    ...query
-  }
-}

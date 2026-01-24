@@ -3,7 +3,7 @@
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { z } from 'zod'
-import { loginGuest } from '@/user/user'
+import { loginGuest } from '@/server/user/user'
 
 const usernameSchema = z
   .string()
@@ -25,7 +25,7 @@ const guestLoginFormSchema = z.object({
   joinCode: joinCodeSchema
 })
 
-export async function guestLoginAction(prevState: any, formData: FormData) {
+export async function guestLoginAction(prevState: unknown, formData: FormData) {
   const username = formData.get('username') as string
   const joinCode = formData.get('joinCode') as string
 
