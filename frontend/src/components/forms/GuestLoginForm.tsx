@@ -52,8 +52,6 @@ export function GuestLoginForm() {
         </div>
       </div>
 
-      {state?.message && <p className="text-sm text-red-500 text-center">{state.message}</p>}
-
       <Button
         type="submit"
         disabled={isPending}
