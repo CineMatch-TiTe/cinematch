@@ -65,6 +65,7 @@ jobs:
 
   build:
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    needs: quality_checks
     name: Build Docker image
     runs-on: ubuntu-latest
     permissions:
