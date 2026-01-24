@@ -10,6 +10,7 @@ use uuid::Uuid;
 
 pub mod models;
 pub mod schema;
+pub mod vector;
 
 mod external_account;
 mod party;
@@ -18,6 +19,8 @@ mod user;
 use diesel::Connection;
 use diesel::PgConnection;
 pub use models::*;
+
+use crate::vector::qdrant::QdrantService;
 
 // ============================================================================
 // Error Types
@@ -67,16 +70,23 @@ pub type DbResult<T> = Result<T, DbError>;
 /// Async database connection pool
 pub struct Database {
     pool: Pool<AsyncPgConnection>,
+    vector: QdrantService,
 }
 
 impl Database {
     /// Create a new database connection pool from a database URL
-    pub fn new(database_url: &str) -> DbResult<Self> {
-        let config = AsyncDieselConnectionManager::<AsyncPgConnection>::new(database_url);
+    pub fn new(postgres_url: &str, qdrant_url: &str) -> DbResult<Self> {
+        let config = AsyncDieselConnectionManager::<AsyncPgConnection>::new(postgres_url);
         let pool = Pool::builder(config)
             .build()
             .map_err(|e| DbError::Connection(e.to_string()))?;
-        Ok(Self { pool })
+
+        let vector_service =
+            QdrantService::new(qdrant_url).map_err(|e| DbError::Connection(e.to_string()))?;
+        Ok(Self {
+            pool,
+            vector: vector_service,
+        })
     }
 
     /// Get a connection from the pool
