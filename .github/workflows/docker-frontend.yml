@@ -64,7 +64,6 @@ jobs:
         run: npm run build
 
   build:
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
     needs: quality_checks
     name: Build Docker image
     runs-on: ubuntu-latest
@@ -85,8 +84,8 @@ jobs:
       - name: Set PR tag if PR
         id: set-pr-tag
         run: |
-          if [[ "${{ github.event.workflow_run.event }}" == "pull_request" ]]; then
-            PR_NUM=${{ github.event.workflow_run.pull_requests[0].number }}
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            PR_NUM=${{ github.event.number }}
             echo "pr_tag=pr-${PR_NUM}" >> $GITHUB_OUTPUT
             echo "pr_number=${PR_NUM}" >> $GITHUB_OUTPUT
           else
@@ -95,7 +94,7 @@ jobs:
           fi
 
       - name: Install cosign
-        if: github.event.workflow_run.event != 'pull_request'
+        if: github.event_name != 'pull_request'
         uses: sigstore/cosign-installer@59acb6260d9c0ba8f4a2f9d9b48431a222b68e20 #v3.5.0
         with:
           cosign-release: 'v2.2.4'
@@ -129,14 +128,14 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: Sign the published Docker image
-        if: ${{ github.event.workflow_run.event != 'pull_request' }}
+        if: ${{ github.event_name != 'pull_request' }}
         env:
           TAGS: ${{ steps.meta.outputs.tags }}
           DIGEST: ${{ steps.build-and-push.outputs.digest }}
         run: echo "${TAGS}" | xargs -I {} cosign sign --yes {}@${DIGEST}
 
   approve-and-push-pr-image:
-    if: github.event.workflow_run.event == 'pull_request' && github.event.workflow_run.conclusion == 'success'
+    if: github.event_name == 'pull_request'
     needs: build
     runs-on: ubuntu-latest
     permissions:
