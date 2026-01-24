@@ -1,0 +1,95 @@
+
+networks:
+  db_network:
+    driver: bridge
+    internal: true
+  internet:
+
+services:
+  cinematch-server:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "8085:8085"
+    environment:
+      - DATABASE_URL=postgres://cinematch_user:password@cinematch-db:5432/cinematch
+      - REDIS_URL=redis://cinematch-redis:6379
+      - QDRANT_URL=http://qdrant:6333
+    depends_on:
+      - cinematch-db
+      - cinematch-redis
+      - qdrant
+    networks:
+      - db_network
+      - internet
+    env_file:
+      - .env
+
+  cinematch-db:
+    image: postgres:15
+    environment:
+      - POSTGRES_USER=cinematch_user
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=cinematch
+    ports:
+      - "5432:5432"
+    volumes:
+      - cinematch_db_data:/var/lib/postgresql/data
+    networks:
+      - db_network
+      - internet
+
+  cinematch-redis:
+    image: redis:7
+    ports:
+      - "6379:6379"
+    volumes:
+      - cinematch_redis_data:/data
+    networks:
+      - db_network
+      - internet
+
+  qdrant:
+    image: qdrant/qdrant:latest
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    volumes:
+      - qdrant_storage:/qdrant/storage
+    environment:
+      - QDRANT_API_KEY=
+    networks:
+      - db_network
+      - internet
+
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    environment:
+      - OLLAMA_HOST=0.0.0.0:11434
+    networks:
+      - internet
+    command: serve
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+volumes:
+  cinematch_db_data:
+  cinematch_redis_data:
+  qdrant_storage:
+  ollama_data:

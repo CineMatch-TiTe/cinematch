@@ -1,0 +1,446 @@
+use super::{
+    CreatePartyResponse, DbError, ErrorResponse, MemberInfo, PartyMembersResponse, PartyState,
+    ReadyStateResponse, SetReadyRequest, VoteMovieRequest, extract_user_id,
+};
+use crate::RoomsState;
+use crate::{AppState, VoteState};
+use actix_identity::Identity;
+use actix_web::{HttpResponse, get, post, web};
+use log::{debug, error, trace};
+use uuid::Uuid;
+
+use crate::websocket::models::{MovieVotes, ServerMessage};
+
+use crate::websocket::send_message_to_party;
+
+#[utoipa::path(
+    responses(
+        (status = 200, description = "Successfully joined party", body = CreatePartyResponse),
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 400, description = "Invalid code or party not joinable", body = ErrorResponse),
+        (status = 404, description = "Party not found", body = ErrorResponse),
+        (status = 500, description = "Internal server error", body = ErrorResponse)
+    ),
+    params(
+        ("code" = String, Path, description = "The 4-character party join code")
+    ),
+    tags = ["party"],
+    security(("bearer_auth" = [])),
+    operation_id = "join_party"
+)]
+#[post("/join/{code}")]
+pub async fn join_party(db: AppState, user: Identity, code: web::Path<String>) -> HttpResponse {
+    let code = code.into_inner();
+    let user_id = extract_user_id!(user);
+
+    trace!("POST /join/{} - user_id={}", code, user_id);
+
+    // Find party by code
+    let party = match db.get_party_by_code(&code).await {
+        Ok(Some(party)) => party,
+        Ok(None) => {
+            trace!("Party not found for code: {}", code);
+            return HttpResponse::NotFound().json(ErrorResponse::new("Party not found"));
+        }
+        Err(e) => {
+            error!("Failed to find party by code: {}", e);
+            return HttpResponse::InternalServerError()
+                .json(ErrorResponse::new("Failed to find party"));
+        }
+    };
+
+    // Check party is still joinable
+    if party.state != PartyState::Created {
+        trace!("Party {} not joinable, state: {:?}", party.id, party.state);
+        return HttpResponse::BadRequest().json(ErrorResponse::new(
+            "Party is no longer accepting new members",
+        ));
+    }
+
+    // Check if user is already a member
+    match db.is_party_member(party.id, user_id).await {
+        Ok(true) => {
+            trace!("User {} already member of party {}", user_id, party.id);
+            return HttpResponse::BadRequest()
+                .json(ErrorResponse::new("Already a member of this party"));
+        }
+        Err(e) => {
+            error!("Failed to check membership: {}", e);
+            return HttpResponse::InternalServerError()
+                .json(ErrorResponse::new("Failed to check membership"));
+        }
+        Ok(false) => {}
+    }
+
+    debug!(
+        "Auth passed - adding user {} to party {}",
+        user_id, party.id
+    );
+    // Add as member
+    match db.add_party_member(party.id, user_id).await {
+        Ok(_) => {
+            debug!("User {} successfully joined party {}", user_id, party.id);
+            let response = CreatePartyResponse {
+                party_id: party.id,
+                code: code.clone(),
+                created_at: party.created_at,
+            };
+            HttpResponse::Ok().json(response)
+        }
+        Err(e) => {
+            error!("Failed to join party: {}", e);
+            HttpResponse::InternalServerError()
+                .json(ErrorResponse::new(format!("Failed to join party: {}", e)))
+        }
+    }
+}
+
+/// Leave a party
+///
+/// Removes the requesting user from the party.
+/// If the leader leaves, leadership is transferred to the oldest member.
+/// If no members remain, the party is disbanded.
+///
+/// **Auth**: Requires authenticated user. Users can only leave for themselves.
+#[utoipa::path(
+    responses(
+        (status = 200, description = "Successfully left party"),
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 400, description = "Not a member of this party", body = ErrorResponse),
+        (status = 404, description = "Party not found", body = ErrorResponse),
+        (status = 500, description = "Internal server error", body = ErrorResponse)
+    ),
+    params(
+        ("party_id" = Uuid, Path, description = "The party ID to leave")
+    ),
+    tags = ["party"],
+    security(("bearer_auth" = [])),
+    operation_id = "leave_party"
+)]
+#[post("/{party_id}/leave")]
+pub async fn leave_party(db: AppState, user: Identity, party_id: web::Path<Uuid>) -> HttpResponse {
+    let party_id = party_id.into_inner();
+    let user_id = extract_user_id!(user);
+
+    match db.remove_party_member(party_id, user_id).await {
+        Ok(_) => {
+            debug!("User {} left party {}", user_id, party_id);
+            HttpResponse::Ok().finish()
+        }
+        Err(DbError::NotPartyMember) => {
+            HttpResponse::BadRequest().json(ErrorResponse::new("Not a member of this party"))
+        }
+        Err(DbError::PartyNotFound(_)) => HttpResponse::NotFound().finish(),
+        Err(e) => {
+            error!("Failed to leave party: {}", e);
+            HttpResponse::InternalServerError()
+                .json(ErrorResponse::new(format!("Failed to leave party: {}", e)))
+        }
+    }
+}
+
+#[utoipa::path(
+    responses(
+        (status = 200, description = "Party members retrieved", body = PartyMembersResponse),
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 403, description = "Not a party member", body = ErrorResponse),
+        (status = 404, description = "Party not found", body = ErrorResponse),
+        (status = 500, description = "Internal server error", body = ErrorResponse)
+    ),
+    params(
+        ("party_id" = Uuid, Path, description = "The party ID")
+    ),
+    tags = ["party"],
+    security(("bearer_auth" = []))
+)]
+#[get("/{party_id}/members")]
+pub async fn get_party_members(
+    db: AppState,
+    user: Identity,
+    party_id: web::Path<Uuid>,
+) -> HttpResponse {
+    let party_id = party_id.into_inner();
+    let user_id = extract_user_id!(user);
+
+    trace!("GET /{}/members - user_id={}", party_id, user_id);
+
+    // Verify user is a member
+    match db.is_party_member(party_id, user_id).await {
+        Ok(false) => {
+            trace!("User {} not member of party {}", user_id, party_id);
+            return HttpResponse::Forbidden()
+                .json(ErrorResponse::new("Not a member of this party"));
+        }
+        Err(_) => {
+            // If error checking membership, assume not a member
+            return HttpResponse::Forbidden()
+                .json(ErrorResponse::new("Not a member of this party"));
+        }
+        Ok(true) => {}
+    }
+
+    // Get party first to get leader ID
+    let party = match db.get_party(party_id).await {
+        Ok(party) => party,
+        Err(DbError::PartyNotFound(_)) => {
+            return HttpResponse::NotFound().json(ErrorResponse::new("Party not found"));
+        }
+        Err(e) => {
+            error!("Failed to get party: {}", e);
+            return HttpResponse::InternalServerError()
+                .json(ErrorResponse::new(format!("Failed to get party: {}", e)));
+        }
+    };
+
+    // Get member records with ready state
+    let user_records = match db.get_party_users(party_id).await {
+        Ok(records) => records,
+        Err(e) => {
+            error!("Failed to get member records: {}", e);
+            return HttpResponse::InternalServerError()
+                .json(ErrorResponse::new(format!("Failed to get members: {}", e)));
+        }
+    };
+
+    // Get user details for each member
+    match db.get_party_members(party_id).await {
+        Ok(members) => {
+            let mut member_infos: Vec<MemberInfo> = Vec::with_capacity(members.len());
+
+            for member in members {
+                // Find the corresponding member record to get is_ready and joined_at
+                let user = user_records.iter().find(|u| u.id == member.user_id);
+
+                let user_name = match user {
+                    Some(u) => u.username.clone(),
+                    None => {
+                        error!("User record not found for member: {}", member.user_id);
+                        continue; // Skip this member
+                    }
+                };
+
+                member_infos.push(MemberInfo {
+                    user_id: member.user_id,
+                    username: user_name,
+                    is_leader: member.user_id == party.party_leader_id,
+                    is_ready: member.is_ready,
+                    joined_at: member.joined_at,
+                });
+            }
+
+            let count = member_infos.len();
+            let ready_count = member_infos.iter().filter(|m| m.is_ready).count();
+            let all_ready = count > 0 && ready_count == count;
+
+            let response = PartyMembersResponse {
+                members: member_infos,
+                count,
+                ready_count,
+                all_ready,
+            };
+            HttpResponse::Ok().json(response)
+        }
+        Err(e) => {
+            error!("Failed to get party members: {}", e);
+            HttpResponse::InternalServerError()
+                .json(ErrorResponse::new(format!("Failed to get members: {}", e)))
+        }
+    }
+}
+
+#[utoipa::path(
+    request_body = SetReadyRequest,
+    responses(
+        (status = 200, description = "Ready set"),
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 400, description = "Not a party member"),
+        (status = 404, description = "Party not found"),
+        (status = 500, description = "Internal server error", body = ErrorResponse)
+    ),
+    params(
+        ("party_id" = Uuid, Path, description = "The party ID")
+    ),
+    tags = ["party"],
+    security(("bearer_auth" = [])),
+    operation_id = "toggle_ready"
+)]
+#[post("/{party_id}/ready")]
+pub async fn set_ready(
+    db: AppState,
+    user: Identity,
+    party_id: web::Path<Uuid>,
+    body: web::Json<SetReadyRequest>,
+) -> HttpResponse {
+    let party_id = party_id.into_inner();
+    let ready = body.into_inner();
+    let user_id = extract_user_id!(user);
+
+    trace!("POST /{}/ready - user_id={}", party_id, user_id);
+
+    // Verify user is a member
+    match db.is_party_member(party_id, user_id).await {
+        Ok(false) => {
+            trace!("User {} not member of party {}", user_id, party_id);
+            return HttpResponse::BadRequest()
+                .json(ErrorResponse::new("Not a member of this party"));
+        }
+        Err(e) => {
+            error!("Failed to check membership: {}", e);
+            return HttpResponse::InternalServerError()
+                .json(ErrorResponse::new("Failed to check membership"));
+        }
+        Ok(true) => {}
+    }
+
+    debug!(
+        "Auth passed - toggling ready state for user {} in party {}",
+        user_id, party_id
+    );
+    match db.set_member_ready(party_id, user_id, ready.is_ready).await {
+        Ok(_) => {
+            debug!("Ready state toggled for user {}", user_id);
+            // Get the ready status for the party
+            match db.get_ready_status(party_id).await {
+                Ok((ready_count, total)) => {
+                    let response = ReadyStateResponse {
+                        all_ready: total > 0 && ready_count == total,
+                    };
+                    HttpResponse::Ok().json(response)
+                }
+                Err(e) => {
+                    error!("Failed to get ready status: {}", e);
+                    // Still return success since the toggle worked
+                    let response = ReadyStateResponse { all_ready: false };
+                    HttpResponse::Ok().json(response)
+                }
+            }
+        }
+        Err(DbError::NotPartyMember) => {
+            HttpResponse::BadRequest().json(ErrorResponse::new("Not a member of this party"))
+        }
+        Err(DbError::PartyNotFound(_)) => {
+            HttpResponse::NotFound().json(ErrorResponse::new("Party not found"))
+        }
+        Err(e) => {
+            error!("Failed to toggle ready state: {}", e);
+            HttpResponse::InternalServerError()
+                .json(ErrorResponse::new(format!("Failed to toggle ready: {}", e)))
+        }
+    }
+}
+
+#[utoipa::path(
+    request_body = VoteMovieRequest,
+    responses(
+        (status = 200, description = "Vote recorded"),
+        (status = 400, description = "Voting not allowed in current party state"),
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 400, description = "Not a party member"),
+        (status = 404, description = "Party not found"),
+        (status = 500, description = "Internal server error", body = ErrorResponse)
+    ),
+    params(
+        ("party_id" = Uuid, Path, description = "The party ID")
+    ),
+    tags = ["party"],
+    security(("bearer_auth" = [])),
+    operation_id = "vote_movie"
+)]
+#[post("/{party_id}/vote/{movie_id}")]
+pub async fn vote_movie(
+    db: AppState,
+    rooms: RoomsState,
+    user: Identity,
+    party_id: web::Path<Uuid>,
+    movie_id: web::Path<String>,
+    vote_store: VoteState,
+    body: web::Json<VoteMovieRequest>,
+) -> HttpResponse {
+    let user_id = extract_user_id!(user);
+
+    let party_id = party_id.into_inner();
+    let movie_id = movie_id.into_inner();
+    let liked = body.like;
+
+    trace!("POST /{}/vote/{} - user_id={}", party_id, movie_id, user_id);
+
+    // Verify user is a member
+    match db.is_party_member(party_id, user_id).await {
+        Ok(false) => {
+            trace!("User {} not member of party {}", user_id, party_id);
+            return HttpResponse::BadRequest()
+                .json(ErrorResponse::new("Not a member of this party"));
+        }
+        Err(e) => {
+            error!("Failed to check membership: {}", e);
+            return HttpResponse::InternalServerError()
+                .json(ErrorResponse::new("Failed to check membership"));
+        }
+        Ok(true) => {}
+    }
+    debug!(
+        "Auth passed - recording vote for user {} in party {} for movie {}",
+        user_id, party_id, movie_id
+    );
+
+    // verify voting phase is going on
+
+    let party = match db.get_party(party_id).await {
+        Ok(party) => party,
+        Err(DbError::PartyNotFound(_)) => {
+            return HttpResponse::NotFound().json(ErrorResponse::new("Party not found"));
+        }
+        Err(e) => {
+            error!("Failed to get party: {}", e);
+            return HttpResponse::InternalServerError()
+                .json(ErrorResponse::new(format!("Failed to get party: {}", e)));
+        }
+    };
+
+    if party.state != PartyState::Voting {
+        trace!(
+            "Party {} not in voting state, current state: {:?}",
+            party_id, party.state
+        );
+        return HttpResponse::BadRequest().json(ErrorResponse::new(
+            "Voting not allowed in current party state",
+        ));
+    }
+
+    match vote_store.cast_vote(party_id, user_id, &movie_id, liked) {
+        Ok(_) => {
+            debug!(
+                "Vote recorded for user {} in party {} for movie {}",
+                user_id, party_id, movie_id
+            );
+        }
+        Err(e) => {
+            error!("Failed to record vote: {:?}", e);
+            return HttpResponse::InternalServerError().json(ErrorResponse::new(format!(
+                "Failed to record vote: {:?}",
+                e
+            )));
+        }
+    }
+
+    let (likes, dislikes) = match vote_store.get_movie_totals(party_id, &movie_id) {
+        Ok(likes) => likes.map(|(l, d)| (l, d)).unwrap_or((0, 0)),
+        Err(e) => {
+            error!("Failed to get vote totals: {:?}", e);
+            return HttpResponse::InternalServerError().json(ErrorResponse::new(format!(
+                "Failed to get vote totals: {:?}",
+                e
+            )));
+        }
+    };
+
+    let message = ServerMessage::MovieVoteUpdate(MovieVotes {
+        movie_id: movie_id.clone(),
+        likes,
+        dislikes,
+    });
+
+    send_message_to_party(&rooms, party_id.to_string(), &message, Some(&[user_id])).await;
+
+    HttpResponse::Ok().finish()
+}

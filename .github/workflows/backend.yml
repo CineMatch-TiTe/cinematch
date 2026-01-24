@@ -1,0 +1,57 @@
+name: CI
+
+on:
+  push:
+    paths:
+      - "backend/**"
+      - ".github/workflows/backend.yml"
+    branches:
+      - main
+  pull_request:
+    paths:
+      - "backend/**"
+      - ".github/workflows/backend.yml"
+    branches:
+      - main
+
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    if: github.event_name != 'push'
+    permissions:
+      pull-requests: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: rustfmt
+      - uses: mbrobbel/rustfmt-check@master
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          mode: review
+
+  lint:
+    name: Lint & Code Analysis
+    runs-on: ubuntu-latest
+    if: github.event_name != 'push'
+    permissions:
+      checks: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+            components: clippy
+
+      - uses: actions-rs-plus/clippy-check@v2.3.0
+        with:
+            args: --all-features -- -D warnings
+            working-directory: ./backend
+      
