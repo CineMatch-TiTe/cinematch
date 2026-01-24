@@ -98,6 +98,10 @@ jobs:
     if: github.event_name == 'pull_request'
     needs: build
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
     environment:
       name: pr-image-publish
       url: ${{ github.server_url }}/${{ github.repository }}/pull/${{ github.event.pull_request.number }}
