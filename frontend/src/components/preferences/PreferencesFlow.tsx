@@ -71,17 +71,17 @@ const PreferencesFlow: React.FC<PreferencesFlowProps> = ({ joinCode }) => {
   }
 
   return (
-    <div className="min-h-screen bg-background text-foreground p-4 md:p-8 flex flex-col items-center pt-10 md:pt-20">
-      <div className="max-w-4xl mx-auto mb-8 text-center animate-in fade-in slide-in-from-top-4 duration-500">
-        <h1 className="text-3xl font-bold bg-clip-text text-red-900 mb-8">
-          Setup your taste profile
-        </h1>
-        <p className="text-muted-foreground">Step {step} of 3</p>
-        <div className="w-full max-w-xs mx-auto h-2 bg-secondary rounded-full mt-4 overflow-hidden">
-          <div
-            className="h-full bg-primary transition-all duration-300 ease-in-out"
-            style={{ width: `${(step / 3) * 100}%` }}
-          />
+    <div className="w-full flex flex-col items-center">
+      <div className="sticky top-0 z-20 w-full bg-zinc-950/80 backdrop-blur-md py-6 mb-8 border-b border-zinc-800/50">
+        <div className="max-w-4xl mx-auto text-center animate-in fade-in slide-in-from-top-4 duration-500 px-4">
+          <h1 className="text-3xl font-bold text-zinc-100 mb-4">Setup your taste profile</h1>
+          <p className="text-zinc-400">Step {step} of 3</p>
+          <div className="w-full max-w-xs mx-auto h-2 bg-zinc-800 rounded-full mt-4 overflow-hidden">
+            <div
+              className="h-full bg-red-600 transition-all duration-300 ease-in-out"
+              style={{ width: `${(step / 3) * 100}%` }}
+            />
+          </div>
         </div>
       </div>
 

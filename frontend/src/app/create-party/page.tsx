@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { CreatePartyForm } from '@/components/forms/CreatePartyForm'
+import Image from 'next/image'
 
 export default function CreatePartyRoute() {
   return (
@@ -11,7 +12,15 @@ export default function CreatePartyRoute() {
       </div>
 
       <main className="relative z-10 w-full max-w-md px-6">
-        <div className="mb-8 text-center">
+        <div className="flex flex-col items-center justify-center mb-8 gap-4 text-center">
+          <Image
+            src="/Logo.png"
+            className="w-36 h-auto"
+            alt="CineMatch"
+            width={320}
+            height={320}
+            loading="eager"
+          />
           <h1 className="text-4xl font-bold tracking-tighter text-white mb-2">CineMatch</h1>
           <p className="text-zinc-400">Host a party and enjoy movies with friends!</p>
         </div>
