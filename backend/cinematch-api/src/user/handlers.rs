@@ -12,7 +12,7 @@ use uuid::Uuid;
 
 use log::error;
 
-use super::{CurrentUserResponse, GuestUserRequest, RenameUserRequest, GuestLoginResponse};
+use super::{CurrentUserResponse, GuestLoginResponse, GuestUserRequest, RenameUserRequest};
 
 use crate::AppState;
 
@@ -80,7 +80,10 @@ pub async fn login_guest(
         Ok(user) => match Identity::login(&request.extensions(), user.id.to_string()) {
             Ok(_) => {
                 trace!("User identity set in session for user_id={}", user.id);
-                HttpResponse::Created().json(GuestLoginResponse { user_id: user.id, username: user.username})
+                HttpResponse::Created().json(GuestLoginResponse {
+                    user_id: user.id,
+                    username: user.username,
+                })
             }
             Err(e) => {
                 error!("Failed to set user identity in session: {}", e);

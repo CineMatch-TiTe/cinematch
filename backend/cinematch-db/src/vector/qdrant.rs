@@ -1,11 +1,14 @@
 use super::models::MovieData;
 use anyhow::{Context, Result};
+use chrono::Datelike;
 use qdrant_client::Qdrant;
 use qdrant_client::qdrant::{Distance, PointStruct};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
+
+use crate::BATCH_SIZE;
 
 /// Movie search result from vector similarity search
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -15,8 +18,7 @@ pub struct MovieSearchResult {
     pub director: Option<String>,
     pub genres: Vec<String>,
     pub overview: Option<String>,
-    pub cast: Vec<String>, // Just names for display
-    pub score: f32,        // Similarity score
+    pub score: f32, // Similarity score
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -64,7 +66,8 @@ impl QdrantService {
 
     /// Create embedding collection with multiple named vectors
     /// Supports: plot_vector, cast_crew_vector, reviews_vector, combined_vector
-    pub async fn create_collection_with_named_vectors(&self, collection_name: &str) -> Result<()> {
+    /// DANGER: deletes existing collection with the same name, should only be used within the importer
+    pub async fn setup(&self, collection_name: &str) -> Result<()> {
         // Delete existing collection
         let _ = self.client.delete_collection(collection_name).await;
 
@@ -104,19 +107,11 @@ impl QdrantService {
         Ok(())
     }
 
-    /// Create both embedding collections with multiple named vectors
-    pub async fn create_collections(&self) -> Result<()> {
-        self.create_collection_with_named_vectors("movies").await?;
-        Ok(())
-    }
-
     /// Upload points in batches (20 per batch) for performance
-    pub async fn upload_batch(&self, collection: &str, points: Vec<PointStruct>) -> Result<()> {
+    pub async fn upload_batch(&self, collection: &str, points: &[PointStruct]) -> Result<()> {
         if points.is_empty() {
             return Ok(());
         }
-
-        const BATCH_SIZE: usize = 20;
 
         for batch in points.chunks(BATCH_SIZE) {
             self.client
@@ -146,25 +141,37 @@ impl QdrantService {
     ) -> PointStruct {
         let mut payload = HashMap::new();
 
-        // Insert in alphabetical order for consistency
+        // Add release_year as an integer for filtering
+        let release_year = if movie.release_date > 0 {
+            let naive = chrono::DateTime::from_timestamp(movie.release_date, 0);
+            naive.map(|dt| dt.year()).unwrap_or(0)
+        } else {
+            0
+        };
         payload.insert(
-            "cast".to_string(),
+            "release_year".to_string(),
             qdrant_client::qdrant::Value {
-                kind: Some(qdrant_client::qdrant::value::Kind::StringValue(
-                    serde_json::to_string(&movie.cast).unwrap_or_default(),
+                kind: Some(qdrant_client::qdrant::value::Kind::IntegerValue(
+                    release_year as i64,
                 )),
             },
         );
 
         payload.insert(
-            "director".to_string(),
+            "directors".to_string(),
             qdrant_client::qdrant::Value {
-                kind: Some(qdrant_client::qdrant::value::Kind::StringValue(
-                    movie
-                        .director
-                        .as_ref()
-                        .map(|d| d.clone())
-                        .unwrap_or_default(),
+                kind: Some(qdrant_client::qdrant::value::Kind::ListValue(
+                    qdrant_client::qdrant::ListValue {
+                        values: movie
+                            .director
+                            .iter()
+                            .map(|d| qdrant_client::qdrant::Value {
+                                kind: Some(qdrant_client::qdrant::value::Kind::StringValue(
+                                    d.clone(),
+                                )),
+                            })
+                            .collect(),
+                    },
                 )),
             },
         );
@@ -172,43 +179,37 @@ impl QdrantService {
         payload.insert(
             "genres".to_string(),
             qdrant_client::qdrant::Value {
-                kind: Some(qdrant_client::qdrant::value::Kind::StringValue(
-                    serde_json::to_string(&movie.genres).unwrap_or_default(),
+                kind: Some(qdrant_client::qdrant::value::Kind::ListValue(
+                    qdrant_client::qdrant::ListValue {
+                        values: movie
+                            .genres
+                            .iter()
+                            .map(|g| qdrant_client::qdrant::Value {
+                                kind: Some(qdrant_client::qdrant::value::Kind::StringValue(
+                                    g.clone(),
+                                )),
+                            })
+                            .collect(),
+                    },
                 )),
             },
         );
 
         payload.insert(
-            "imdb_id".to_string(),
+            "tags".to_string(),
             qdrant_client::qdrant::Value {
-                kind: Some(qdrant_client::qdrant::value::Kind::StringValue(
-                    movie
-                        .imdb_id
-                        .as_ref()
-                        .map(|id| id.clone())
-                        .unwrap_or_default(),
-                )),
-            },
-        );
-
-        payload.insert(
-            "keywords".to_string(),
-            qdrant_client::qdrant::Value {
-                kind: Some(qdrant_client::qdrant::value::Kind::StringValue(
-                    serde_json::to_string(&movie.keywords).unwrap_or_default(),
-                )),
-            },
-        );
-
-        payload.insert(
-            "mediawiki_id".to_string(),
-            qdrant_client::qdrant::Value {
-                kind: Some(qdrant_client::qdrant::value::Kind::StringValue(
-                    movie
-                        .mediawiki_id
-                        .as_ref()
-                        .map(|id| id.clone())
-                        .unwrap_or_default(),
+                kind: Some(qdrant_client::qdrant::value::Kind::ListValue(
+                    qdrant_client::qdrant::ListValue {
+                        values: movie
+                            .keywords
+                            .iter()
+                            .map(|g| qdrant_client::qdrant::Value {
+                                kind: Some(qdrant_client::qdrant::value::Kind::StringValue(
+                                    g.clone(),
+                                )),
+                            })
+                            .collect(),
+                    },
                 )),
             },
         );
@@ -241,47 +242,7 @@ impl QdrantService {
             "runtime".to_string(),
             qdrant_client::qdrant::Value {
                 kind: Some(qdrant_client::qdrant::value::Kind::IntegerValue(
-                    movie.runtime,
-                )),
-            },
-        );
-
-        payload.insert(
-            "tagline".to_string(),
-            qdrant_client::qdrant::Value {
-                kind: Some(qdrant_client::qdrant::value::Kind::StringValue(
-                    movie
-                        .tagline
-                        .as_ref()
-                        .map(|t| t.clone())
-                        .unwrap_or_default(),
-                )),
-            },
-        );
-
-        payload.insert(
-            "poster_url".to_string(),
-            qdrant_client::qdrant::Value {
-                kind: Some(qdrant_client::qdrant::value::Kind::StringValue(
-                    serde_json::to_string(&movie.poster_url).unwrap_or_default(),
-                )),
-            },
-        );
-
-        payload.insert(
-            "production_countries".to_string(),
-            qdrant_client::qdrant::Value {
-                kind: Some(qdrant_client::qdrant::value::Kind::StringValue(
-                    serde_json::to_string(&movie.production_countries).unwrap_or_default(),
-                )),
-            },
-        );
-
-        payload.insert(
-            "reviews".to_string(),
-            qdrant_client::qdrant::Value {
-                kind: Some(qdrant_client::qdrant::value::Kind::StringValue(
-                    serde_json::to_string(&movie.reviews).unwrap_or_default(),
+                    movie.runtime as i64,
                 )),
             },
         );
@@ -325,103 +286,4 @@ impl QdrantService {
             payload,
         }
     }
-
-    /// Search for similar movies using a vector embedding
-    /// vector_name: which semantic vector to search ("plot_vector", "cast_crew_vector", etc.)
-    /// embedding: the query vector embedding
-    /// limit: max number of results to return
-    pub async fn search_similar(
-        &self,
-        collection: &str,
-        vector_name: &str,
-        embedding: Vec<f32>,
-        limit: u64,
-    ) -> Result<Vec<MovieSearchResult>> {
-        let results = self
-            .client
-            .search_points(qdrant_client::qdrant::SearchPoints {
-                collection_name: collection.to_string(),
-                vector: embedding,
-                limit,
-                with_payload: Some(true.into()),
-                vector_name: Some(vector_name.to_string()),
-                ..Default::default()
-            })
-            .await
-            .context("Failed to search points")?;
-
-        // Extract search results and reconstruct movie info from payload
-        let mut movies = Vec::new();
-        for scored_point in results.result {
-            let movie = parse_payload_to_movie(&scored_point.payload)?;
-            movies.push(MovieSearchResult {
-                movie_id: movie.movie_id,
-                title: movie.title,
-                director: movie.director,
-                genres: movie.genres,
-                overview: movie.overview,
-                cast: movie.cast.iter().map(|m| m.name.clone()).collect(),
-                score: scored_point.score,
-            });
-        }
-
-        Ok(movies)
-    }
-}
-
-/// Helper function to reconstruct movie data from Qdrant payload
-pub fn parse_payload_to_movie(
-    payload: &HashMap<String, qdrant_client::qdrant::Value>,
-) -> Result<MovieData> {
-    use qdrant_client::qdrant::value::Kind;
-
-    let get_string = |key: &str| -> Option<String> {
-        payload.get(key).and_then(|v| {
-            if let Some(Kind::StringValue(s)) = &v.kind {
-                Some(s.clone())
-            } else {
-                None
-            }
-        })
-    };
-
-    let get_int = |key: &str| -> Option<i64> {
-        payload.get(key).and_then(|v| {
-            if let Some(Kind::IntegerValue(i)) = &v.kind {
-                Some(*i)
-            } else {
-                None
-            }
-        })
-    };
-
-    let movie_id = get_int("movie_id").unwrap_or(0);
-    let title = get_string("title").unwrap_or_default();
-
-    Ok(MovieData {
-        movie_id,
-        title,
-        runtime: get_int("runtime").unwrap_or(0),
-        average_rating: 0.0,
-        popularity: 0.0,
-        imdb_id: get_string("imdb_id"),
-        mediawiki_id: get_string("mediawiki_id"),
-        rating: get_string("rating"),
-        release_date: get_int("release_date").unwrap_or(0),
-        original_language: None,
-        poster_url: get_string("poster_url"),
-        overview: get_string("overview"),
-        tagline: get_string("tagline"),
-        director: get_string("director"),
-        genres: serde_json::from_str(&get_string("genres").unwrap_or_default()).unwrap_or_default(),
-        keywords: serde_json::from_str(&get_string("keywords").unwrap_or_default())
-            .unwrap_or_default(),
-        cast: serde_json::from_str(&get_string("cast").unwrap_or_default()).unwrap_or_default(),
-        production_countries: serde_json::from_str(
-            &get_string("production_countries").unwrap_or_default(),
-        )
-        .unwrap_or_default(),
-        reviews: serde_json::from_str(&get_string("reviews").unwrap_or_default())
-            .unwrap_or_default(),
-    })
 }

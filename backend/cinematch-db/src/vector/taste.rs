@@ -6,11 +6,17 @@ use qdrant_client::{
 
 use uuid::Uuid;
 
-const RECOMMENDATION_COUNT: u64 = 10;
+const RECOMMENDATION_COUNT: u64 = 5;
 const NAME: &str = "movies";
 
 impl Database {
-    pub async fn get_recommendations(&self, user: Uuid, vector: VectorCollection) {
+    // get recommendations for a user based on their taste, using the colleciton specified
+    pub async fn get_recommendations(
+        &self,
+        user: Uuid,
+        party: Option<Uuid>,
+        vector: VectorCollection,
+    ) {
 
         // self.vector.client.query(
         //     QueryPointsBuilder::new(NAME)
@@ -21,7 +27,8 @@ impl Database {
         // )
     }
 
-    pub async fn add_taste(&self, user: Uuid, movie_id: &str, like: bool) {
+    // get the point id, of the movie and whether the user liked it or not and add to pg
+    pub async fn update_taste(&self, user: Uuid, movie_id: &str, like: bool) {
         // let point_id = format!("{}-{}", user, movie_id);
         // let vector = self.vector.generate_taste_vector(user, movie_id, like).await;
 

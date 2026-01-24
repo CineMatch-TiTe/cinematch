@@ -1,7 +1,6 @@
-use serde::{Serialize, Deserialize, Deserializer};
+use crate::{CastMember, MovieData};
 use py_literal::Value as PyValue;
-
-
+use serde::{Deserialize, Deserializer, Serialize};
 
 /// Helper: Extract string from PyValue
 fn pyvalue_to_string(val: &PyValue) -> Option<String> {
@@ -43,11 +42,11 @@ where
 /// Parse a string field - try JSON string first, then Python literal
 fn parse_string_field(s: &str) -> Option<String> {
     let trimmed = s.trim();
-    
+
     if trimmed.is_empty() || trimmed == "null" {
         return None;
     }
-    
+
     // Try JSON parsing
     if let Ok(val) = serde_json::from_str::<serde_json::Value>(trimmed) {
         if let Some(st) = val.as_str() {
@@ -56,8 +55,7 @@ fn parse_string_field(s: &str) -> Option<String> {
             }
         }
     }
-    
-    // Try Python literal parsing
+
     if let Ok(val) = trimmed.parse::<PyValue>() {
         if let Some(st) = pyvalue_to_string(&val) {
             if !st.is_empty() {
@@ -65,15 +63,16 @@ fn parse_string_field(s: &str) -> Option<String> {
             }
         }
     }
-    
+
     // Return as-is if no outer quotes
-    if !((trimmed.starts_with('"') && trimmed.ends_with('"')) || 
-         (trimmed.starts_with('\'') && trimmed.ends_with('\''))) {
+    if !((trimmed.starts_with('"') && trimmed.ends_with('"'))
+        || (trimmed.starts_with('\'') && trimmed.ends_with('\'')))
+    {
         if !trimmed.is_empty() {
             return Some(trimmed.to_string());
         }
     }
-    
+
     None
 }
 
@@ -89,21 +88,36 @@ where
 /// Parse string array - try JSON first, then Python literal
 fn parse_string_array(s: &str) -> Vec<String> {
     let trimmed = s.trim();
-    
+
     if trimmed.is_empty() || trimmed == "[]" {
         return Vec::new();
     }
-    
+
     // Try JSON first
     if let Ok(arr) = serde_json::from_str::<Vec<String>>(trimmed) {
         return arr;
     }
-    
+
     // Try Python literal parsing
     if let Ok(val) = trimmed.parse::<PyValue>() {
         return pyvalue_to_string_vec(&val);
     }
-    
+
+    // If comma-separated, split and trim
+    if trimmed.contains(',') {
+        return trimmed
+            .split(',')
+            .map(|s| s.trim())
+            .filter(|s| !s.is_empty() && *s != "null")
+            .map(|s| s.to_string())
+            .collect();
+    }
+
+    // Otherwise, treat as single string value
+    if !trimmed.is_empty() && trimmed != "null" {
+        return vec![trimmed.to_string()];
+    }
+
     Vec::new()
 }
 
@@ -119,69 +133,79 @@ where
 /// Parse cast array - try JSON first, then Python literal
 fn parse_cast_array(s: &str) -> Vec<CastMember> {
     let trimmed = s.trim();
-    
+
     if trimmed.is_empty() || trimmed == "[]" {
         return Vec::new();
     }
-    
+
     // Try JSON first
     if let Ok(items) = serde_json::from_str::<Vec<serde_json::Value>>(trimmed) {
         return extract_cast_members_from_json(&items);
     }
-    
+
     // Try Python literal parsing
     if let Ok(val) = trimmed.parse::<PyValue>() {
         return extract_cast_members_from_pyvalue(&val);
     }
-    
+
     Vec::new()
 }
 
 /// Extract cast members from JSON array
 fn extract_cast_members_from_json(items: &[serde_json::Value]) -> Vec<CastMember> {
-    items.iter().filter_map(|item| {
-        let name = item.get("name")
-            .and_then(|v| v.as_str())
-            .map(|s| s.to_string())?;
-        let profile_url = item.get("profile_url")
-            .and_then(|v| v.as_str())
-            .and_then(|s| if s.is_empty() || s == "null" { None } else { Some(s.to_string()) });
-        Some(CastMember::with_profile(name, profile_url))
-    }).collect()
+    items
+        .iter()
+        .filter_map(|item| {
+            let name = item
+                .get("name")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string())?;
+            let profile_url = item
+                .get("profile_url")
+                .and_then(|v| v.as_str())
+                .and_then(|s| {
+                    if s.is_empty() || s == "null" {
+                        None
+                    } else {
+                        Some(s.to_string())
+                    }
+                });
+            Some(CastMember::with_profile(name, profile_url))
+        })
+        .collect()
 }
 
 /// Extract cast members from PyValue (dict in list)
 fn extract_cast_members_from_pyvalue(val: &PyValue) -> Vec<CastMember> {
     match val {
-        PyValue::List(items) | PyValue::Tuple(items) => {
-            items.iter().filter_map(|item| {
-                match item {
-                    PyValue::Dict(pairs) => {
-                        let mut name: Option<String> = None;
-                        let mut profile_url: Option<String> = None;
-                        
-                        for (k, v) in pairs {
-                            if let Some(key) = pyvalue_to_string(k) {
-                                match key.as_str() {
-                                    "name" => name = pyvalue_to_string(v),
-                                    "profile_url" => {
-                                        if let Some(url) = pyvalue_to_string(v) {
-                                            if !url.is_empty() && url != "null" {
-                                                profile_url = Some(url);
-                                            }
+        PyValue::List(items) | PyValue::Tuple(items) => items
+            .iter()
+            .filter_map(|item| match item {
+                PyValue::Dict(pairs) => {
+                    let mut name: Option<String> = None;
+                    let mut profile_url: Option<String> = None;
+
+                    for (k, v) in pairs {
+                        if let Some(key) = pyvalue_to_string(k) {
+                            match key.as_str() {
+                                "name" => name = pyvalue_to_string(v),
+                                "profile_url" => {
+                                    if let Some(url) = pyvalue_to_string(v) {
+                                        if !url.is_empty() && url != "null" {
+                                            profile_url = Some(url);
                                         }
                                     }
-                                    _ => {}
                                 }
+                                _ => {}
                             }
                         }
-                        
-                        name.map(|n| CastMember::with_profile(n, profile_url))
                     }
-                    _ => None,
+
+                    name.map(|n| CastMember::with_profile(n, profile_url))
                 }
-            }).collect()
-        }
+                _ => None,
+            })
+            .collect(),
         _ => Vec::new(),
     }
 }
@@ -198,37 +222,42 @@ where
 /// Parse external IDs dict - try JSON first, then Python literal
 fn parse_external_ids(s: &str) -> Vec<(String, String)> {
     let trimmed = s.trim();
-    
+
     if trimmed.is_empty() || trimmed == "{}" {
         return Vec::new();
     }
-    
+
     // Try JSON first
     if let Ok(obj) = serde_json::from_str::<serde_json::Value>(trimmed) {
         if let Some(map) = obj.as_object() {
-            return map.iter()
+            return map
+                .iter()
                 .filter_map(|(k, v)| {
                     v.as_str().and_then(|val| {
-                        if val.is_empty() || val == "null" { None } else { Some((k.clone(), val.to_string())) }
+                        if val.is_empty() || val == "null" {
+                            None
+                        } else {
+                            Some((k.clone(), val.to_string()))
+                        }
                     })
                 })
                 .collect();
         }
     }
-    
+
     // Try Python literal parsing
     if let Ok(val) = trimmed.parse::<PyValue>() {
         return extract_external_ids_from_pyvalue(&val);
     }
-    
     Vec::new()
 }
 
 /// Extract external IDs from PyValue dict
 fn extract_external_ids_from_pyvalue(val: &PyValue) -> Vec<(String, String)> {
     match val {
-        PyValue::Dict(pairs) => {
-            pairs.iter().filter_map(|(k, v)| {
+        PyValue::Dict(pairs) => pairs
+            .iter()
+            .filter_map(|(k, v)| {
                 if let Some(key) = pyvalue_to_string(k) {
                     if let Some(value) = pyvalue_to_string(v) {
                         if !value.is_empty() && value != "null" {
@@ -237,8 +266,8 @@ fn extract_external_ids_from_pyvalue(val: &PyValue) -> Vec<(String, String)> {
                     }
                 }
                 None
-            }).collect()
-        }
+            })
+            .collect(),
         _ => Vec::new(),
     }
 }
@@ -252,12 +281,13 @@ where
     if s.is_empty() {
         return Ok(0);
     }
-    
-    let date = chrono::NaiveDate::parse_from_str(&s, "%Y-%m-%d")
-        .map_err(serde::de::Error::custom)?;
-    let datetime = date.and_hms_opt(0, 0, 0)
+
+    let date =
+        chrono::NaiveDate::parse_from_str(&s, "%Y-%m-%d").map_err(serde::de::Error::custom)?;
+    let datetime = date
+        .and_hms_opt(0, 0, 0)
         .ok_or_else(|| serde::de::Error::custom("Invalid date"))?;
-    
+
     Ok(datetime.and_utc().timestamp())
 }
 
@@ -273,8 +303,8 @@ pub struct MovieDataBuilder {
     pub genres: Vec<String>,
     #[serde(default, deserialize_with = "deserialize_string_array")]
     pub keywords: Vec<String>,
-    #[serde(default, deserialize_with = "deserialize_quoted_option_string")]
-    pub director: Option<String>,
+    #[serde(default, deserialize_with = "deserialize_string_array")]
+    pub director: Vec<String>,
     #[serde(default, deserialize_with = "deserialize_release_date")]
     pub release_date: i64,
     #[serde(default)]
@@ -293,11 +323,19 @@ pub struct MovieDataBuilder {
     pub poster_urls: Vec<String>,
     #[serde(default, deserialize_with = "deserialize_string_array")]
     pub video_keys: Vec<String>,
-    #[serde(default, rename = "review_texts", deserialize_with = "deserialize_string_array")]
+    #[serde(
+        default,
+        rename = "review_texts",
+        deserialize_with = "deserialize_string_array"
+    )]
     pub reviews: Vec<String>,
     #[serde(default, deserialize_with = "deserialize_external_ids")]
     pub external_ids: Vec<(String, String)>,
-    #[serde(default, rename = "certification", deserialize_with = "deserialize_quoted_option_string")]
+    #[serde(
+        default,
+        rename = "certification",
+        deserialize_with = "deserialize_quoted_option_string"
+    )]
     pub rating: Option<String>,
     #[serde(default, deserialize_with = "deserialize_cast")]
     pub cast: Vec<CastMember>,
@@ -321,7 +359,7 @@ impl MovieDataBuilder {
             overview: None,
             genres: Vec::new(),
             keywords: Vec::new(),
-            director: None,
+            director: Vec::new(),
             release_date: 0,
             popularity: 0.0,
             poster_url: None,
@@ -348,7 +386,9 @@ impl MovieDataBuilder {
                 "imdb_id" if self.imdb_id.is_none() && !value.is_empty() && value != "null" => {
                     self.imdb_id = Some(value.clone());
                 }
-                "wikidata_id" if self.mediawiki_id.is_none() && !value.is_empty() && value != "null" => {
+                "wikidata_id"
+                    if self.mediawiki_id.is_none() && !value.is_empty() && value != "null" =>
+                {
                     self.mediawiki_id = Some(value.clone());
                 }
                 _ => {}
@@ -357,12 +397,10 @@ impl MovieDataBuilder {
     }
 
     /// Build the final MovieData struct
-    pub fn build(mut self) -> crate::models::MovieData {
-        use crate::models::MovieData;
-        
+    pub fn build(mut self) -> MovieData {
         // Extract IDs from external_ids
         self.extract_external_ids();
-        
+
         // Clean up empty/null strings in optional fields
         let clean_string = |s: Option<String>| {
             s.and_then(|val| {
@@ -373,12 +411,11 @@ impl MovieDataBuilder {
                 }
             })
         };
-        
+
         MovieData {
             movie_id: self.movie_id,
             title: self.title,
             runtime: self.runtime,
-            average_rating: 0.0,  // Not in CSV, default to 0
             popularity: self.popularity,
             imdb_id: self.imdb_id,
             mediawiki_id: self.mediawiki_id,
@@ -388,12 +425,17 @@ impl MovieDataBuilder {
             poster_url: clean_string(self.poster_url),
             overview: clean_string(self.overview),
             tagline: clean_string(self.tagline),
-            director: clean_string(self.director),
+            director: self
+                .director
+                .into_iter()
+                .filter(|d| !d.trim().is_empty() && d != "null")
+                .collect(),
             genres: self.genres,
             keywords: self.keywords,
             cast: self.cast,
             production_countries: self.production_countries,
             reviews: self.reviews,
+            video_keys: self.video_keys,
         }
     }
 }
@@ -408,7 +450,7 @@ mod tests {
             "Elijah Wood".to_string(),
             Some("https://image.tmdb.org/t/p/w500/5uYw76OQnQYcVUU01zuM2QCqNzP.jpg".to_string()),
         );
-        
+
         assert_eq!(member.name, "Elijah Wood");
         assert!(member.profile_url.is_some());
         assert!(!member.get_unique_id().is_empty());
@@ -435,12 +477,18 @@ mod tests {
             title: "The Lord of the Rings: The Fellowship of the Ring".to_string(),
             runtime: 179,
             overview: Some("Young hobbit Frodo Baggins...".to_string()),
-            genres: vec!["Adventure".to_string(), "Fantasy".to_string(), "Action".to_string()],
+            genres: vec![
+                "Adventure".to_string(),
+                "Fantasy".to_string(),
+                "Action".to_string(),
+            ],
             keywords: vec!["fantasy".to_string(), "magic".to_string()],
-            director: Some("Peter Jackson".to_string()),
+            director: vec!["Peter Jackson".to_string()],
             release_date: 1008633600,
             popularity: 20.9517,
-            poster_url: Some("https://image.tmdb.org/t/p/w500/6oom5QYQ2yQTMJIbnvbkBL9cHo6.jpg".to_string()),
+            poster_url: Some(
+                "https://image.tmdb.org/t/p/w500/6oom5QYQ2yQTMJIbnvbkBL9cHo6.jpg".to_string(),
+            ),
             budget: 93000000,
             revenue: 871368364,
             tagline: Some("One ring to rule them all.".to_string()),
@@ -449,9 +497,10 @@ mod tests {
             reviews: vec!["A masterpiece.".to_string()],
             external_ids: vec![],
             rating: Some("PG-13".to_string()),
-            cast: vec![
-                CastMember::with_profile("Elijah Wood".to_string(), Some("https://...".to_string())),
-            ],
+            cast: vec![CastMember::with_profile(
+                "Elijah Wood".to_string(),
+                Some("https://...".to_string()),
+            )],
             imdb_id: Some("tt0120737".to_string()),
             mediawiki_id: Some("Q127367".to_string()),
             original_language: Some("en".to_string()),
@@ -461,7 +510,10 @@ mod tests {
         let movie = builder.build();
 
         assert_eq!(movie.movie_id, 120);
-        assert_eq!(movie.title, "The Lord of the Rings: The Fellowship of the Ring");
+        assert_eq!(
+            movie.title,
+            "The Lord of the Rings: The Fellowship of the Ring"
+        );
         assert_eq!(movie.runtime, 179);
         assert_eq!(movie.genres.len(), 3);
         assert_eq!(movie.cast.len(), 1);
@@ -476,7 +528,7 @@ mod tests {
             overview: None,
             genres: vec![],
             keywords: vec![],
-            director: None,
+            director: Vec::new(),
             release_date: 0,
             popularity: 0.0,
             poster_url: None,

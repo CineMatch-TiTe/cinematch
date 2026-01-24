@@ -12,9 +12,13 @@ pub mod models;
 pub mod schema;
 pub mod vector;
 
+// Batch size for bulk operations
+pub const BATCH_SIZE: usize = 20;
+
 mod external_account;
 mod party;
 mod user;
+mod movie;
 
 use diesel::Connection;
 use diesel::PgConnection;
@@ -69,8 +73,8 @@ pub type DbResult<T> = Result<T, DbError>;
 
 /// Async database connection pool
 pub struct Database {
-    pool: Pool<AsyncPgConnection>,
-    vector: QdrantService,
+    pub pool: Pool<AsyncPgConnection>,
+    pub vector: QdrantService,
 }
 
 impl Database {
