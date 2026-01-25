@@ -13,7 +13,7 @@ macro_rules! extract_and_validate_username {
             || name.len() > cinematch_common::NAME_MAX_LENGTH
         {
             use ::actix_web::HttpResponse;
-            return HttpResponse::BadRequest().json($crate::ErrorResponse::new(format!(
+            return HttpResponse::BadRequest().json($crate::models::ErrorResponse::new(format!(
                 "Username must be between {} and {} characters",
                 cinematch_common::NAME_MIN_LENGTH,
                 cinematch_common::NAME_MAX_LENGTH
@@ -27,20 +27,10 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 pub mod vote_store;
+pub mod models;
 
-/// Standard error response
-#[derive(Debug, Serialize, Deserialize, ToSchema)]
-pub struct ErrorResponse {
-    pub error: String,
-}
-
-impl ErrorResponse {
-    pub fn new(error: impl Into<String>) -> Self {
-        Self {
-            error: error.into(),
-        }
-    }
-}
+// Re-export models for easier access
+pub use models::*;
 
 #[macro_export]
 macro_rules! extract_user_id {
@@ -60,19 +50,19 @@ macro_rules! extract_user_id {
                     Err(_) => {
                         error!("Invalid user ID in identity: {}", &id_str);
                         return HttpResponse::InternalServerError()
-                            .json(cinematch_common::ErrorResponse::new("Invalid user ID"));
+                            .json(cinematch_common::models::ErrorResponse::new("Invalid user ID"));
                     }
                 },
                 Err(_) => {
                     trace!("No user ID found in identity");
                     return HttpResponse::Unauthorized()
-                        .json(cinematch_common::ErrorResponse::new("No user ID found"));
+                        .json(cinematch_common::models::ErrorResponse::new("No user ID found"));
                 }
             },
             None => {
                 trace!("No identity provided");
                 return HttpResponse::Unauthorized()
-                    .json(cinematch_common::ErrorResponse::new("No user ID found"));
+                    .json(cinematch_common::models::ErrorResponse::new("No user ID found"));
             }
         }
     }};

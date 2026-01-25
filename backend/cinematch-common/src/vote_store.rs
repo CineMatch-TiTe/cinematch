@@ -19,7 +19,9 @@ impl VoteStore {
     pub fn add_movie_to_party(&self, party_id: Uuid, movie_id: i64) -> Result<(), ()> {
         let mut votes_lock = self.votes.lock().map_err(|_| ())?;
         let party_votes = votes_lock.entry(party_id).or_insert_with(HashMap::new);
-        party_votes.entry(movie_id).or_insert_with(|| MovieVote::new());
+        party_votes
+            .entry(movie_id)
+            .or_insert_with(|| MovieVote::new());
         Ok(())
     }
 
@@ -72,10 +74,7 @@ impl VoteStore {
             .and_then(|movie_votes| movie_votes.get(&movie_id).map(|mv| mv.get_totals())))
     }
 
-    pub fn get_party_votes(
-        &self,
-        party_id: Uuid,
-    ) -> Result<Option<HashMap<i64, (u32, u32)>>, ()> {
+    pub fn get_party_votes(&self, party_id: Uuid) -> Result<Option<HashMap<i64, (u32, u32)>>, ()> {
         let votes_lock = self.votes.lock().map_err(|_| ())?;
         Ok(votes_lock.get(&party_id).map(|movie_votes| {
             movie_votes

@@ -1,16 +1,14 @@
+use crate::movie::SearchResponse;
+
 use super::{
-    AppState, ErrorResponse, MovieResponse, GenreResponse, RecommendedMoviesResponse,
+    AppState, ErrorResponse, GenreResponse, MovieResponse, RecommendedMoviesResponse, SearchQuery,
     extract_user_id,
 };
 use actix_identity::Identity;
 use actix_web::{HttpResponse, get, web};
-use cinematch_recommendation_engine::recommend_movies;
-use futures::SinkExt;
-use log::{error};
-use chrono::Utc;
+use log::error;
 
 #[utoipa::path(
-    
     responses(
         (status = 200, description = "Get movie information", body = MovieResponse),
         (status = 400, description = "Bad request", body = ErrorResponse),
@@ -26,19 +24,19 @@ use chrono::Utc;
     operation_id = "movie_get_info"
 )]
 #[get("/info/{movie_id}")]
-pub async fn get_movie(db: AppState, user: Option<Identity>, movie_id: web::Path<i64>) -> HttpResponse {
+pub async fn get_movie(
+    db: AppState,
+    user: Option<Identity>,
+    movie_id: web::Path<i64>,
+) -> HttpResponse {
     let _ = extract_user_id!(user);
 
     let movie_id = movie_id.into_inner();
 
     match db.get_movie_by_id(movie_id).await {
         Ok(movie) => match movie {
-            Some(movie) => {
-                HttpResponse::Ok().json(Into::<MovieResponse>::into(movie))
-            }
-            None => {
-                HttpResponse::NotFound().json(ErrorResponse::new("Movie not found"))
-            }
+            Some(movie) => HttpResponse::Ok().json(Into::<MovieResponse>::into(movie)),
+            None => HttpResponse::NotFound().json(ErrorResponse::new("Movie not found")),
         },
         Err(e) => {
             error!("Failed to retrieve movie with ID {}: {}", movie_id, e);
@@ -63,19 +61,21 @@ pub async fn get_genres(db: AppState, user: Option<Identity>) -> HttpResponse {
     let _ = extract_user_id!(user);
 
     match db.get_genres().await {
-        Ok(genres) => {
-            if genres.is_empty() {
+        Ok(genre_map) => {
+            let mut names: Vec<String> = genre_map.keys().cloned().collect();
+            names.sort();
+            if names.is_empty() {
                 return HttpResponse::NotFound().finish();
             }
-            HttpResponse::Ok().json(GenreResponse { genres })
+            HttpResponse::Ok().json(GenreResponse { genres: names })
         }
         Err(e) => {
             error!("Failed to retrieve genres: {}", e);
-            HttpResponse::InternalServerError().json(ErrorResponse::new("Failed to retrieve genres"))
+            HttpResponse::InternalServerError()
+                .json(ErrorResponse::new("Failed to retrieve genres"))
         }
     }
 }
-
 
 #[utoipa::path(
     responses(
@@ -93,9 +93,8 @@ pub async fn get_recommendations(db: AppState, user: Option<Identity>) -> HttpRe
     let user_id = extract_user_id!(user);
 
     // 3 is good
-    let movies = recommend_movies(&db, user_id, 3).await;
 
-    let ids =match movies {
+    let ids = match cinematch_recommendation_engine::recommend_movies(&db, user_id, 3).await {
         Ok(movies) => {
             if movies.is_empty() {
                 return HttpResponse::NotFound().finish();
@@ -104,7 +103,8 @@ pub async fn get_recommendations(db: AppState, user: Option<Identity>) -> HttpRe
         }
         Err(e) => {
             error!("Failed to retrieve recommended movies: {}", e);
-            return HttpResponse::InternalServerError().json(ErrorResponse::new("Failed to retrieve recommended movies"))
+            return HttpResponse::InternalServerError()
+                .json(ErrorResponse::new("Failed to retrieve recommended movies"));
         }
     };
 
@@ -124,7 +124,8 @@ pub async fn get_recommendations(db: AppState, user: Option<Identity>) -> HttpRe
             },
             Err(e) => {
                 error!("Failed to retrieve movie with ID {}: {}", movie_id, e);
-                return HttpResponse::InternalServerError().json(ErrorResponse::new("Failed to retrieve movie"))
+                return HttpResponse::InternalServerError()
+                    .json(ErrorResponse::new("Failed to retrieve movie"));
             }
         }
     }
@@ -133,6 +134,58 @@ pub async fn get_recommendations(db: AppState, user: Option<Identity>) -> HttpRe
         return HttpResponse::NotFound().finish();
     }
 
-    HttpResponse::Ok().json(RecommendedMoviesResponse { recommended_movies: responses })
+    HttpResponse::Ok().json(RecommendedMoviesResponse {
+        recommended_movies: responses,
+    })
+}
 
+#[utoipa::path(
+    responses(
+        (status = 200, description = "Get list of movies", body = SearchResponse),
+        (status = 400, description = "Bad request", body = ErrorResponse),
+        (status = 401, description = "Unauthorized"),
+        (status = 404, description = "Movies not found"),
+        (status = 500, description = "Internal server error", body = ErrorResponse)
+    ),
+    params(
+        ("query" = String, Query, description = "The search query string"),
+        ("page" = Option<i64>, Query, description = "The page number for pagination")
+    ),
+    tags = ["movie"],
+    security(("bearer_auth" = [])),
+    operation_id = "search_movies"
+)]
+#[get("/search")]
+pub async fn search(
+    db: AppState,
+    user: Option<Identity>,
+    params: web::Query<SearchQuery>,
+) -> HttpResponse {
+    let _ = extract_user_id!(user);
+
+    let query = params.query.trim();
+    let page = params.page.unwrap_or(1);
+    if query.is_empty() {
+        return HttpResponse::BadRequest().json(ErrorResponse::new("Query cannot be empty"));
+    }
+
+    let movies = match db.search_movies(query, page).await {
+        Ok(movies) => movies,
+        Err(e) => {
+            error!("Failed to search movies with query '{}': {}", query, e);
+            return HttpResponse::InternalServerError()
+                .json(ErrorResponse::new("Failed to search movies"));
+        }
+    };
+
+    if movies.is_empty() {
+        return HttpResponse::NotFound().json(ErrorResponse::new("No movies found"));
+    }
+
+    let responses: Vec<MovieResponse> = movies
+        .into_iter()
+        .map(|movie| Into::<MovieResponse>::into(movie))
+        .collect();
+
+    HttpResponse::Ok().json(SearchResponse { movies: responses })
 }

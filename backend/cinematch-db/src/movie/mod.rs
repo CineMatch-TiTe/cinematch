@@ -4,16 +4,18 @@ use crate::Database;
 use diesel::prelude::*;
 use diesel_async::RunQueryDsl;
 
+use uuid::Uuid;
+
 use crate::Movie;
 
 use crate::DbError;
 use crate::DbResult;
 
-use crate::vector::models::{MovieData, CastMember};
+use crate::vector::models::{CastMember, MovieData};
 
 impl Database {
     pub async fn get_movie_directors(&self, movie_id: i64) -> DbResult<Vec<String>> {
-        use crate::schema::{movie_directors, directors};
+        use crate::schema::{directors, movie_directors};
         use diesel::prelude::*;
         use diesel_async::RunQueryDsl;
         let mut conn = self.conn().await?;
@@ -28,7 +30,7 @@ impl Database {
     }
 
     pub async fn get_movie_genres(&self, movie_id: i64) -> DbResult<Vec<String>> {
-        use crate::schema::{movie_genres, genres};
+        use crate::schema::{genres, movie_genres};
         use diesel::prelude::*;
         use diesel_async::RunQueryDsl;
 
@@ -38,16 +40,15 @@ impl Database {
             .filter(movie_genres::movie_id.eq(movie_id))
             .select(genres::name)
             .load::<String>(&mut conn)
-            .await {
+            .await
+        {
             Ok(genres_vec) => Ok(genres_vec),
-            Err(e) => {
-                Err(DbError::from(e))
-            }
+            Err(e) => Err(DbError::from(e)),
         }
     }
 
     pub async fn get_movie_keywords(&self, movie_id: i64) -> DbResult<Vec<String>> {
-        use crate::schema::{movie_keywords, keywords};
+        use crate::schema::{keywords, movie_keywords};
         use diesel::prelude::*;
         use diesel_async::RunQueryDsl;
 
@@ -62,8 +63,11 @@ impl Database {
         Ok(keywords_vec)
     }
 
-    pub async fn get_movie_cast(&self, movie_id: i64) -> DbResult<Vec<crate::vector::models::CastMember>> {
-        use crate::schema::{movie_cast, cast_members};
+    pub async fn get_movie_cast(
+        &self,
+        movie_id: i64,
+    ) -> DbResult<Vec<crate::vector::models::CastMember>> {
+        use crate::schema::{cast_members, movie_cast};
         use diesel::prelude::*;
         use diesel_async::RunQueryDsl;
         let mut conn = self.conn().await?;
@@ -111,21 +115,17 @@ impl Database {
         Ok(video_keys)
     }
 
-    pub async fn get_genres(&self) -> DbResult<Vec<String>> {
-        use diesel_async::RunQueryDsl;
-        use crate::schema::genres;
-
+    /// Get all genres as a map: name -> id
+    pub async fn get_genres(&self) -> DbResult<std::collections::HashMap<String, Uuid>> {
+        use crate::schema::genres::dsl::*;
         let mut conn = self.conn().await?;
-        let mut names = genres::table
-            .select(genres::name)
-            .load::<String>(&mut conn)
+        let rows = genres
+            .select((name, genre_id))
+            .load::<(String, Uuid)>(&mut conn)
             .await
-            .map_err(|e| {
-                log::error!("DB error in get_genres: {}", e);
-                DbError::Query(e)
-            })?;
-        names.sort();
-        Ok(names)
+            .map_err(DbError::from)?;
+
+        Ok(rows.into_iter().collect())
     }
 
     pub async fn get_movie_by_id(&self, movie_id: i64) -> DbResult<Option<MovieData>> {
@@ -190,6 +190,39 @@ impl Database {
         let movie_rows: Vec<Movie> = movies::table
             .order(movies::popularity.desc())
             .limit(limit)
+            .load::<Movie>(&mut conn)
+            .await
+            .map_err(DbError::from)?;
+
+        let mut movies_data = Vec::with_capacity(movie_rows.len());
+        for movie_row in movie_rows {
+            if let Some(movie_data) = self.get_movie_by_id(movie_row.movie_id).await? {
+                movies_data.push(movie_data);
+            }
+        }
+
+        Ok(movies_data)
+    }
+
+    pub async fn search_movies(&self, name: &str, page: i64) -> DbResult<Vec<MovieData>> {
+        use crate::schema::movies;
+        use diesel::prelude::*;
+        use diesel_async::RunQueryDsl;
+
+        let mut conn = self.conn().await?;
+
+        let pattern = format!("%{}", name);
+        let pattern2 = format!("{}%", name);
+
+        let movie_rows: Vec<Movie> = movies::table
+            .filter(
+                movies::title
+                    .ilike(pattern)
+                    .or(movies::title.ilike(pattern2)),
+            )
+            .order(movies::popularity.desc())
+            .limit(10)
+            .offset((page - 1) * 10)
             .load::<Movie>(&mut conn)
             .await
             .map_err(DbError::from)?;

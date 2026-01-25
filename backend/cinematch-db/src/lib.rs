@@ -16,10 +16,10 @@ pub mod vector;
 pub const BATCH_SIZE: usize = 20;
 
 mod external_account;
-mod party;
-mod user;
 mod movie;
+mod party;
 mod taste;
+mod user;
 
 use diesel::Connection;
 use diesel::PgConnection;
@@ -64,6 +64,12 @@ pub enum DbError {
 
     #[error("Failed to generate unique party code after max attempts")]
     CodeGenerationFailed,
+
+    #[error("Invalid genre id: {0}")]
+    InvalidGenreId(Uuid),
+
+    #[error("Invalid user preferences: {0}")]
+    InvalidPreferences(String),
 
     #[error("Other database error: {0}")]
     Other(String),

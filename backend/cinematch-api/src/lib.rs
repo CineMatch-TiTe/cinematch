@@ -1,10 +1,10 @@
 use actix_web::web;
 use utoipa::OpenApi;
 
+mod movie;
 mod party;
 mod user;
 mod websocket;
-mod movie;
 
 pub mod routes;
 

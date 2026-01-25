@@ -7,21 +7,15 @@ use crate::DbError;
 use crate::DbResult;
 use crate::schema;
 impl Database {
-    pub async fn get_genres(&self) -> DbResult<Vec<String>> {
-        use schema::genres::dsl::*;
-
+    /// Get all genres as a map: name -> id
+    pub async fn get_genres(&self) -> DbResult<std::collections::HashMap<String, Uuid>> {
+        use crate::schema::genres::dsl::*;
         let mut conn = self.conn().await?;
-        let mut results: Vec<String> = match genres
-            .select(name)
-            .load::<String>(&mut conn)
-            .await {
-            Ok(res) => res,
-            Err(e) => {
-                return Err(DbError::Query(e));
-            }
-        };
-        results.sort();
-        results.dedup();
-        Ok(results)
+        let rows = genres
+            .select((name, genre_id))
+            .load::<(String, Uuid)>(&mut conn)
+            .await
+            .map_err(DbError::from)?;
+        Ok(rows.into_iter().collect())
     }
 }

@@ -6,13 +6,16 @@
 use actix_identity::Identity;
 use actix_web::HttpMessage;
 use actix_web::HttpRequest;
-use actix_web::{HttpResponse, get, patch, post, web, put};
+use actix_web::{HttpResponse, get, patch, post, put, web};
 use log::{debug, trace};
 use uuid::Uuid;
 
 use log::error;
 
-use super::{CurrentUserResponse, GuestLoginResponse, GuestUserRequest, RenameUserRequest, UpdateTasteRequest};
+use super::{
+    CurrentUserResponse, GuestLoginResponse, GuestUserRequest, RenameUserRequest,
+    UpdateTasteRequest,
+};
 
 use crate::AppState;
 
@@ -267,10 +270,10 @@ pub async fn update_taste(
 
     // Check if movie exists
     match db.get_movie_by_id(movie_id).await {
-        Ok(Some(_)) => {},
+        Ok(Some(_)) => {}
         Ok(None) => {
             return HttpResponse::NotFound().json(ErrorResponse::new("Movie not found"));
-        },
+        }
         Err(e) => {
             log::error!("DB error checking movie existence: {}", e);
             return HttpResponse::InternalServerError().json(ErrorResponse::new("Database error"));
@@ -281,7 +284,8 @@ pub async fn update_taste(
         Ok(_) => HttpResponse::Ok().finish(),
         Err(e) => {
             log::error!("Failed to update taste for user {}: {}", user_id, e);
-            HttpResponse::InternalServerError().json(ErrorResponse::new(format!("Failed to update taste: {}", e)))
+            HttpResponse::InternalServerError()
+                .json(ErrorResponse::new(format!("Failed to update taste: {}", e)))
         }
     }
 }

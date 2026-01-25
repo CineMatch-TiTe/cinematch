@@ -19,7 +19,7 @@ pub mod models;
 use crate::Database;
 use crate::websocket::models::{ClientMessage, ServerMessage};
 
-use cinematch_common::ErrorResponse;
+use cinematch_common::models::ErrorResponse;
 
 // returns 403 if not authorized
 

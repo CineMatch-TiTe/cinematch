@@ -22,3 +22,6 @@ log = "0.4"
 qdrant-client = "1.16.0"
 
 pq-sys = { version = "0.7", features = ["bundled"] }
+
+
+cinematch-common = { path = "../cinematch-common" }

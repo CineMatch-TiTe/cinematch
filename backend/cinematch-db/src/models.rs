@@ -1,13 +1,16 @@
 // Minimal models for movie metadata tables for ergonomic queries
-use crate::schema::{directors, genres, keywords, cast_members, production_countries, trailers};
+use crate::schema::{cast_members, directors, genres, keywords, production_countries, trailers};
 
 // Re-export movie/vector models for easy access from crate root
-pub use crate::vector::models::{MovieData, CastMember};
+pub use crate::vector::models::{CastMember, MovieData};
 use chrono::{DateTime, Utc};
 use diesel::prelude::*;
 use uuid::Uuid;
 
-use crate::schema::{external_accounts, parties, party_codes, party_members, users, movies};
+use crate::schema::{
+    external_accounts, movies, parties, party_codes, party_members, prefs_exclude_genre,
+    prefs_include_genre, user_preferences, users,
+};
 
 // ============================================================================
 // Enums (mapped to PostgreSQL ENUMs)
@@ -198,8 +201,6 @@ pub struct NewPartyCode<'a> {
     pub party_id: Uuid,
 }
 
-
-
 #[derive(Debug, Clone, Queryable, Selectable, Identifiable)]
 #[diesel(table_name = directors)]
 #[diesel(primary_key(director_id))]
@@ -276,4 +277,74 @@ pub struct Movie {
     pub poster_url: Option<String>,
     pub overview: Option<String>,
     pub tagline: Option<String>,
+    pub release_year: Option<i32>,
+}
+
+// ============================================================================
+// User Preferences Models
+// ============================================================================
+
+#[derive(Debug, Clone, Queryable, Selectable, Identifiable, Associations)]
+#[diesel(table_name = user_preferences)]
+#[diesel(primary_key(user_id))]
+#[diesel(belongs_to(User))]
+#[diesel(check_for_backend(diesel::pg::Pg))]
+pub struct UserPreferences {
+    pub user_id: Uuid,
+    pub target_release_year: Option<i32>,
+    pub release_year_flex: i32,
+    pub is_tite: bool,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Insertable)]
+#[diesel(table_name = user_preferences)]
+pub struct NewUserPreferences {
+    pub user_id: Uuid,
+    pub target_release_year: Option<i32>,
+    pub release_year_flex: i32,
+}
+
+#[derive(Debug, Clone, AsChangeset)]
+#[diesel(table_name = user_preferences)]
+pub struct UpdateUserPreferences {
+    pub target_release_year: Option<Option<i32>>,
+    pub release_year_flex: Option<i32>,
+}
+
+// Join table models for included genres
+#[derive(Debug, Clone, Queryable, Identifiable, Associations)]
+#[diesel(table_name = prefs_include_genre)]
+#[diesel(primary_key(user_id, genre_id))]
+#[diesel(belongs_to(User, foreign_key = user_id))]
+#[diesel(belongs_to(Genre, foreign_key = genre_id))]
+pub struct PrefsIncludeGenre {
+    pub user_id: Uuid,
+    pub genre_id: Uuid,
+}
+
+#[derive(Debug, Clone, Insertable)]
+#[diesel(table_name = prefs_include_genre)]
+pub struct NewPrefsIncludeGenre {
+    pub user_id: Uuid,
+    pub genre_id: Uuid,
+}
+
+// Join table models for excluded genres
+#[derive(Debug, Clone, Queryable, Identifiable, Associations)]
+#[diesel(table_name = prefs_exclude_genre)]
+#[diesel(primary_key(user_id, genre_id))]
+#[diesel(belongs_to(User, foreign_key = user_id))]
+#[diesel(belongs_to(Genre, foreign_key = genre_id))]
+pub struct PrefsExcludeGenre {
+    pub user_id: Uuid,
+    pub genre_id: Uuid,
+}
+
+#[derive(Debug, Clone, Insertable)]
+#[diesel(table_name = prefs_exclude_genre)]
+pub struct NewPrefsExcludeGenre {
+    pub user_id: Uuid,
+    pub genre_id: Uuid,
 }

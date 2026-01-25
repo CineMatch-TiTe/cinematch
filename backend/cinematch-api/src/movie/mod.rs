@@ -53,11 +53,19 @@ impl Into<MovieResponse> for cinematch_db::MovieData {
             rating: self.rating,
             tagline: self.tagline,
             popularity: Some(self.popularity),
-            trailers: self.video_keys.into_iter().map(|video_id| format!("https://www.youtube.com/watch?v={}", video_id)).collect(),
-            cast: self.cast.into_iter().map(|member| CastMemberResponse {
-                name: member.name,
-                profile_url: member.profile_url,
-            }).collect(),
+            trailers: self
+                .video_keys
+                .into_iter()
+                .map(|video_id| format!("https://www.youtube.com/watch?v={}", video_id))
+                .collect(),
+            cast: self
+                .cast
+                .into_iter()
+                .map(|member| CastMemberResponse {
+                    name: member.name,
+                    profile_url: member.profile_url,
+                })
+                .collect(),
         }
     }
 }
@@ -76,4 +84,15 @@ pub struct GenreResponse {
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct RecommendedMoviesResponse {
     pub recommended_movies: Vec<MovieResponse>,
+}
+
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+pub struct SearchQuery {
+    pub query: String,
+    pub page: Option<i64>,
+}
+
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+pub struct SearchResponse {
+    pub movies: Vec<MovieResponse>,
 }

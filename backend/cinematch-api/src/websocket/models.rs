@@ -54,5 +54,5 @@ pub enum ClientMessage {
 #[derive(Debug, serde::Serialize, serde::Deserialize, ToSchema)]
 pub struct VoteMovie {
     pub movie_id: i64, //we're using tmdb ids
-    pub vote: bool,       // true = like, false = dislike
+    pub vote: bool,    // true = like, false = dislike
 }

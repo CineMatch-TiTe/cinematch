@@ -94,7 +94,6 @@ async fn main() -> std::io::Result<()> {
         }
     };
 
-
     let deadline_expiration = Duration::from_secs(24 * 60 * 60); // last visit this long ago will be logged out
     let last_login_duration = Duration::from_secs(30 * 24 * 60 * 60); // last login this long ago will be logged out
 

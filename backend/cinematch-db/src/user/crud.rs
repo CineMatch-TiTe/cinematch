@@ -1,15 +1,33 @@
-//! User database operations
+use crate::models::{Genre, NewUserPreferences, UpdateUserPreferences, UserPreferences};
 
 use diesel::prelude::*;
 use diesel_async::RunQueryDsl;
-use uuid::Uuid;
 
 use crate::models::{NewUser, UpdateUser, User};
 use crate::schema::parties;
 use crate::{Database, DbError, DbResult};
 use crate::{Party, schema};
 
+use uuid::Uuid;
+
 impl Database {
+    /// Create user preferences (now only handles year/flex)
+    pub async fn create_user_preferences(
+        &self,
+        new_prefs: NewUserPreferences,
+    ) -> DbResult<UserPreferences> {
+        use crate::schema::user_preferences;
+        let mut conn = self.conn().await?;
+        diesel::insert_into(user_preferences::table)
+            .values(&new_prefs)
+            .returning(UserPreferences::as_returning())
+            .get_result(&mut conn)
+            .await
+            .map_err(DbError::from)
+    }
+
+    ///!User database operations
+
     /// Create a new oneshot (temporary) user
     pub async fn create_oneshot_user(&self, username: &str) -> DbResult<User> {
         use schema::users;
