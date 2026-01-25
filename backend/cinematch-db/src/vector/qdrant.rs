@@ -31,7 +31,7 @@ pub struct PointPayload {
 }
 
 pub struct QdrantService {
-    pub(crate) client: Arc<Qdrant>,
+    pub client: Arc<Qdrant>,
 }
 
 impl Clone for QdrantService {

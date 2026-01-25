@@ -39,7 +39,8 @@ pub fn configure_party() -> impl FnOnce(&mut ServiceConfig) {
 pub fn configure_movies() -> impl FnOnce(&mut ServiceConfig) {
     |cfg: &mut ServiceConfig| {
         cfg.service(movie::handlers::get_movie)
-            .service(movie::handlers::get_genres);
+            .service(movie::handlers::get_genres)
+            .service(movie::handlers::get_recommendations);
     }
 }
 

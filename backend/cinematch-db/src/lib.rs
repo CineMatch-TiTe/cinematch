@@ -64,6 +64,9 @@ pub enum DbError {
 
     #[error("Failed to generate unique party code after max attempts")]
     CodeGenerationFailed,
+
+    #[error("Other database error: {0}")]
+    Other(String),
 }
 
 pub type DbResult<T> = Result<T, DbError>;

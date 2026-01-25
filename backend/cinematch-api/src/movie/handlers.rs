@@ -1,9 +1,11 @@
 use super::{
-    AppState, ErrorResponse, MovieResponse, GenreResponse, TrailerResponse, CastMemberResponse,
+    AppState, ErrorResponse, MovieResponse, GenreResponse, RecommendedMoviesResponse,
     extract_user_id,
 };
 use actix_identity::Identity;
 use actix_web::{HttpResponse, get, web};
+use cinematch_recommendation_engine::recommend_movies;
+use futures::SinkExt;
 use log::{error};
 use chrono::Utc;
 
@@ -32,33 +34,7 @@ pub async fn get_movie(db: AppState, user: Option<Identity>, movie_id: web::Path
     match db.get_movie_by_id(movie_id).await {
         Ok(movie) => match movie {
             Some(movie) => {
-                HttpResponse::Ok().json(MovieResponse {
-                    movie_id: movie.movie_id,
-                    title: movie.title,
-                    director: movie.director.get(0).cloned(),
-                    genres: movie.genres,
-                    overview: movie.overview,
-                    release_date: if movie.release_date > 0 {
-                        Some({
-                            let naive = chrono::NaiveDateTime::from_timestamp(movie.release_date, 0);
-                            chrono::DateTime::<Utc>::from_naive_utc_and_offset(naive, Utc)
-                        })
-                    } else {
-                        None
-                    },
-                    poster_url: movie.poster_url,
-                    runtime: Some(movie.runtime as i32),
-                    imdb_id: movie.imdb_id,
-                    mediawiki_id: movie.mediawiki_id,
-                    rating: movie.rating,
-                    tagline: movie.tagline,
-                    popularity: Some(movie.popularity),
-                    trailers: movie.video_keys.into_iter().map(|video_id| TrailerResponse { trailer_url: format!("https://www.youtube.com/watch?v={}", video_id) }).collect(),
-                    cast: movie.cast.into_iter().map(|member| CastMemberResponse {
-                        name: member.name,
-                        profile_url: member.profile_url,
-                    }).collect(),
-                })
+                HttpResponse::Ok().json(Into::<MovieResponse>::into(movie))
             }
             None => {
                 HttpResponse::NotFound().json(ErrorResponse::new("Movie not found"))
@@ -98,4 +74,65 @@ pub async fn get_genres(db: AppState, user: Option<Identity>) -> HttpResponse {
             HttpResponse::InternalServerError().json(ErrorResponse::new("Failed to retrieve genres"))
         }
     }
+}
+
+
+#[utoipa::path(
+    responses(
+        (status = 200, description = "Get list of recommended movies", body = RecommendedMoviesResponse),
+        (status = 401, description = "Unauthorized"),
+        (status = 404, description = "Recommended movies not found"),
+        (status = 500, description = "Internal server error", body = ErrorResponse)
+    ),
+    tags = ["movie"],
+    security(("bearer_auth" = [])),
+    operation_id = "get_recommendations"
+)]
+#[get("/recommend")]
+pub async fn get_recommendations(db: AppState, user: Option<Identity>) -> HttpResponse {
+    let user_id = extract_user_id!(user);
+
+    // 3 is good
+    let movies = recommend_movies(&db, user_id, 3).await;
+
+    let ids =match movies {
+        Ok(movies) => {
+            if movies.is_empty() {
+                return HttpResponse::NotFound().finish();
+            }
+            movies
+        }
+        Err(e) => {
+            error!("Failed to retrieve recommended movies: {}", e);
+            return HttpResponse::InternalServerError().json(ErrorResponse::new("Failed to retrieve recommended movies"))
+        }
+    };
+
+    // build a list of movie responses
+
+    let mut responses = Vec::with_capacity(ids.len());
+
+    for movie_id in ids.iter() {
+        match db.get_movie_by_id(*movie_id).await {
+            Ok(movie) => match movie {
+                Some(movie) => {
+                    responses.push(Into::<MovieResponse>::into(movie));
+                }
+                None => {
+                    error!("Recommended movie with ID {} not found", movie_id);
+                }
+            },
+            Err(e) => {
+                error!("Failed to retrieve movie with ID {}: {}", movie_id, e);
+                return HttpResponse::InternalServerError().json(ErrorResponse::new("Failed to retrieve movie"))
+            }
+        }
+    }
+
+    if responses.is_empty() {
+        return HttpResponse::NotFound().finish();
+    }
+
+    HttpResponse::Ok().json(RecommendedMoviesResponse { recommended_movies: responses })
+
 }

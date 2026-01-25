@@ -26,13 +26,40 @@ pub struct MovieResponse {
     pub rating: Option<String>,
     pub tagline: Option<String>,
     pub popularity: Option<f32>,
-    pub trailers: Vec<TrailerResponse>,
+    pub trailers: Vec<String>,
     pub cast: Vec<CastMemberResponse>,
 }
 
-#[derive(Debug, Serialize, Deserialize, ToSchema)]
-pub struct TrailerResponse {
-    pub trailer_url: String,
+impl Into<MovieResponse> for cinematch_db::MovieData {
+    fn into(self) -> MovieResponse {
+        MovieResponse {
+            movie_id: self.movie_id,
+            title: self.title,
+            director: self.director.get(0).cloned(),
+            genres: self.genres,
+            overview: self.overview,
+            release_date: if self.release_date > 0 {
+                Some({
+                    let naive = chrono::NaiveDateTime::from_timestamp(self.release_date, 0);
+                    chrono::DateTime::<Utc>::from_naive_utc_and_offset(naive, Utc)
+                })
+            } else {
+                None
+            },
+            poster_url: self.poster_url,
+            runtime: Some(self.runtime as i32),
+            imdb_id: self.imdb_id,
+            mediawiki_id: self.mediawiki_id,
+            rating: self.rating,
+            tagline: self.tagline,
+            popularity: Some(self.popularity),
+            trailers: self.video_keys.into_iter().map(|video_id| format!("https://www.youtube.com/watch?v={}", video_id)).collect(),
+            cast: self.cast.into_iter().map(|member| CastMemberResponse {
+                name: member.name,
+                profile_url: member.profile_url,
+            }).collect(),
+        }
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
@@ -44,4 +71,9 @@ pub struct CastMemberResponse {
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct GenreResponse {
     pub genres: Vec<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+pub struct RecommendedMoviesResponse {
+    pub recommended_movies: Vec<MovieResponse>,
 }

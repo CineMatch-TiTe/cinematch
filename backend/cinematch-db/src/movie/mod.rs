@@ -4,6 +4,8 @@ use crate::Database;
 use diesel::prelude::*;
 use diesel_async::RunQueryDsl;
 
+use crate::Movie;
+
 use crate::DbError;
 use crate::DbResult;
 
@@ -176,5 +178,29 @@ impl Database {
             video_keys,
         };
         Ok(Some(movie_data))
+    }
+
+    pub async fn get_popular_movies(&self, limit: i64) -> DbResult<Vec<MovieData>> {
+        use crate::schema::movies;
+        use diesel::prelude::*;
+        use diesel_async::RunQueryDsl;
+
+        let mut conn = self.conn().await?;
+
+        let movie_rows: Vec<Movie> = movies::table
+            .order(movies::popularity.desc())
+            .limit(limit)
+            .load::<Movie>(&mut conn)
+            .await
+            .map_err(DbError::from)?;
+
+        let mut movies_data = Vec::with_capacity(movie_rows.len());
+        for movie_row in movie_rows {
+            if let Some(movie_data) = self.get_movie_by_id(movie_row.movie_id).await? {
+                movies_data.push(movie_data);
+            }
+        }
+
+        Ok(movies_data)
     }
 }

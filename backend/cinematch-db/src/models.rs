@@ -277,9 +277,3 @@ pub struct Movie {
     pub overview: Option<String>,
     pub tagline: Option<String>,
 }
-
-
-pub struct TasteProfile {
-    pub point_id: i64,
-    pub liked: bool,
-}
