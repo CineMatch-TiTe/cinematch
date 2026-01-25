@@ -1,5 +1,3 @@
-//! Party database operations
-
 use diesel::prelude::*;
 use diesel_async::RunQueryDsl;
 use rand::Rng;
@@ -58,6 +56,21 @@ impl Database {
             .await?;
 
         Ok((party, code))
+    }
+
+    /// Get the party a user is currently in (if any)
+    pub async fn get_user_party(&self, user_id: Uuid) -> DbResult<Option<Party>> {
+        use crate::schema::{party_members, parties};
+        let mut conn = self.conn().await?;
+        let result = party_members::table
+            .inner_join(parties::table.on(party_members::party_id.eq(parties::id)))
+            .filter(party_members::user_id.eq(user_id))
+            .filter(parties::state.ne(PartyState::Disbanded))
+            .select(Party::as_select())
+            .first::<Party>(&mut conn)
+            .await
+            .optional()?;
+        Ok(result)
     }
 
     /// Internal helper to generate a unique party code
@@ -254,6 +267,12 @@ impl Database {
 
         // Release code if exists
         let _ = self.release_party_code(party_id).await;
+
+        // kick all members
+        let members = self.get_party_members(party_id).await?;
+        for member in members {
+            let _ = self.remove_party_member(party_id, member.user_id).await?;
+        }
 
         // Set state to disbanded
         let mut conn = self.conn().await?;

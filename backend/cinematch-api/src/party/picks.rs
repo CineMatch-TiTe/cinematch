@@ -30,7 +30,6 @@ use crate::websocket::models::{MovieVotes, ServerMessage};
 #[put("/{party_id}/pick/{movie_id}")]
 pub async fn pick_movie(
     db: AppState,
-    rooms: WsBroadcaster,
     user: Identity,
     path: web::Path<(Uuid, i64)>,
 ) -> HttpResponse {
@@ -44,7 +43,7 @@ pub async fn pick_movie(
 
     // 2. Check user can pick movies
     match db.get_state(party_id).await {
-        Ok(PartyState::Picking) => {}
+        Ok(PartyState::Picking | PartyState::Created) => {}
         Ok(_) => {
             return HttpResponse::Forbidden().json(ErrorResponse::new("Picking is not allowed at this time."));
         }
@@ -53,7 +52,12 @@ pub async fn pick_movie(
         }
     }
     // 3. Register the pick
-    
 
-    todo!(" Register the pick for user {user_id} in party {party_id} for movie {movie_id}" )
+    match db.add_party_taste(user_id, party_id, movie_id, true).await {
+        Ok(_) => HttpResponse::Ok().json("Movie picked successfully"),
+        Err(e) => {
+            error!("Failed to register pick for user {} in party {}: {}", user_id, party_id, e);
+            HttpResponse::InternalServerError().json(ErrorResponse::new("Failed to register movie pick"))
+        }
+    }
 }

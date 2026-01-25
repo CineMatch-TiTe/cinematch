@@ -62,7 +62,6 @@ pub async fn login_guest(
         return HttpResponse::Conflict().json(ErrorResponse::new("User already logged in"));
     }
     let username = body.into_inner();
-    let is_tite = username.is_tite;
     let username = match &username.username {
         Some(name) => {
             let name = cinematch_common::extract_and_validate_username!(name); // early return on invalid
@@ -80,7 +79,7 @@ pub async fn login_guest(
         }
     };
     debug!("Creating guest user with username: {}", username);
-    match db.create_guest_user(&username, is_tite).await {
+    match db.create_guest_user(&username).await {
         Ok(user) => match Identity::login(&request.extensions(), user.id.to_string()) {
             Ok(_) => {
                 trace!("User identity set in session for user_id={}", user.id);

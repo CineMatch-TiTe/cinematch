@@ -30,7 +30,7 @@ WHERE p.user_id IS NULL;
 
 -- add the selected movie to party as a field
 ALTER TABLE parties
-ADD COLUMN selected_movie_id BIGINT REFERENCES movies(movie_id) ON DELETE CASCADE;
+ADD COLUMN selected_movie_id BIGINT REFERENCES movies(movie_id) ON DELETE CASCADE DEFAULT NULL;
 
 -- add the selected movie to party as a field
 ALTER TABLE movies

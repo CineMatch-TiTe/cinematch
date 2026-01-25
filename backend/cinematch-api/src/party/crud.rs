@@ -11,6 +11,7 @@ use uuid::Uuid;
     responses(
         (status = 201, description = "Party created successfully", body = CreatePartyResponse),
         (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 403, description = "Forbidden", body = ErrorResponse),
         (status = 404, description = "User not found", body = ErrorResponse),
         (status = 500, description = "Internal server error", body = ErrorResponse)
     ),
@@ -35,6 +36,18 @@ pub async fn create_party(db: AppState, user: Option<Identity>) -> HttpResponse 
             error!("Failed to verify user: {}", e);
             return HttpResponse::InternalServerError()
                 .json(ErrorResponse::new("Failed to verify user"));
+        }
+    }
+
+    // Check if user is already in a party
+    match db.get_user_party(user_id).await {
+        Ok(Some(_)) => {
+            return HttpResponse::Forbidden().json(ErrorResponse::new("User is already in a party"));
+        }
+        Ok(None) => {}
+        Err(e) => {
+            error!("Failed to check user party: {}", e);
+            return HttpResponse::InternalServerError().json(ErrorResponse::new("Failed to check user party"));
         }
     }
 

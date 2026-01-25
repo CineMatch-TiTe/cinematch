@@ -131,6 +131,7 @@ pub struct Party {
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
     pub disbanded_at: Option<DateTime<Utc>>,
+    pub selected_movie_id: Option<i64>,
     pub can_vote: bool,
 }
 

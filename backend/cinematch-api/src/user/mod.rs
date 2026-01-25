@@ -15,10 +15,6 @@ use uuid::Uuid;
 pub struct GuestUserRequest {
     /// Desired username for the guest user (optional)
     pub username: Option<String>,
-    
-    /// Whether this is a TITE user ;D
-    #[schema(example = true)]
-    pub is_tite: bool,
 }
 
 /// Response when creating a guest user
@@ -94,6 +90,8 @@ pub struct UpdateUserPreferencesRequest {
     pub target_release_year: Option<Option<i32>>, 
     #[schema(example = json!(2))]
     pub release_year_flex: Option<i32>,
+    #[schema(example = json!(true))]
+    pub is_tite: Option<bool>,
 }
 
 /// API-facing user preferences response (genre names, not IDs)

@@ -18,6 +18,11 @@ add healthcheck to docker
 party code generation is not ideal, perhaps investigate some time based 
 imdb rating crawling for backend side
 
+-- users can pick their movies either in creating or picking phase
+-- we store these picks as party taste profiles
+-- each user can pick multiple movies which define their taste profile for the party
+-- we recommend movies to be picked based on user global taste
+
 -- party voting works
 -- we go to voting stage after nominating movies
 -- for each user we select 5 movies based on the pickings and taste profiles

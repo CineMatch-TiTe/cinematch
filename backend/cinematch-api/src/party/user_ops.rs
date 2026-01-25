@@ -9,7 +9,7 @@ use actix_web::{HttpResponse, get, post, web};
 use log::{debug, error, trace};
 use uuid::Uuid;
 
-use crate::websocket::models::{MovieVotes, ServerMessage};
+use crate::websocket::models::{MemberJoined, MovieVotes, ServerMessage};
 
 use crate::websocket::send_message_to_party;
 
@@ -29,7 +29,7 @@ use crate::websocket::send_message_to_party;
     operation_id = "join_party"
 )]
 #[post("/join/{code}")]
-pub async fn join_party(db: AppState, user: Identity, code: web::Path<String>) -> HttpResponse {
+pub async fn join_party(db: AppState, user: Identity, room: WsBroadcaster, code: web::Path<String>) -> HttpResponse {
     let code = code.into_inner();
     let user_id = extract_user_id!(user);
 
@@ -57,6 +57,17 @@ pub async fn join_party(db: AppState, user: Identity, code: web::Path<String>) -
         ));
     }
 
+    // Check if user is already in a party
+    match db.get_user_party(user_id).await {
+        Ok(Some(_)) => {
+            return HttpResponse::BadRequest().json(ErrorResponse::new("User is already in a party"));
+        }
+        Ok(None) => {}
+        Err(e) => {
+            error!("Failed to check user party: {}", e);
+            return HttpResponse::InternalServerError().json(ErrorResponse::new("Failed to check user party"));
+        }
+    }
     // Check if user is already a member
     match db.is_party_member(party.id, user_id).await {
         Ok(true) => {
@@ -80,6 +91,24 @@ pub async fn join_party(db: AppState, user: Identity, code: web::Path<String>) -
     match db.add_party_member(party.id, user_id).await {
         Ok(_) => {
             debug!("User {} successfully joined party {}", user_id, party.id);
+
+
+            let username = match db.get_user(user_id).await {
+                Ok(user) => user.username,
+                Err(e) => {
+                    error!("Failed to fetch username for user {}: {}", user_id, e);
+                    "Unknown".to_string()
+                }
+            };
+
+            let msg = ServerMessage::PartyMemberJoined(
+                MemberJoined {
+                    user_id,
+                    username,
+                }
+            );
+            let _ = send_message_to_party(&room, party.id.to_string(), &msg, Some(&[user_id])).await;
+
             let response = CreatePartyResponse {
                 party_id: party.id,
                 code: code.clone(),
@@ -118,13 +147,16 @@ pub async fn join_party(db: AppState, user: Identity, code: web::Path<String>) -
     operation_id = "leave_party"
 )]
 #[post("/{party_id}/leave")]
-pub async fn leave_party(db: AppState, user: Identity, party_id: web::Path<Uuid>) -> HttpResponse {
+pub async fn leave_party(db: AppState, user: Identity, room: WsBroadcaster, party_id: web::Path<Uuid>) -> HttpResponse {
     let party_id = party_id.into_inner();
     let user_id = extract_user_id!(user);
 
     match db.remove_party_member(party_id, user_id).await {
         Ok(_) => {
             debug!("User {} left party {}", user_id, party_id);
+            // Notify remaining members
+            let msg = ServerMessage::PartyMemberLeft(user_id);
+            let _ = send_message_to_party(&room, party_id.to_string(), &msg, None).await;
             HttpResponse::Ok().finish()
         }
         Err(DbError::NotPartyMember) => {
