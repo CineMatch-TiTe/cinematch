@@ -40,6 +40,7 @@ impl Database {
         let new_party = NewParty {
             party_leader_id: leader_id,
             state: PartyState::Created,
+            can_vote: false,
         };
 
         let mut conn = self.conn().await?;
@@ -215,6 +216,19 @@ impl Database {
         self.reset_all_ready_states(party_id).await?;
 
         Ok(updated_party)
+    }
+
+    pub async fn get_state(&self, party_id: Uuid) -> DbResult<PartyState> {
+        use schema::parties::dsl::*;
+
+        let mut conn = self.conn().await?;
+        let party_state = parties
+            .filter(id.eq(party_id))
+            .select(state)
+            .first::<PartyState>(&mut conn)
+            .await?;
+
+        Ok(party_state)
     }
 
     /// Start a new movie round

@@ -16,10 +16,12 @@ use cinematch_common::extract_user_id;
 
 pub mod models;
 
-use crate::Database;
+use crate::{AppState, Database};
 use crate::websocket::models::{ClientMessage, ServerMessage};
 
 use cinematch_common::models::ErrorResponse;
+
+pub type WsBroadcaster = Data<Arc<RwLock<Broadcaster>>>;
 
 // returns 403 if not authorized
 
@@ -106,8 +108,8 @@ pub async fn send_message_to_party(
 pub async fn websocket_controller(
     req: HttpRequest,
     body: Payload,
-    db: Data<Database>,
-    broadcaster: Data<Arc<RwLock<Broadcaster>>>,
+    db: AppState,
+    broadcaster: WsBroadcaster,
     user: Option<Identity>,
 ) -> HttpResponse {
     // validates user is authenticated

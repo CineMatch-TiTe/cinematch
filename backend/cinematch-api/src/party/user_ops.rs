@@ -2,8 +2,8 @@ use super::{
     CreatePartyResponse, DbError, ErrorResponse, MemberInfo, PartyMembersResponse, PartyState,
     ReadyStateResponse, SetReadyRequest, VoteMovieRequest, extract_user_id,
 };
-use crate::RoomsState;
-use crate::{AppState, VoteState};
+
+use crate::{AppState, WsBroadcaster};
 use actix_identity::Identity;
 use actix_web::{HttpResponse, get, post, web};
 use log::{debug, error, trace};
@@ -327,121 +327,4 @@ pub async fn set_ready(
                 .json(ErrorResponse::new(format!("Failed to toggle ready: {}", e)))
         }
     }
-}
-
-#[utoipa::path(
-    request_body = VoteMovieRequest,
-    responses(
-        (status = 200, description = "Vote recorded"),
-        (status = 400, description = "Voting not allowed in current party state"),
-        (status = 401, description = "Unauthorized", body = ErrorResponse),
-        (status = 400, description = "Bad request", body = ErrorResponse),
-        (status = 404, description = "Party not found"),
-        (status = 500, description = "Internal server error", body = ErrorResponse)
-    ),
-    params(
-        ("party_id" = Uuid, Path, description = "The party ID"),
-        ("movie_id" = i64, Path, description = "The movie ID to vote on")
-    ),
-    tags = ["party"],
-    security(("bearer_auth" = [])),
-    operation_id = "vote_movie"
-)]
-#[post("/{party_id}/vote/{movie_id}")]
-pub async fn vote_movie(
-    db: AppState,
-    rooms: RoomsState,
-    user: Identity,
-    party_id: web::Path<Uuid>,
-    movie_id: web::Path<i64>,
-    vote_store: VoteState,
-    body: web::Json<VoteMovieRequest>,
-) -> HttpResponse {
-    let user_id = extract_user_id!(user);
-
-    let party_id = party_id.into_inner();
-    let movie_id = movie_id.into_inner();
-    let liked = body.like;
-
-    trace!("POST /{}/vote/{} - user_id={}", party_id, movie_id, user_id);
-
-    // Verify user is a member
-    match db.is_party_member(party_id, user_id).await {
-        Ok(false) => {
-            trace!("User {} not member of party {}", user_id, party_id);
-            return HttpResponse::BadRequest()
-                .json(ErrorResponse::new("Not a member of this party"));
-        }
-        Err(e) => {
-            error!("Failed to check membership: {}", e);
-            return HttpResponse::InternalServerError()
-                .json(ErrorResponse::new("Failed to check membership"));
-        }
-        Ok(true) => {}
-    }
-    debug!(
-        "Auth passed - recording vote for user {} in party {} for movie {}",
-        user_id, party_id, movie_id
-    );
-
-    // verify voting phase is going on
-
-    let party = match db.get_party(party_id).await {
-        Ok(party) => party,
-        Err(DbError::PartyNotFound(_)) => {
-            return HttpResponse::NotFound().json(ErrorResponse::new("Party not found"));
-        }
-        Err(e) => {
-            error!("Failed to get party: {}", e);
-            return HttpResponse::InternalServerError()
-                .json(ErrorResponse::new(format!("Failed to get party: {}", e)));
-        }
-    };
-
-    if party.state != PartyState::Voting {
-        trace!(
-            "Party {} not in voting state, current state: {:?}",
-            party_id, party.state
-        );
-        return HttpResponse::BadRequest().json(ErrorResponse::new(
-            "Voting not allowed in current party state",
-        ));
-    }
-
-    match vote_store.cast_vote(party_id, user_id, movie_id, liked) {
-        Ok(_) => {
-            debug!(
-                "Vote recorded for user {} in party {} for movie {}",
-                user_id, party_id, movie_id
-            );
-        }
-        Err(e) => {
-            error!("Failed to record vote: {:?}", e);
-            return HttpResponse::InternalServerError().json(ErrorResponse::new(format!(
-                "Failed to record vote: {:?}",
-                e
-            )));
-        }
-    }
-
-    let (likes, dislikes) = match vote_store.get_movie_totals(party_id, movie_id) {
-        Ok(likes) => likes.map(|(l, d)| (l, d)).unwrap_or((0, 0)),
-        Err(e) => {
-            error!("Failed to get vote totals: {:?}", e);
-            return HttpResponse::InternalServerError().json(ErrorResponse::new(format!(
-                "Failed to get vote totals: {:?}",
-                e
-            )));
-        }
-    };
-
-    let message = ServerMessage::MovieVoteUpdate(MovieVotes {
-        movie_id,
-        likes,
-        dislikes,
-    });
-
-    send_message_to_party(&rooms, party_id.to_string(), &message, Some(&[user_id])).await;
-
-    HttpResponse::Ok().finish()
 }

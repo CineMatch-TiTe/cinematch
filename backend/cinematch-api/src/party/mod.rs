@@ -1,6 +1,8 @@
 pub mod crud;
 pub mod leader_ops;
 pub mod user_ops;
+pub mod votes;
+pub mod picks;
 
 pub use self::crud::*;
 pub use self::leader_ops::*;
@@ -14,7 +16,6 @@ use uuid::Uuid;
 use std::collections::HashMap;
 
 // Re-export types that are used in responses
-pub use super::VoteState;
 pub use crate::AppState;
 pub use cinematch_common::ErrorResponse;
 pub use cinematch_common::extract_user_id;
@@ -160,6 +161,13 @@ pub struct ReadyStateResponse {
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct VoteMovieRequest {
     pub like: bool,
+}
+
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+pub struct VoteMovieResponse {
+    /// Current vote totals for the movie
+    pub likes: u32,
+    pub dislikes: u32,
 }
 
 // ============================================================================

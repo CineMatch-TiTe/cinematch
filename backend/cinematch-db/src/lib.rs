@@ -20,6 +20,7 @@ mod movie;
 mod party;
 mod taste;
 mod user;
+mod vote;
 
 use diesel::Connection;
 use diesel::PgConnection;

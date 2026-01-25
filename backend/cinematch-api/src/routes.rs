@@ -34,7 +34,7 @@ pub fn configure_party() -> impl FnOnce(&mut ServiceConfig) {
             .service(party::leader_ops::advance_phase)
             .service(party::leader_ops::start_new_round)
             .service(party::leader_ops::disband_party)
-            .service(party::user_ops::vote_movie)
+            .service(party::votes::vote_movie)
             .service(party::crud::get_my_party);
     }
 }

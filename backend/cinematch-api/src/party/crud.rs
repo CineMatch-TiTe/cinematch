@@ -7,8 +7,6 @@ use actix_web::{HttpResponse, get, post, web};
 use log::{debug, error, trace};
 use uuid::Uuid;
 
-use crate::VoteState;
-
 #[utoipa::path(
     responses(
         (status = 201, description = "Party created successfully", body = CreatePartyResponse),
@@ -86,7 +84,6 @@ pub async fn create_party(db: AppState, user: Option<Identity>) -> HttpResponse 
 #[get("/{party_id}")]
 pub async fn get_party(
     db: AppState,
-    vote: VoteState,
     user: Identity,
     party_id: web::Path<Uuid>,
 ) -> HttpResponse {
@@ -121,8 +118,8 @@ pub async fn get_party(
                 None
             };
 
-            let vote_status = match vote.get_party_votes(party_id) {
-                Ok(votes) if party.state == PartyState::Voting => votes,
+            let vote_status = match db.get_party_votes(party_id, Some(user_id)).await {
+                Ok(votes) if party.state == PartyState::Voting => Some(votes),
                 _ => None,
             };
 
@@ -159,7 +156,7 @@ pub async fn get_party(
     operation_id = "get_my_party"
 )]
 #[get("")]
-pub async fn get_my_party(db: AppState, vote: VoteState, user: Identity) -> HttpResponse {
+pub async fn get_my_party(db: AppState, user: Identity) -> HttpResponse {
     let user_id = extract_user_id!(user);
     match db.get_user_active_party(user_id).await {
         Ok(party_id) => {
@@ -180,8 +177,8 @@ pub async fn get_my_party(db: AppState, vote: VoteState, user: Identity) -> Http
                     } else {
                         None
                     };
-                    let vote_status = match vote.get_party_votes(party_id) {
-                        Ok(votes) if party.state == PartyState::Voting => votes,
+                    let vote_status = match db.get_party_votes(party_id, Some(user_id)).await {
+                        Ok(votes) if party.state == PartyState::Voting => Some(votes),
                         _ => None,
                     };
                     let response = PartyResponse {

@@ -134,7 +134,8 @@ diesel::table! {
         created_at -> Timestamptz,
         updated_at -> Timestamptz,
         disbanded_at -> Nullable<Timestamptz>,
-        selected_movie_id -> Int8,
+        selected_movie_id -> Nullable<Int8>,
+        can_vote -> Bool,
     }
 }
 
@@ -180,6 +181,15 @@ diesel::table! {
 }
 
 diesel::table! {
+    shown_movies (party_id, user_id, movie_id) {
+        party_id -> Uuid,
+        user_id -> Uuid,
+        movie_id -> Int8,
+        shown_at -> Timestamptz,
+    }
+}
+
+diesel::table! {
     trailers (trailer_id) {
         trailer_id -> Uuid,
         video_key -> Text,
@@ -220,6 +230,16 @@ diesel::table! {
     }
 }
 
+diesel::table! {
+    votes (party_id, user_id, movie_id) {
+        party_id -> Uuid,
+        user_id -> Uuid,
+        movie_id -> Int8,
+        vote_value -> Bool,
+        voted_at -> Timestamptz,
+    }
+}
+
 diesel::joinable!(external_accounts -> users (user_id));
 diesel::joinable!(movie_cast -> cast_members (cast_id));
 diesel::joinable!(movie_cast -> movies (movie_id));
@@ -242,6 +262,9 @@ diesel::joinable!(prefs_exclude_genre -> genres (genre_id));
 diesel::joinable!(prefs_exclude_genre -> users (user_id));
 diesel::joinable!(prefs_include_genre -> genres (genre_id));
 diesel::joinable!(prefs_include_genre -> users (user_id));
+diesel::joinable!(shown_movies -> movies (movie_id));
+diesel::joinable!(shown_movies -> parties (party_id));
+diesel::joinable!(shown_movies -> users (user_id));
 diesel::joinable!(user_preferences -> users (user_id));
 diesel::joinable!(user_tastes -> movies (movie_id));
 
@@ -264,8 +287,10 @@ diesel::allow_tables_to_appear_in_same_query!(
     prefs_exclude_genre,
     prefs_include_genre,
     production_countries,
+    shown_movies,
     trailers,
     user_preferences,
     user_tastes,
     users,
+    votes,
 );

@@ -1,6 +1,6 @@
 use super::{
     AppState, CreatePartyResponse, DbError, ErrorResponse, PartyCode, PartyResponse, PartyState,
-    extract_user_id,
+    extract_user_id, VoteMovieRequest, VoteMovieResponse,
 };
 use actix_identity::Identity;
 use actix_web::{HttpResponse, get, post, web};
@@ -8,70 +8,80 @@ use log::{debug, error, trace};
 use uuid::Uuid;
 
 
+use crate::WsBroadcaster;
+use crate::websocket::models::{MovieVotes, ServerMessage};
+
 #[utoipa::path(
+    request_body = VoteMovieRequest,
     responses(
-        (status = 200, description = "Party details retrieved", body = PartyResponse),
+        (status = 200, description = "Vote cast", body = VoteMovieResponse), // likes, dislikes
         (status = 401, description = "Unauthorized", body = ErrorResponse),
-        (status = 403, description = "Not a party member", body = ErrorResponse),
-        (status = 404, description = "Party not found", body = ErrorResponse),
+        (status = 403, description = "Not a party member or cannot vote", body = ErrorResponse),
+        (status = 404, description = "Party or movie not found", body = ErrorResponse),
         (status = 500, description = "Internal server error", body = ErrorResponse)
     ),
     params(
-        ("party_id" = Uuid, Path, description = "The party's unique ID")
+        ("party_id" = Uuid, Path, description = "The party's unique ID"),
+        ("movie_id" = i64, Path, description = "The movie's unique ID"),
+        ("vote_value" = bool, Query, description = "true for like, false for dislike")
     ),
     tags = ["party"],
     security(("bearer_auth" = []))
 )]
-#[get("/{party_id}/vote/{movie_id}")]
-pub async fn vote_movie(db: AppState, user: Identity, party_id: web::Path<Uuid>, movie_id: web::Path<i64>) -> HttpResponse {
-    let party_id = party_id.into_inner();
-    let movie_id = movie_id.into_inner();
+#[post("/{party_id}/vote/{movie_id}")]
+pub async fn vote_movie(
+    db: AppState,
+    rooms: WsBroadcaster,
+    user: Identity,
+    path: web::Path<(Uuid, i64)>,
+    vote: web::Json<VoteMovieRequest>,
+) -> HttpResponse {
+    let (party_id, movie_id) = path.into_inner();
+    let vote = vote.into_inner();
     let user_id = extract_user_id!(user);
 
-    trace!("GET /{} - user_id={}", party_id, user_id);
+    // 1. Verify user is a member
+    if let Ok(false) | Err(_) = db.is_party_member(party_id, user_id).await {
+        return HttpResponse::Forbidden().json(ErrorResponse::new("Not a member of this party"));
+    }
 
-    // Verify user is a member
-    match db.is_party_member(party_id, user_id).await {
+    // 2. Parse vote_value from query
+    let vote_value = vote.like;
+
+    // 3. Check user can vote for this movie
+    match db.can_vote(party_id, user_id, movie_id).await {
         Ok(false) => {
-            trace!("User {} not member of party {}", user_id, party_id);
-            return HttpResponse::Forbidden()
-                .json(ErrorResponse::new("Not a member of this party"));
+            return HttpResponse::Forbidden().json(ErrorResponse::new("You cannot vote for this movie. Or voting is disabled."));
         }
-        Err(_) => {
-            // If error checking membership, assume not a member
-            return HttpResponse::Forbidden()
-                .json(ErrorResponse::new("Not a member of this party"));
+        Err(e) => {
+            return HttpResponse::InternalServerError().json(ErrorResponse::new(format!("DB error: {e}")));
         }
         Ok(true) => {}
     }
 
-    match db.get_party(party_id).await {
-        Ok(party) => {
-            // Only fetch code if party is in Created state
-            let code: Option<String> = if party.state == PartyState::Created {
-                let code_result: Result<Option<PartyCode>, DbError> =
-                    db.get_party_code(party_id).await;
-                code_result.ok().flatten().map(|c| c.code)
-            } else {
-                None
+    // 4. Cast vote
+    match db.cast_vote(party_id, user_id, movie_id, vote_value).await {
+        Ok(_) => {
+            let (likes, dislikes) = match db.get_vote_totals(movie_id, Some(party_id)).await {
+                Ok((likes, dislikes)) => (likes as u32, dislikes as u32),
+                Err(e) => return HttpResponse::InternalServerError().json(ErrorResponse::new(format!("DB error: {e}"))),
             };
+            // Notify via WebSocket
+            // send websocket update to party members
+            let ws_message = ServerMessage::MovieVoteUpdate(
+                MovieVotes {
+                    movie_id,
+                    likes,
+                    dislikes,
+                }
+            );
+        
+            crate::websocket::send_message_to_party(&rooms, party_id.to_string(), &ws_message, Some(&[user_id])).await;
 
-            let response = PartyResponse {
-                id: party.id,
-                leader_id: party.party_leader_id,
-                state: party.state.into(),
-                created_at: party.created_at,
-                code,
-            };
-            HttpResponse::Ok().json(response)
+            HttpResponse::Ok().json(VoteMovieResponse { likes, dislikes })
+
+
         }
-        Err(DbError::PartyNotFound(_)) => {
-            HttpResponse::NotFound().json(ErrorResponse::new("Party not found"))
-        }
-        Err(e) => {
-            error!("Failed to get party: {}", e);
-            HttpResponse::InternalServerError()
-                .json(ErrorResponse::new(format!("Failed to get party: {}", e)))
-        }
+        Err(e) => HttpResponse::InternalServerError().json(ErrorResponse::new(format!("Failed to cast vote: {e}"))),
     }
 }

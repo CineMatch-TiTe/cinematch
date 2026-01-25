@@ -1,5 +1,5 @@
 // Minimal models for movie metadata tables for ergonomic queries
-use crate::schema::{cast_members, directors, genres, keywords, production_countries, trailers};
+use crate::schema::{cast_members, directors, genres, keywords, production_countries, trailers, shown_movies, votes};
 
 // Re-export movie/vector models for easy access from crate root
 pub use crate::vector::models::{CastMember, MovieData};
@@ -131,6 +131,7 @@ pub struct Party {
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
     pub disbanded_at: Option<DateTime<Utc>>,
+    pub can_vote: bool,
 }
 
 /// For inserting a new party
@@ -139,6 +140,7 @@ pub struct Party {
 pub struct NewParty {
     pub party_leader_id: Uuid,
     pub state: PartyState,
+    pub can_vote: bool,
 }
 
 /// For updating a party
@@ -147,6 +149,7 @@ pub struct NewParty {
 pub struct UpdateParty {
     pub party_leader_id: Option<Uuid>,
     pub state: Option<PartyState>,
+    pub can_vote: Option<bool>,
     pub updated_at: Option<DateTime<Utc>>,
     pub disbanded_at: Option<DateTime<Utc>>,
 }
@@ -347,4 +350,48 @@ pub struct PrefsExcludeGenre {
 pub struct NewPrefsExcludeGenre {
     pub user_id: Uuid,
     pub genre_id: Uuid,
+}
+
+#[derive(Debug, Clone, Queryable, Identifiable, Associations)]
+#[diesel(table_name = shown_movies)]
+#[diesel(primary_key(party_id, user_id, movie_id))]
+#[diesel(belongs_to(crate::models::Party, foreign_key = party_id))]
+#[diesel(belongs_to(crate::models::User, foreign_key = user_id))]
+#[diesel(belongs_to(crate::models::Movie, foreign_key = movie_id))]
+pub struct ShownMovie {
+    pub party_id: Uuid,
+    pub user_id: Uuid,
+    pub movie_id: i64,
+    pub shown_at: chrono::DateTime<chrono::Utc>,
+}
+
+#[derive(Debug, Clone, Insertable)]
+#[diesel(table_name = shown_movies)]
+pub struct NewShownMovie {
+    pub party_id: Uuid,
+    pub user_id: Uuid,
+    pub movie_id: i64,
+}
+
+#[derive(Debug, Clone, Queryable, Identifiable, Associations)]
+#[diesel(table_name = votes)]
+#[diesel(primary_key(party_id, user_id, movie_id))]
+#[diesel(belongs_to(crate::models::Party, foreign_key = party_id))]
+#[diesel(belongs_to(crate::models::User, foreign_key = user_id))]
+#[diesel(belongs_to(crate::models::Movie, foreign_key = movie_id))]
+pub struct Vote {
+    pub party_id: Uuid,
+    pub user_id: Uuid,
+    pub movie_id: i64,
+    pub vote_value: bool,
+    pub voted_at: chrono::DateTime<chrono::Utc>,
+}
+
+#[derive(Debug, Clone, Insertable)]
+#[diesel(table_name = votes)]
+pub struct NewVote {
+    pub party_id: Uuid,
+    pub user_id: Uuid,
+    pub movie_id: i64,
+    pub vote_value: bool,
 }
