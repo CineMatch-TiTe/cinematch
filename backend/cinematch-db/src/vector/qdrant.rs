@@ -242,7 +242,7 @@ impl QdrantService {
             "runtime".to_string(),
             qdrant_client::qdrant::Value {
                 kind: Some(qdrant_client::qdrant::value::Kind::IntegerValue(
-                    movie.runtime as i64,
+                    movie.runtime,
                 )),
             },
         );

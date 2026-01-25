@@ -4,6 +4,7 @@ use utoipa::OpenApi;
 mod party;
 mod user;
 mod websocket;
+mod movie;
 
 pub mod routes;
 
@@ -19,6 +20,7 @@ pub type RoomsState = web::Data<std::sync::Arc<std::sync::RwLock<Broadcaster>>>;
     tags(
         (name = "user", description = "User management endpoints."),
         (name = "party", description = "Party management endpoints."),
+        (name = "movie", description = "Movie retrieval and search endpoints."),
         (name = "websocket", description = "WebSocket endpoints.")
     )
 )]

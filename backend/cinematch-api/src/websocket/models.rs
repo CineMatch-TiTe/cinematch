@@ -20,7 +20,7 @@ pub enum ServerMessage {
 
 #[derive(Debug, serde::Serialize, serde::Deserialize, ToSchema)]
 pub struct MovieVotes {
-    pub movie_id: String,
+    pub movie_id: i64,
     pub likes: u32,
     pub dislikes: u32,
 }
@@ -53,6 +53,6 @@ pub enum ClientMessage {
 
 #[derive(Debug, serde::Serialize, serde::Deserialize, ToSchema)]
 pub struct VoteMovie {
-    pub movie_id: String, //we're using tmdb ids
+    pub movie_id: i64, //we're using tmdb ids
     pub vote: bool,       // true = like, false = dislike
 }

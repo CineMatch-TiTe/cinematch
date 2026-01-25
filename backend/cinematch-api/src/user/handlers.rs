@@ -6,13 +6,13 @@
 use actix_identity::Identity;
 use actix_web::HttpMessage;
 use actix_web::HttpRequest;
-use actix_web::{HttpResponse, get, patch, post, web};
+use actix_web::{HttpResponse, get, patch, post, web, put};
 use log::{debug, trace};
 use uuid::Uuid;
 
 use log::error;
 
-use super::{CurrentUserResponse, GuestLoginResponse, GuestUserRequest, RenameUserRequest};
+use super::{CurrentUserResponse, GuestLoginResponse, GuestUserRequest, RenameUserRequest, UpdateTasteRequest};
 
 use crate::AppState;
 
@@ -121,6 +121,7 @@ pub async fn login_guest(
         ("user_id" = Uuid, Path, description = "The user ID")
     ),
     tags = ["user"],
+    security(("bearer_auth" = [])),
     operation_id = "rename_user"
 )]
 #[patch("/rename/{user_id}")]
@@ -185,6 +186,7 @@ pub async fn get_current_user(user: Identity, db: AppState) -> HttpResponse {
         Ok(user) => {
             debug!("Successfully fetched user profile for {}", user_id);
             // Token expiry: 24 hours from now
+            // TODO make sure this matches main auth token expiry, it should be set to 24 hours, or just remove
             let now = chrono::Utc::now().timestamp();
             let token_expires_in = 24 * 60 * 60; // 24 hours in seconds
             let token_expires_at = now + token_expires_in;
@@ -233,5 +235,53 @@ pub async fn logout_user(user: Option<Identity>) -> HttpResponse {
         HttpResponse::Ok().finish()
     } else {
         HttpResponse::NoContent().finish()
+    }
+}
+
+#[utoipa::path(
+    request_body = UpdateTasteRequest,
+    responses(
+        (status = 201, description = "Updated"),
+        (status = 400, description = "Bad Request - invalid input", body = ErrorResponse),
+        (status = 401, description = "Unauthorized - authentication required"),
+        (status = 404, description = "Movie not found"),
+        (status = 500, description = "Internal server error", body = ErrorResponse)
+    ),
+    params(
+        ("movie_id" = i64, Path, description = "The movie ID")
+    ),
+    tags = ["user"],
+    security(("bearer_auth" = [])),
+    operation_id = "update_taste"
+)]
+#[put("/like/{movie_id}")]
+pub async fn update_taste(
+    db: AppState,
+    user: Identity,
+    movie_id: web::Path<i64>,
+    body: web::Json<UpdateTasteRequest>,
+) -> HttpResponse {
+    let user_id = extract_user_id!(user);
+    let movie_id = movie_id.into_inner();
+    let like = body.into_inner();
+
+    // Check if movie exists
+    match db.get_movie_by_id(movie_id).await {
+        Ok(Some(_)) => {},
+        Ok(None) => {
+            return HttpResponse::NotFound().json(ErrorResponse::new("Movie not found"));
+        },
+        Err(e) => {
+            log::error!("DB error checking movie existence: {}", e);
+            return HttpResponse::InternalServerError().json(ErrorResponse::new("Database error"));
+        }
+    }
+
+    match db.add_taste(user_id, movie_id, like.liked).await {
+        Ok(_) => HttpResponse::Ok().finish(),
+        Err(e) => {
+            log::error!("Failed to update taste for user {}: {}", user_id, e);
+            HttpResponse::InternalServerError().json(ErrorResponse::new(format!("Failed to update taste: {}", e)))
+        }
     }
 }

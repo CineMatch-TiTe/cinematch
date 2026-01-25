@@ -814,6 +814,7 @@ dependencies = [
  "diesel-derive-enum",
  "diesel_migrations",
  "futures-util",
+ "log",
  "pq-sys",
  "qdrant-client",
  "rand 0.9.2",

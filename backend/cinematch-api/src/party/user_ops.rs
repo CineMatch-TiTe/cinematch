@@ -335,12 +335,13 @@ pub async fn set_ready(
         (status = 200, description = "Vote recorded"),
         (status = 400, description = "Voting not allowed in current party state"),
         (status = 401, description = "Unauthorized", body = ErrorResponse),
-        (status = 400, description = "Not a party member"),
+        (status = 400, description = "Bad request", body = ErrorResponse),
         (status = 404, description = "Party not found"),
         (status = 500, description = "Internal server error", body = ErrorResponse)
     ),
     params(
-        ("party_id" = Uuid, Path, description = "The party ID")
+        ("party_id" = Uuid, Path, description = "The party ID"),
+        ("movie_id" = i64, Path, description = "The movie ID to vote on")
     ),
     tags = ["party"],
     security(("bearer_auth" = [])),
@@ -352,7 +353,7 @@ pub async fn vote_movie(
     rooms: RoomsState,
     user: Identity,
     party_id: web::Path<Uuid>,
-    movie_id: web::Path<String>,
+    movie_id: web::Path<i64>,
     vote_store: VoteState,
     body: web::Json<VoteMovieRequest>,
 ) -> HttpResponse {
@@ -407,7 +408,7 @@ pub async fn vote_movie(
         ));
     }
 
-    match vote_store.cast_vote(party_id, user_id, &movie_id, liked) {
+    match vote_store.cast_vote(party_id, user_id, movie_id, liked) {
         Ok(_) => {
             debug!(
                 "Vote recorded for user {} in party {} for movie {}",
@@ -423,7 +424,7 @@ pub async fn vote_movie(
         }
     }
 
-    let (likes, dislikes) = match vote_store.get_movie_totals(party_id, &movie_id) {
+    let (likes, dislikes) = match vote_store.get_movie_totals(party_id, movie_id) {
         Ok(likes) => likes.map(|(l, d)| (l, d)).unwrap_or((0, 0)),
         Err(e) => {
             error!("Failed to get vote totals: {:?}", e);
@@ -435,7 +436,7 @@ pub async fn vote_movie(
     };
 
     let message = ServerMessage::MovieVoteUpdate(MovieVotes {
-        movie_id: movie_id.clone(),
+        movie_id,
         likes,
         dislikes,
     });

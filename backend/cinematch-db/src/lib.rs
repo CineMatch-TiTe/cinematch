@@ -19,6 +19,7 @@ mod external_account;
 mod party;
 mod user;
 mod movie;
+mod taste;
 
 use diesel::Connection;
 use diesel::PgConnection;

@@ -69,3 +69,10 @@ pub struct RenameUserRequest {
     /// The new username (max 32 characters)
     pub new_username: String,
 }
+
+/// Request to update user taste for a movie
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct UpdateTasteRequest {
+    /// Whether the user liked the movie (true = like, false = dislike)
+    pub liked: bool,
+}

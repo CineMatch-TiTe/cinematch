@@ -1,7 +1,7 @@
 CREATE TABLE movies (
     movie_id BIGINT PRIMARY KEY, -- TMDB movie ID, same for qdrant
     title TEXT NOT NULL,
-    runtime INTEGER CHECK (runtime > 0),
+    runtime INTEGER NOT NULL,
     popularity REAL NOT NULL CHECK (popularity >= 0),
     imdb_id TEXT UNIQUE,
     mediawiki_id TEXT UNIQUE,

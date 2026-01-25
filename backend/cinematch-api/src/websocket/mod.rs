@@ -99,6 +99,7 @@ pub async fn send_message_to_party(
         (status = 500, description = "Internal server error", body = ErrorResponse)
     ),
     tags = ["websocket"],
+    security(("bearer_auth" = [])),
     operation_id = "websocket_controller"
 )]
 #[get("")]

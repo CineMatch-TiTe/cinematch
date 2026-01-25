@@ -5,7 +5,7 @@ use uuid::Uuid;
 #[derive(Default)]
 pub struct VoteStore {
     // key is party_id
-    votes: Mutex<HashMap<Uuid, HashMap<String, MovieVote>>>,
+    votes: Mutex<HashMap<Uuid, HashMap<i64, MovieVote>>>,
 }
 
 impl VoteStore {
@@ -15,23 +15,31 @@ impl VoteStore {
         }
     }
 
+    /// Add a movie to the party's vote store
+    pub fn add_movie_to_party(&self, party_id: Uuid, movie_id: i64) -> Result<(), ()> {
+        let mut votes_lock = self.votes.lock().map_err(|_| ())?;
+        let party_votes = votes_lock.entry(party_id).or_insert_with(HashMap::new);
+        party_votes.entry(movie_id).or_insert_with(|| MovieVote::new());
+        Ok(())
+    }
+
     /// Cast a vote for a movie in a party by a user
     pub fn cast_vote(
         &self,
         party_id: Uuid,
         user_id: Uuid,
-        movie_id: impl Into<String>,
+        movie_id: i64,
         vote: bool,
     ) -> Result<(), ()> {
-        let movie_id = movie_id.into();
         let mut votes_lock = self.votes.lock().map_err(|_| ())?;
         let party_votes = votes_lock.entry(party_id).or_insert_with(HashMap::new);
-        let movie_vote = party_votes
-            .entry(movie_id.clone())
-            .or_insert_with(|| MovieVote::new());
-        movie_vote.cast_vote(user_id, vote);
-
-        Ok(())
+        if let Some(movie_vote) = party_votes.get_mut(&movie_id) {
+            movie_vote.cast_vote(user_id, vote);
+            Ok(())
+        } else {
+            // Movie not present in party
+            Err(())
+        }
     }
 
     /// Get a user's vote for a movie in a party
@@ -39,9 +47,8 @@ impl VoteStore {
         &self,
         party_id: Uuid,
         user_id: Uuid,
-        movie_id: impl Into<String>,
+        movie_id: i64,
     ) -> Result<Option<bool>, ()> {
-        let movie_id = movie_id.into();
         let votes_lock = self.votes.lock().map_err(|_| ())?;
         Ok(votes_lock
             .get(&party_id)
@@ -57,13 +64,25 @@ impl VoteStore {
     pub fn get_movie_totals(
         &self,
         party_id: Uuid,
-        movie_id: impl Into<String>,
+        movie_id: i64,
     ) -> Result<Option<(u32, u32)>, ()> {
-        let movie_id = movie_id.into();
         let votes_lock = self.votes.lock().map_err(|_| ())?;
         Ok(votes_lock
             .get(&party_id)
             .and_then(|movie_votes| movie_votes.get(&movie_id).map(|mv| mv.get_totals())))
+    }
+
+    pub fn get_party_votes(
+        &self,
+        party_id: Uuid,
+    ) -> Result<Option<HashMap<i64, (u32, u32)>>, ()> {
+        let votes_lock = self.votes.lock().map_err(|_| ())?;
+        Ok(votes_lock.get(&party_id).map(|movie_votes| {
+            movie_votes
+                .iter()
+                .map(|(movie_id, mv)| (*movie_id, mv.get_totals()))
+                .collect()
+        }))
     }
 
     /// Cleanup votes for a party

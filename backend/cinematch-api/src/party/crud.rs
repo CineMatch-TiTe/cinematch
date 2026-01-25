@@ -1,3 +1,4 @@
+
 use super::{
     AppState, CreatePartyResponse, DbError, ErrorResponse, PartyCode, PartyResponse, PartyState,
     extract_user_id,
@@ -6,6 +7,8 @@ use actix_identity::Identity;
 use actix_web::{HttpResponse, get, post, web};
 use log::{debug, error, trace};
 use uuid::Uuid;
+
+use crate::VoteState;
 
 #[utoipa::path(
     responses(
@@ -82,7 +85,7 @@ pub async fn create_party(db: AppState, user: Option<Identity>) -> HttpResponse 
     security(("bearer_auth" = []))
 )]
 #[get("/{party_id}")]
-pub async fn get_party(db: AppState, user: Identity, party_id: web::Path<Uuid>) -> HttpResponse {
+pub async fn get_party(db: AppState, vote: VoteState,user: Identity, party_id: web::Path<Uuid>) -> HttpResponse {
     let party_id = party_id.into_inner();
     let user_id = extract_user_id!(user);
 
@@ -114,12 +117,20 @@ pub async fn get_party(db: AppState, user: Identity, party_id: web::Path<Uuid>) 
                 None
             };
 
+            let vote_status = match vote.get_party_votes(party_id) {
+                Ok(votes) if party.state == PartyState::Voting => {
+                    votes
+                }
+                _ => None,
+            };
+
             let response = PartyResponse {
                 id: party.id,
                 leader_id: party.party_leader_id,
                 state: party.state.into(),
                 created_at: party.created_at,
                 code,
+                vote_status,
             };
             HttpResponse::Ok().json(response)
         }
@@ -130,6 +141,70 @@ pub async fn get_party(db: AppState, user: Identity, party_id: web::Path<Uuid>) 
             error!("Failed to get party: {}", e);
             HttpResponse::InternalServerError()
                 .json(ErrorResponse::new(format!("Failed to get party: {}", e)))
+        }
+    }
+}
+
+#[utoipa::path(
+    responses(
+        (status = 200, description = "Party details retrieved", body = PartyResponse),
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 404, description = "No active party found", body = ErrorResponse),
+        (status = 500, description = "Internal server error", body = ErrorResponse)
+    ),
+    tags = ["party"],
+    security(("bearer_auth" = [])),
+    operation_id = "get_my_party"
+)]
+#[get("")]
+pub async fn get_my_party(db: AppState, vote: VoteState, user: Identity) -> HttpResponse {
+    let user_id = extract_user_id!(user);
+    match db.get_user_active_party(user_id).await {
+        Ok(party_id) => {
+            // Reuse the logic from get_party
+            match db.is_party_member(party_id, user_id).await {
+                Ok(false) | Err(_) => {
+                    return HttpResponse::Forbidden().json(ErrorResponse::new("Not a member of this party"));
+                }
+                Ok(true) => {}
+            }
+            match db.get_party(party_id).await {
+                Ok(party) => {
+                    let code: Option<String> = if party.state == PartyState::Created {
+                        let code_result: Result<Option<PartyCode>, DbError> = db.get_party_code(party_id).await;
+                        code_result.ok().flatten().map(|c| c.code)
+                    } else {
+                        None
+                    };
+                    let vote_status = match vote.get_party_votes(party_id) {
+                        Ok(votes) if party.state == PartyState::Voting => votes,
+                        _ => None,
+                    };
+                    let response = PartyResponse {
+                        id: party.id,
+                        leader_id: party.party_leader_id,
+                        state: party.state.into(),
+                        created_at: party.created_at,
+                        code,
+                        vote_status,
+                    };
+                    HttpResponse::Ok().json(response)
+                }
+                Err(DbError::PartyNotFound(_)) => {
+                    HttpResponse::NotFound().json(ErrorResponse::new("Party not found"))
+                }
+                Err(e) => {
+                    error!("Failed to get party: {}", e);
+                    HttpResponse::InternalServerError().json(ErrorResponse::new(format!("Failed to get party: {}", e)))
+                }
+            }
+        }
+        Err(DbError::UserNotInParty(_)) => {
+            HttpResponse::NotFound().json(ErrorResponse::new("No active party found"))
+        }
+        Err(e) => {
+            error!("Failed to get user's active party: {}", e);
+            HttpResponse::InternalServerError().json(ErrorResponse::new(format!("Failed to get user's active party: {}", e)))
         }
     }
 }

@@ -11,6 +11,8 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
 
+use std::collections::HashMap;
+
 // Re-export types that are used in responses
 pub use super::VoteState;
 pub use crate::AppState;
@@ -47,6 +49,9 @@ pub struct PartyResponse {
     pub created_at: DateTime<Utc>,
     /// The join code (only present in Created state)
     pub code: Option<String>,
+
+    // where key is movie id, and (likes, dislikes)
+    pub vote_status: Option<HashMap<i64, (u32, u32)>>,
 }
 
 /// Party state for API responses
