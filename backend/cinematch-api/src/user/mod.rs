@@ -15,6 +15,10 @@ use uuid::Uuid;
 pub struct GuestUserRequest {
     /// Desired username for the guest user (optional)
     pub username: Option<String>,
+    
+    /// Whether this is a TITE user ;D
+    #[schema(example = true)]
+    pub is_tite: bool,
 }
 
 /// Response when creating a guest user

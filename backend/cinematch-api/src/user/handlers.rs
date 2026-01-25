@@ -54,14 +54,15 @@ use cinematch_common::{ErrorResponse, extract_user_id};
 pub async fn login_guest(
     db: AppState,
     request: HttpRequest,
-    username: web::Json<GuestUserRequest>,
+    body: web::Json<GuestUserRequest>,
     user: Option<Identity>,
 ) -> HttpResponse {
     if let Some(existing_user) = user {
         trace!("User already logged in with ID: {:?}", existing_user.id());
         return HttpResponse::Conflict().json(ErrorResponse::new("User already logged in"));
     }
-
+    let username = body.into_inner();
+    let is_tite = username.is_tite;
     let username = match &username.username {
         Some(name) => {
             let name = cinematch_common::extract_and_validate_username!(name); // early return on invalid
@@ -79,7 +80,7 @@ pub async fn login_guest(
         }
     };
     debug!("Creating guest user with username: {}", username);
-    match db.create_guest_user(&username).await {
+    match db.create_guest_user(&username, is_tite).await {
         Ok(user) => match Identity::login(&request.extensions(), user.id.to_string()) {
             Ok(_) => {
                 trace!("User identity set in session for user_id={}", user.id);

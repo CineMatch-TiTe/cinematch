@@ -307,6 +307,7 @@ pub struct NewUserPreferences {
     pub user_id: Uuid,
     pub target_release_year: Option<i32>,
     pub release_year_flex: i32,
+    pub is_tite: bool,
 }
 
 #[derive(Debug, Clone, AsChangeset)]
@@ -314,6 +315,7 @@ pub struct NewUserPreferences {
 pub struct UpdateUserPreferences {
     pub target_release_year: Option<Option<i32>>,
     pub release_year_flex: Option<i32>,
+    pub is_tite: Option<bool>,
 }
 
 // Join table models for included genres

@@ -29,7 +29,7 @@ impl Database {
     ///!User database operations
 
     /// Create a new oneshot (temporary) user
-    pub async fn create_oneshot_user(&self, username: &str) -> DbResult<User> {
+    pub async fn create_oneshot_user(&self, username: &str, is_tite: bool) -> DbResult<User> {
         use schema::users;
 
         let new_user = NewUser {
@@ -38,17 +38,28 @@ impl Database {
         };
 
         let mut conn = self.conn().await?;
-        diesel::insert_into(users::table)
+        let user = diesel::insert_into(users::table)
             .values(&new_user)
             .returning(User::as_returning())
             .get_result(&mut conn)
             .await
-            .map_err(DbError::from)
+            .map_err(DbError::from)?;
+
+        // Create default user preferences
+
+        let prefs = NewUserPreferences {
+            user_id: user.id,
+            target_release_year: None,
+            release_year_flex: 0,
+            is_tite,
+        };
+        self.create_user_preferences(prefs).await?;
+        Ok(user)
     }
 
     /// Create a new guest user (alias for create_oneshot_user for API clarity)
-    pub async fn create_guest_user(&self, username: &str) -> DbResult<User> {
-        self.create_oneshot_user(username).await
+    pub async fn create_guest_user(&self, username: &str, is_tite: bool) -> DbResult<User> {
+        self.create_oneshot_user(username, is_tite).await
     }
 
     /// Create a new persistent user (must link external account after)

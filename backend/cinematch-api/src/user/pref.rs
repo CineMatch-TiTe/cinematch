@@ -86,6 +86,7 @@ pub async fn edit_user_pref(
     let update_internal = UpdateUserPreferences {
         target_release_year: update.target_release_year,
         release_year_flex: update.release_year_flex,
+        is_tite: None,
     };
     if let Err(e) = db.update_user_preferences(user_id, update_internal).await {
         error!("Failed to update user preferences: {}", e);
