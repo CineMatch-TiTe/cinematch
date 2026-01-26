@@ -5,11 +5,10 @@ use actix_web::{HttpRequest, HttpResponse, get, rt::spawn, web::Payload};
 
 use actix_ws::{Item, Message};
 use actix_wsb::Broadcaster;
+use log::{debug, error, info, trace};
 use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, RwLock};
 use uuid::Uuid;
-
-use log::error;
 
 use cinematch_common::extract_user_id;
 
@@ -43,6 +42,7 @@ impl WsStore {
     }
 
     /// Broadcast to all connections in the room whose user_id (from map) is NOT in ignore_users.
+    /// Creates the room if it doesn't exist (no-op if no connections).
     pub async fn send_message_to_party(
         &self,
         room_id: String,
@@ -58,8 +58,10 @@ impl WsStore {
         };
 
         let mut write_broadcaster = self.broadcaster.write().unwrap();
+
+        // If room doesn't exist, it means no connections are in this party yet
         if write_broadcaster.check_room(&room_id).is_none() {
-            error!("Room {} does not exist in broadcaster", room_id);
+            trace!("Room {} has no connections, skipping broadcast", room_id);
             return;
         }
 
@@ -83,6 +85,7 @@ impl WsStore {
     }
 
     /// Send only to connections whose user_id (from map) equals target_user_id.
+    /// Creates the room if it doesn't exist (no-op if no connections).
     pub async fn send_message_to_user(
         &self,
         room_id: String,
@@ -104,11 +107,27 @@ impl WsStore {
                 .map(|(cid, _)| cid.clone())
                 .collect()
         };
-        let mut write_broadcaster = self.broadcaster.write().unwrap();
-        if write_broadcaster.check_room(&room_id).is_none() {
-            error!("Room {} does not exist in broadcaster", room_id);
+
+        // If no connections for this user, nothing to send
+        if target_conn_ids.is_empty() {
+            trace!(
+                "No connections found for user {} in room {}",
+                target_user_id, room_id
+            );
             return;
         }
+
+        let mut write_broadcaster = self.broadcaster.write().unwrap();
+
+        // If room doesn't exist, it means no connections are in this party yet
+        if write_broadcaster.check_room(&room_id).is_none() {
+            trace!(
+                "Room {} has no connections, skipping message to user {}",
+                room_id, target_user_id
+            );
+            return;
+        }
+
         write_broadcaster
             .room(&room_id)
             .broadcast_if(msg_text, |connection| {
@@ -170,6 +189,12 @@ pub async fn websocket_controller(
 
     let room_id = party_id.to_string();
     let conn_id = Uuid::new_v4().to_string();
+
+    info!(
+        "WebSocket connection established for user {} in party {}",
+        requester_id, room_id
+    );
+
     {
         let mut m = store.conn_map.write().unwrap();
         m.insert(conn_id.clone(), requester_id);
@@ -188,51 +213,63 @@ pub async fn websocket_controller(
     let conn_map = store.conn_map.clone();
 
     spawn(async move {
-        while let Some(Ok(msg)) = msg_stream.recv().await {
-            match msg {
-                Message::Text(msg) => {
-                    let _message: ClientMessage = match serde_json::from_str(&msg) {
-                        Ok(m) => m,
-                        Err(e) => {
-                            error!("Failed to parse client message: {}", e);
-                            continue;
-                        }
-                    };
-                    let mut w = get_broadcaster.write().unwrap();
-                    w.room(&room_id).broadcast(msg.to_string()).await;
-                }
-                Message::Close(reason) => {
+        while let Some(result) = msg_stream.recv().await {
+            match result {
+                Ok(msg) => match msg {
+                    Message::Text(msg) => {
+                        let _message: ClientMessage = match serde_json::from_str(&msg) {
+                            Ok(m) => m,
+                            Err(e) => {
+                                error!("Failed to parse client message: {}", e);
+                                continue;
+                            }
+                        };
+                        let mut w = get_broadcaster.write().unwrap();
+                        w.room(&room_id).broadcast(msg.to_string()).await;
+                    }
+                    Message::Close(reason) => {
+                        debug!("WebSocket connection {} closed: {:?}", conn_id, reason);
+                        let _ = conn_map.write().unwrap().remove(&conn_id);
+                        let _ = get_broadcaster
+                            .write()
+                            .unwrap()
+                            .room(&room_id)
+                            .close_conn(reason, &conn_id)
+                            .await;
+                        break;
+                    }
+                    Message::Pong(bytes) => {
+                        let mut w = get_broadcaster.write().unwrap();
+                        w.room(&room_id).ping(bytes.to_vec()).await;
+                    }
+                    Message::Ping(bytes) => {
+                        let mut w = get_broadcaster.write().unwrap();
+                        w.room(&room_id).pong(bytes.to_vec()).await;
+                    }
+                    Message::Continuation(item) => {
+                        let mut w = get_broadcaster.write().unwrap();
+                        let room = w.room(&room_id);
+                        let msg = format!(r"hello, your continuation message: {:#?}", item);
+                        let start = Item::FirstBinary(msg.into());
+                        let _ = room.continuation(start).await;
+                        let cont_cont = Item::Continue(r"continue".into());
+                        let _ = room.continuation(cont_cont).await;
+                        let last = Item::Last(r"end".into());
+                        let _ = room.continuation(last).await;
+                    }
+                    _ => {}
+                },
+                Err(e) => {
+                    error!("WebSocket stream error for connection {}: {}", conn_id, e);
+                    // Clean up connection on stream error
                     let _ = conn_map.write().unwrap().remove(&conn_id);
-                    let _ = get_broadcaster
-                        .write()
-                        .unwrap()
-                        .room(&room_id)
-                        .close_conn(reason, &conn_id)
-                        .await;
                     break;
                 }
-                Message::Pong(bytes) => {
-                    let mut w = get_broadcaster.write().unwrap();
-                    w.room(&room_id).ping(bytes.to_vec()).await;
-                }
-                Message::Ping(bytes) => {
-                    let mut w = get_broadcaster.write().unwrap();
-                    w.room(&room_id).pong(bytes.to_vec()).await;
-                }
-                Message::Continuation(item) => {
-                    let mut w = get_broadcaster.write().unwrap();
-                    let room = w.room(&room_id);
-                    let msg = format!(r"hello, your continuation message: {:#?}", item);
-                    let start = Item::FirstBinary(msg.into());
-                    let _ = room.continuation(start).await;
-                    let cont_cont = Item::Continue(r"continue".into());
-                    let _ = room.continuation(cont_cont).await;
-                    let last = Item::Last(r"end".into());
-                    let _ = room.continuation(last).await;
-                }
-                _ => {}
             }
         }
+        // Ensure cleanup on stream end (normal or error)
+        let _ = conn_map.write().unwrap().remove(&conn_id);
+        debug!("WebSocket connection {} cleaned up", conn_id);
     });
 
     HttpResponse::Ok().finish()
