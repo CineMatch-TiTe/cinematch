@@ -16,7 +16,7 @@ pub mod vector;
 pub const BATCH_SIZE: usize = 20;
 
 mod external_account;
-mod movie;
+pub mod movie;
 mod party;
 mod taste;
 mod user;

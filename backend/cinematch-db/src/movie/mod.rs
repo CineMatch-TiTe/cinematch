@@ -12,6 +12,7 @@ use crate::DbError;
 use crate::DbResult;
 
 use crate::vector::models::{CastMember, MovieData};
+use cinematch_common::SearchFilter;
 
 impl Database {
     pub async fn get_movie_directors(&self, movie_id: i64) -> DbResult<Vec<String>> {
@@ -128,6 +129,25 @@ impl Database {
         Ok(rows.into_iter().collect())
     }
 
+    /// Get genre ID by name (case-insensitive)
+    pub async fn get_genre_id_by_name(&self, genre_name: &str) -> DbResult<Option<Uuid>> {
+        use crate::schema::genres::dsl::*;
+        let mut conn = self.conn().await?;
+        let result = genres
+            .filter(name.ilike(genre_name))
+            .select(genre_id)
+            .first::<Uuid>(&mut conn)
+            .await
+            .optional()
+            .map_err(DbError::from)?;
+        Ok(result)
+    }
+
+    /// Get Documentary genre ID (helper for default preferences)
+    pub async fn get_doc_genre_id(&self) -> DbResult<Option<Uuid>> {
+        self.get_genre_id_by_name("Documentary").await
+    }
+
     pub async fn get_movie_by_id(&self, movie_id: i64) -> DbResult<Option<MovieData>> {
         use crate::schema::movies;
         use diesel::prelude::*;
@@ -221,8 +241,13 @@ impl Database {
         Ok(movies_data)
     }
 
-    pub async fn search_movies(&self, name: &str, page: i64) -> DbResult<Vec<MovieData>> {
-        use crate::schema::movies;
+    pub async fn search_movies(
+        &self,
+        name: &str,
+        page: i64,
+        filter_opt: Option<SearchFilter>,
+    ) -> DbResult<Vec<MovieData>> {
+        use crate::schema::{movie_genres, movies};
         use diesel::prelude::*;
         use diesel_async::RunQueryDsl;
 
@@ -231,12 +256,69 @@ impl Database {
         let pattern = format!("%{}", name);
         let pattern2 = format!("{}%", name);
 
-        let movie_rows: Vec<Movie> = movies::table
+        let mut query = movies::table
             .filter(
                 movies::title
-                    .ilike(pattern)
-                    .or(movies::title.ilike(pattern2)),
+                    .ilike(pattern.clone())
+                    .or(movies::title.ilike(pattern2.clone())),
             )
+            .into_boxed();
+
+        let genre_map = self.get_genres().await?;
+
+        // Apply filters if provided
+        if let Some(filter) = filter_opt {
+            // Exclude genres - use subquery
+            // Clone the vector to ensure it lives long enough for the query
+            if !filter.exclude_genres.is_empty() {
+                let exclude_genres: Vec<Uuid> = filter
+                    .exclude_genres
+                    .into_iter()
+                    .filter_map(|name| genre_map.get(&name).copied())
+                    .collect();
+                use diesel::dsl::not;
+                query = query.filter(not(movies::movie_id.eq_any(
+                    movie_genres::table
+                        .filter(movie_genres::genre_id.eq_any(exclude_genres))
+                        .select(movie_genres::movie_id),
+                )));
+            }
+
+            // Include genres (must have at least one of these) - use subquery
+            // Clone the vector to ensure it lives long enough for the query
+            if !filter.include_genres.is_empty() {
+                let include_genres: Vec<Uuid> = filter
+                    .include_genres
+                    .into_iter()
+                    .filter_map(|name| genre_map.get(&name).copied())
+                    .collect();
+                query = query.filter(
+                    movies::movie_id.eq_any(
+                        movie_genres::table
+                            .filter(movie_genres::genre_id.eq_any(include_genres))
+                            .select(movie_genres::movie_id),
+                    ),
+                );
+            }
+
+            // Year range filter
+            if let Some(min_year) = filter.min_year {
+                query = query.filter(movies::release_year.ge(min_year));
+            }
+            if let Some(max_year) = filter.max_year {
+                query = query.filter(movies::release_year.le(max_year));
+            }
+
+            // Runtime range filter
+            if let Some(min_runtime) = filter.min_runtime {
+                query = query.filter(movies::runtime.ge(min_runtime));
+            }
+            if let Some(max_runtime) = filter.max_runtime {
+                query = query.filter(movies::runtime.le(max_runtime));
+            }
+        }
+
+        let movie_rows: Vec<Movie> = query
             .order(movies::popularity.desc())
             .limit(10)
             .offset((page - 1) * 10)
