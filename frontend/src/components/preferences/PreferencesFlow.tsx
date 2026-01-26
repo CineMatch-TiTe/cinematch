@@ -2,8 +2,9 @@
 
 import React, { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { MovieGenre, UserPreferences, PreferenceStep } from '../../types/types'
-import { editUserPreferences } from '../../server/user/user'
+import { UserPreferences, PreferenceStep } from '../../types/types'
+import { submitUserPreferencesAction } from '../../app/actions/user-actions'
+import { getGenresAction } from '../../app/actions/movie-actions'
 import GenreSelection from './GenreSelection'
 import DecadeSelection from './DecadeSelection'
 import StudyStatusSelection from './StudyStatusSelection'
@@ -21,8 +22,17 @@ const PreferencesFlow: React.FC<PreferencesFlowProps> = ({ joinCode }) => {
     isStudying: null
   })
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [availableGenres, setAvailableGenres] = useState<string[]>([])
 
-  const handleToggleGenre = (genre: MovieGenre) => {
+  React.useEffect(() => {
+    const fetchGenres = async () => {
+      const genres = await getGenresAction()
+      setAvailableGenres(genres)
+    }
+    fetchGenres()
+  }, [])
+
+  const handleToggleGenre = (genre: string) => {
     setPreferences((prev) => {
       const current = prev.genres
       const newGenres = current.includes(genre)
@@ -70,16 +80,16 @@ const PreferencesFlow: React.FC<PreferencesFlowProps> = ({ joinCode }) => {
         release_year_flex = Math.ceil((maxYear - minYear) / 2)
       }
 
-      await editUserPreferences({
+      await submitUserPreferencesAction({
         include_genres: preferences.genres,
         is_tite: preferences.isStudying,
         target_release_year,
         release_year_flex,
-        exclude_genres: [] // Explicitly sending empty array if needed, or omit if undefined is fine. Request says nullable.
+        exclude_genres: []
       })
 
       // Redirect to party or success page
-      router.push(`/party/${joinCode}`)
+      router.push(`/party-room/${joinCode}`)
     } catch (error) {
       console.error('Failed to submit preferences', error)
       // Handle error (toast, etc.)
@@ -109,6 +119,7 @@ const PreferencesFlow: React.FC<PreferencesFlowProps> = ({ joinCode }) => {
             selectedGenres={preferences.genres}
             onToggleGenre={handleToggleGenre}
             onNext={nextStep}
+            availableGenres={availableGenres}
           />
         )}
 

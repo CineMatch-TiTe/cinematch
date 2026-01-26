@@ -13,12 +13,28 @@ export const customInstance = async <T>(
   const searchParams = new URLSearchParams(params)
   const finalUrl = `${absoluteUrl}${searchParams.toString() ? `?${searchParams.toString()}` : ''}`
 
+  const reqHeaders: HeadersInit = {
+    'Content-Type': 'application/json',
+    ...(headers as Record<string, string>)
+  }
+
+  // Server-side cookie forwarding
+  if (typeof window === 'undefined') {
+    const { cookies } = await import('next/headers')
+    const cookieStore = await cookies()
+    const allCookies = cookieStore
+      .getAll()
+      .map((c) => `${c.name}=${c.value}`)
+      .join('; ')
+    if (allCookies) {
+      reqHeaders['Cookie'] = allCookies
+    }
+  }
+
   const config: RequestInit = {
     ...rest,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(headers as Record<string, string>)
-    }
+    headers: reqHeaders,
+    credentials: 'include'
   }
 
   const response = await fetch(finalUrl, config)

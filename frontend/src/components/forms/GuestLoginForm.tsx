@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { User, Lock, Loader2 } from 'lucide-react'
-import { guestLoginAction } from '@/app/actions'
+import { guestLoginAction } from '@/actions/onboarding'
 
 const initialState = {
   message: '',

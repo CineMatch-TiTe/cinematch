@@ -1,20 +1,21 @@
 import React from 'react'
-import { MovieGenre } from '../../types/types'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 
 interface GenreSelectionProps {
-  selectedGenres: MovieGenre[]
-  onToggleGenre: (genre: MovieGenre) => void
+  selectedGenres: string[]
+  onToggleGenre: (genre: string) => void
   onNext: () => void
+  availableGenres: string[]
 }
 
 const GenreSelection: React.FC<GenreSelectionProps> = ({
   selectedGenres,
   onToggleGenre,
-  onNext
+  onNext,
+  availableGenres
 }) => {
-  const genres = Object.values(MovieGenre)
+  const genres = availableGenres
 
   return (
     <Card className="w-full mx-auto border-zinc-800 bg-zinc-900/50 backdrop-blur-xl shadow-2xl">

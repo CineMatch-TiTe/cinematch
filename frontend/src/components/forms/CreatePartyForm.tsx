@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { User, Loader2, PartyPopper } from 'lucide-react'
-import { createPartyAction } from '@/app/actions'
+import { createPartyAction } from '@/actions/onboarding'
 
 const initialState = {
   message: '',
