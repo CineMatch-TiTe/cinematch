@@ -39,7 +39,6 @@ type LoginResult = {
 
 async function performGuestLogin(username: string): Promise<LoginResult> {
   const response = await loginGuest({ username })
-  console.log('[GuestLogin] Login response status:', response.status)
 
   if (response.status === 201) {
     const setCookieHeader = response.headers.get('set-cookie')
@@ -70,14 +69,16 @@ export async function guestLoginAction(prevState: unknown, formData: FormData) {
   const username = formData.get('username') as string
   const joinCode = formData.get('joinCode') as string
 
-  console.log('[GuestLogin] Attempt:', { username, joinCode })
-
   const result = guestLoginFormSchema.safeParse({ username, joinCode })
 
   if (!result.success) {
-    console.log('[GuestLogin] Validation failed:', result.error.flatten().fieldErrors)
+    const formatted = z.treeifyError(result.error)
+    const fieldErrors = {
+      username: formatted.properties?.username?.errors,
+      joinCode: formatted.properties?.joinCode?.errors
+    }
     return {
-      errors: result.error.flatten().fieldErrors,
+      errors: fieldErrors,
       message: 'Validation failed'
     }
   }
@@ -108,8 +109,6 @@ export async function guestLoginAction(prevState: unknown, formData: FormData) {
       headers: { Cookie: cookieString }
     })
 
-    console.log('[GuestLogin] Join response status:', joinResponse.status)
-
     if (joinResponse.status === 200) {
       await setSessionCookie(cookieName, cookieValue)
     } else {
@@ -133,14 +132,14 @@ export async function guestLoginAction(prevState: unknown, formData: FormData) {
 export async function createPartyAction(prevState: unknown, formData: FormData) {
   const username = formData.get('username') as string
 
-  console.log('[CreateParty] Attempt:', { username })
-
   const result = createPartyFormSchema.safeParse({ username })
 
   if (!result.success) {
-    console.log('[CreateParty] Validation failed:', result.error.flatten().fieldErrors)
+    const formatted = z.treeifyError(result.error)
     return {
-      errors: result.error.flatten().fieldErrors,
+      errors: {
+        username: formatted.properties?.username?.errors
+      },
       message: 'Validation failed'
     }
   }
@@ -151,7 +150,6 @@ export async function createPartyAction(prevState: unknown, formData: FormData) 
     const loginResult = await performGuestLogin(result.data.username)
 
     if (!loginResult.success || !loginResult.cookieName || !loginResult.cookieValue) {
-      console.error('[CreateParty] Login failed', loginResult.status)
       if (loginResult.status === 409) {
         return {
           message: 'Validation failed',
@@ -172,8 +170,6 @@ export async function createPartyAction(prevState: unknown, formData: FormData) 
     const createResponse = await createParty({
       headers: { Cookie: cookieString }
     })
-
-    console.log('[CreateParty] Create response status:', createResponse.status)
 
     if (createResponse.status === 201) {
       await setSessionCookie(cookieName, cookieValue)
