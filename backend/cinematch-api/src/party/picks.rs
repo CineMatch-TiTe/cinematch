@@ -179,3 +179,73 @@ pub async fn delete_pick(
         }
     }
 }
+
+#[utoipa::path(
+    responses(
+        (status = 200, description = "Recommended movies for party (excluding already picked)", body = crate::movie::RecommendedMoviesResponse),
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 403, description = "Not a party member", body = ErrorResponse),
+        (status = 404, description = "No recommendations", body = ErrorResponse),
+        (status = 500, description = "Internal server error", body = ErrorResponse)
+    ),
+    params(("party_id" = Uuid, Path, description = "Party ID")),
+    tags = ["party"],
+    security(("cookie_auth" = [])),
+    operation_id = "get_party_recommendations"
+)]
+#[get("/{party_id}/recommend")]
+pub async fn get_party_recommendations(
+    db: AppState,
+    user: Identity,
+    party_id: web::Path<Uuid>,
+) -> HttpResponse {
+    let party_id = party_id.into_inner();
+    let user_id = extract_user_id!(user);
+
+    if let Ok(false) | Err(_) = db.is_party_member(party_id, user_id).await {
+        return HttpResponse::Forbidden().json(ErrorResponse::new("Not a member of this party"));
+    }
+
+    let ids: Vec<i64> =
+        match cinematch_recommendation_engine::recommend_movies(&db, user_id, 3, Some(party_id))
+            .await
+        {
+            Ok(movies) => {
+                if movies.is_empty() {
+                    return HttpResponse::NotFound()
+                        .json(ErrorResponse::new("No recommendations available"));
+                }
+                movies
+            }
+            Err(e) => {
+                error!("Failed to retrieve party recommendations: {}", e);
+                return HttpResponse::InternalServerError()
+                    .json(ErrorResponse::new("Failed to retrieve recommendations"));
+            }
+        };
+
+    let mut responses = Vec::with_capacity(ids.len());
+    for movie_id in ids.iter() {
+        match db.get_movie_by_id(*movie_id).await {
+            Ok(Some(movie)) => {
+                responses.push(Into::<crate::movie::MovieResponse>::into(movie));
+            }
+            Ok(None) => {
+                error!("Recommended movie with ID {} not found", movie_id);
+            }
+            Err(e) => {
+                error!("Failed to retrieve movie with ID {}: {}", movie_id, e);
+                return HttpResponse::InternalServerError()
+                    .json(ErrorResponse::new("Failed to retrieve movie"));
+            }
+        }
+    }
+
+    if responses.is_empty() {
+        return HttpResponse::NotFound().json(ErrorResponse::new("No recommendations available"));
+    }
+
+    HttpResponse::Ok().json(crate::movie::RecommendedMoviesResponse {
+        recommended_movies: responses,
+    })
+}
