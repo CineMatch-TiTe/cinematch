@@ -1,13 +1,9 @@
 //! User API routing configuration
-use actix_web::web;
 use utoipa_actix_web::service_config::ServiceConfig;
 
 use crate::{movie, party, user, websocket};
 
 /// Configure all user API routes under /user (protected routes, already under /api scope)
-///
-///
-
 pub fn configure_user() -> impl FnOnce(&mut ServiceConfig) {
     |cfg: &mut ServiceConfig| {
         cfg.service(user::handlers::login_guest)

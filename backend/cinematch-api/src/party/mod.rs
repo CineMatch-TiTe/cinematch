@@ -4,13 +4,8 @@ pub mod picks;
 pub mod user_ops;
 pub mod votes;
 
-pub use self::crud::*;
-pub use self::leader_ops::*;
-pub use self::user_ops::*;
-
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use serde_json::json;
 use utoipa::ToSchema;
 use uuid::Uuid;
 
@@ -210,6 +205,7 @@ pub struct GetVoteResponse {
 // ============================================================================
 
 /// Response after advancing to next phase
+#[allow(dead_code)]
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct PhaseAdvanceResponse {
     /// New party state after advancing
@@ -217,6 +213,7 @@ pub struct PhaseAdvanceResponse {
 }
 
 /// Response after starting a new round
+#[allow(dead_code)]
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct NewRoundResponse {
     /// New join code for the round
@@ -224,6 +221,7 @@ pub struct NewRoundResponse {
 }
 
 /// Response after ending voting (round 2 started, winner selected, or no winner -> Picking)
+#[allow(dead_code)]
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct EndVotingResponse {
     /// True when round 2 (top 3) has started
@@ -239,12 +237,14 @@ pub struct EndVotingResponse {
 // ============================================================================
 
 /// Generic status response
+#[allow(dead_code)]
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct StatusResponse {
     /// Status message
     pub status: String,
 }
 
+#[allow(dead_code)]
 impl StatusResponse {
     pub fn ok() -> Self {
         Self {

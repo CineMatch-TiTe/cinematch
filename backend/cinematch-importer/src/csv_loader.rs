@@ -8,6 +8,7 @@ use std::io::BufReader;
 /// Async streaming movie iterator with buffering for efficient memory usage
 /// Single reader instance, no Arc/Mutex - accessed sequentially through spawn_blocking
 /// Also supports random access by movie_id via lazy indexing
+#[allow(dead_code)]
 pub struct AsyncMovieStream {
     /// CSV reader - owned by this struct, moved into spawn_blocking when needed
     reader: Option<csv::Reader<BufReader<std::fs::File>>>,
@@ -22,6 +23,7 @@ pub struct AsyncMovieStream {
     progress: Option<ProgressBar>,
 }
 
+#[allow(dead_code)]
 impl AsyncMovieStream {
     /// Create a new async streaming movie iterator with a buffer size
     /// Index is NOT built during initialization - call build_index() for that
@@ -316,6 +318,7 @@ pub async fn load_and_preprocess_movies(path: &str) -> Result<AsyncMovieStream> 
 }
 
 /// Load movies as an async streaming iterator with custom buffer size
+#[allow(dead_code)]
 pub async fn load_and_preprocess_movies_buffered(
     path: &str,
     buffer_size: usize,

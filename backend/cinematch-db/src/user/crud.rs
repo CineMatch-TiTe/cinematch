@@ -4,8 +4,8 @@ use diesel::prelude::*;
 use diesel_async::RunQueryDsl;
 
 use crate::models::{NewUser, UpdateUser, User};
-use crate::{Database, DbError, DbResult};
 use crate::schema;
+use crate::{Database, DbError, DbResult};
 
 use uuid::Uuid;
 

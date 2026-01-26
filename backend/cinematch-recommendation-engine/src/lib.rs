@@ -1,9 +1,7 @@
-use cinematch_db::vector::qdrant::{MovieSearchResult, QdrantService};
 use cinematch_db::{Database, DbResult};
 use qdrant_client::qdrant::{
-    Filter, PointId, RecommendPoints, RecommendStrategy, WithPayloadSelector, WithVectorsSelector,
+    PointId, RecommendPoints, RecommendStrategy, WithPayloadSelector, WithVectorsSelector,
 };
-use std::collections::HashMap;
 use uuid::Uuid;
 
 mod utils;
@@ -156,7 +154,7 @@ pub async fn build_voting_ballots_for_party(db: &Database, party_id: Uuid) -> Db
         let user_id = member.user_id;
         let own_pool: Vec<i64> = picks_by_user
             .get(&user_id)
-            .map(|v| v.iter().copied().collect())
+            .map(|v| v.to_vec())
             .unwrap_or_default();
 
         let recs_party = recommend_from_pool(db, user_id, &party_pool, PARTY_POOL_LIMIT).await?;
@@ -278,7 +276,7 @@ pub async fn recommend_movies(db: &Database, user_id: Uuid, limit: usize) -> DbR
         collection_name: "movies".to_string(),
         positive: positive_ids,
         negative: negative_ids,
-        filter: filter,
+        filter,
         limit: limit as u64,
         with_payload: Some(WithPayloadSelector {
             selector_options: Some(

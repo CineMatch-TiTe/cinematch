@@ -94,11 +94,15 @@ impl MovieData {
             parts.push(format!("Genres: {}", self.genres.join(", ")));
         }
 
-        if let Some(tagline) = &self.tagline && !tagline.trim().is_empty() {
+        if let Some(tagline) = &self.tagline
+            && !tagline.trim().is_empty()
+        {
             parts.push(tagline.trim().to_string());
         }
 
-        if let Some(overview) = &self.overview && !overview.trim().is_empty() {
+        if let Some(overview) = &self.overview
+            && !overview.trim().is_empty()
+        {
             parts.push(overview.trim().to_string());
         }
 
@@ -220,7 +224,9 @@ impl MovieData {
             parts.push(format!("Genres: {}", self.genres.join(", ")));
         }
 
-        if let Some(tagline) = &self.tagline && !tagline.trim().is_empty() {
+        if let Some(tagline) = &self.tagline
+            && !tagline.trim().is_empty()
+        {
             parts.push(tagline.trim().to_string());
         }
 
@@ -241,7 +247,9 @@ impl MovieData {
             parts.push(format!("Cast: {}", cast_preview.trim()));
         }
 
-        if let Some(overview) = &self.overview && !overview.trim().is_empty() {
+        if let Some(overview) = &self.overview
+            && !overview.trim().is_empty()
+        {
             parts.push(overview.trim().to_string());
         }
 

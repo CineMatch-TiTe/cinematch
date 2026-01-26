@@ -218,7 +218,7 @@ impl QdrantService {
             "movie_id".to_string(),
             qdrant_client::qdrant::Value {
                 kind: Some(qdrant_client::qdrant::value::Kind::IntegerValue(
-                    movie.movie_id as i64,
+                    movie.movie_id,
                 )),
             },
         );

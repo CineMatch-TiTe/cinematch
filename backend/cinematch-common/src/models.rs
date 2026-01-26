@@ -1,6 +1,6 @@
+use serde::{Deserialize, Serialize};
 #[allow(unused_imports)]
 use serde_json::json;
-use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
 

@@ -319,10 +319,10 @@ impl Database {
 
         let mut vote_map: HashMap<i64, (u32, u32)> = HashMap::new();
         for (movie_id, vote_value) in votes {
-            if let Some(ref allowed) = allowed_movies {
-                if !allowed.contains(&movie_id) {
-                    continue;
-                }
+            if let Some(ref allowed) = allowed_movies
+                && !allowed.contains(&movie_id)
+            {
+                continue;
             }
             let entry = vote_map.entry(movie_id).or_insert((0, 0));
             if vote_value {

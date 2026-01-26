@@ -1,13 +1,10 @@
-use serde::Deserialize;
-
 use actix_identity::Identity;
 use actix_web::{HttpResponse, get, patch, web};
 use log::error;
-use uuid::Uuid;
 
 use crate::AppState;
 use cinematch_common::{ErrorResponse, FullUserPreferences, extract_user_id};
-use cinematch_db::{DbError, UpdateUserPreferences, UserPreferences};
+use cinematch_db::{DbError, UpdateUserPreferences};
 
 /// Get the current user's preferences
 use super::{UpdateUserPreferencesRequest, UserPreferencesResponse};

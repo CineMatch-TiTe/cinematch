@@ -337,7 +337,7 @@ impl Database {
         // kick all members
         let members = self.get_party_members(party_id).await?;
         for member in members {
-            let _ = self.remove_party_member(party_id, member.user_id).await?;
+            self.remove_party_member(party_id, member.user_id).await?;
         }
 
         // Set state to disbanded

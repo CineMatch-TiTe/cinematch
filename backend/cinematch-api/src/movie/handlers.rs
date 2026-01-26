@@ -184,7 +184,7 @@ pub async fn search(
 
     let responses: Vec<MovieResponse> = movies
         .into_iter()
-        .map(|movie| Into::<MovieResponse>::into(movie))
+        .map(Into::<MovieResponse>::into)
         .collect();
 
     HttpResponse::Ok().json(SearchResponse { movies: responses })

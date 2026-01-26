@@ -3,7 +3,6 @@ use crate::schema::{
     movie_production_countries, movies, production_countries,
 };
 use crate::vector::models::MovieData;
-use chrono::DateTime;
 use diesel::result::Error as DieselError;
 
 use crate::Database;

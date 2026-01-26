@@ -1,6 +1,5 @@
 use anyhow::Result;
 use ollama_rs::Ollama;
-use ollama_rs::generation::completion::request::GenerationRequest;
 use ollama_rs::generation::embeddings::request::{EmbeddingsInput, GenerateEmbeddingsRequest};
 use std::sync::Arc;
 
@@ -28,21 +27,19 @@ impl OllamaService {
     }
 
     pub async fn check_service(&self) -> Result<()> {
-        let _ = self
-            .client
+        self.client
             .list_local_models()
             .await
             .map(|_| ())
             .map_err(|e| anyhow::anyhow!("Failed to connect to Ollama: {}", e))?;
 
-        let _ = self.pull_model(EMBED_MODEL).await?;
+        self.pull_model(EMBED_MODEL).await?;
 
         Ok(())
     }
 
     pub async fn pull_model(&self, model_name: &str) -> Result<()> {
-        let _ = self
-            .client
+        self.client
             .pull_model(model_name.to_string(), false)
             .await
             .map_err(|e| anyhow::anyhow!("Failed to pull model {}: {}", model_name, e))?;
@@ -50,7 +47,8 @@ impl OllamaService {
         Ok(())
     }
 
-    // embed text using the specified embedding model
+    /// Embed text using the specified embedding model
+    #[allow(dead_code)]
     pub async fn embed(&self, text: &str) -> Result<Vec<f32>> {
         let request = GenerateEmbeddingsRequest::new(
             EMBED_MODEL.to_string(),

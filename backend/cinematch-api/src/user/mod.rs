@@ -1,10 +1,8 @@
-pub use self::handlers::*;
 pub mod handlers;
 pub mod pref;
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use serde_json::json;
 use utoipa::ToSchema;
 use uuid::Uuid;
 
@@ -28,6 +26,7 @@ pub struct GuestLoginResponse {
 }
 
 /// Response with user details
+#[allow(dead_code)]
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct UserResponse {
     /// The user's unique ID

@@ -1,6 +1,6 @@
 use crate::{CastMember, MovieData};
 use py_literal::Value as PyValue;
-use serde::{Deserialize, Deserializer, Serialize};
+use serde::{Deserialize, Deserializer};
 
 /// Helper: Extract string from PyValue
 fn pyvalue_to_string(val: &PyValue) -> Option<String> {
@@ -48,29 +48,25 @@ fn parse_string_field(s: &str) -> Option<String> {
     }
 
     // Try JSON parsing
-    if let Ok(val) = serde_json::from_str::<serde_json::Value>(trimmed) {
-        if let Some(st) = val.as_str() {
-            if !st.is_empty() {
-                return Some(st.to_string());
-            }
-        }
+    if let Ok(val) = serde_json::from_str::<serde_json::Value>(trimmed)
+        && let Some(st) = val.as_str()
+        && !st.is_empty()
+    {
+        return Some(st.to_string());
     }
 
-    if let Ok(val) = trimmed.parse::<PyValue>() {
-        if let Some(st) = pyvalue_to_string(&val) {
-            if !st.is_empty() {
-                return Some(st);
-            }
-        }
+    if let Ok(val) = trimmed.parse::<PyValue>()
+        && let Some(st) = pyvalue_to_string(&val)
+        && !st.is_empty()
+    {
+        return Some(st);
     }
 
     // Return as-is if no outer quotes
-    if !((trimmed.starts_with('"') && trimmed.ends_with('"'))
-        || (trimmed.starts_with('\'') && trimmed.ends_with('\'')))
-    {
-        if !trimmed.is_empty() {
-            return Some(trimmed.to_string());
-        }
+    let quoted = (trimmed.starts_with('"') && trimmed.ends_with('"'))
+        || (trimmed.starts_with('\'') && trimmed.ends_with('\''));
+    if !quoted && !trimmed.is_empty() {
+        return Some(trimmed.to_string());
     }
 
     None
@@ -190,10 +186,11 @@ fn extract_cast_members_from_pyvalue(val: &PyValue) -> Vec<CastMember> {
                             match key.as_str() {
                                 "name" => name = pyvalue_to_string(v),
                                 "profile_url" => {
-                                    if let Some(url) = pyvalue_to_string(v) {
-                                        if !url.is_empty() && url != "null" {
-                                            profile_url = Some(url);
-                                        }
+                                    if let Some(url) = pyvalue_to_string(v)
+                                        && !url.is_empty()
+                                        && url != "null"
+                                    {
+                                        profile_url = Some(url);
                                     }
                                 }
                                 _ => {}
@@ -228,21 +225,21 @@ fn parse_external_ids(s: &str) -> Vec<(String, String)> {
     }
 
     // Try JSON first
-    if let Ok(obj) = serde_json::from_str::<serde_json::Value>(trimmed) {
-        if let Some(map) = obj.as_object() {
-            return map
-                .iter()
-                .filter_map(|(k, v)| {
-                    v.as_str().and_then(|val| {
-                        if val.is_empty() || val == "null" {
-                            None
-                        } else {
-                            Some((k.clone(), val.to_string()))
-                        }
-                    })
+    if let Ok(obj) = serde_json::from_str::<serde_json::Value>(trimmed)
+        && let Some(map) = obj.as_object()
+    {
+        return map
+            .iter()
+            .filter_map(|(k, v)| {
+                v.as_str().and_then(|val| {
+                    if val.is_empty() || val == "null" {
+                        None
+                    } else {
+                        Some((k.clone(), val.to_string()))
+                    }
                 })
-                .collect();
-        }
+            })
+            .collect();
     }
 
     // Try Python literal parsing
@@ -258,14 +255,15 @@ fn extract_external_ids_from_pyvalue(val: &PyValue) -> Vec<(String, String)> {
         PyValue::Dict(pairs) => pairs
             .iter()
             .filter_map(|(k, v)| {
-                if let Some(key) = pyvalue_to_string(k) {
-                    if let Some(value) = pyvalue_to_string(v) {
-                        if !value.is_empty() && value != "null" {
-                            return Some((key, value));
-                        }
-                    }
+                if let Some(key) = pyvalue_to_string(k)
+                    && let Some(value) = pyvalue_to_string(v)
+                    && !value.is_empty()
+                    && value != "null"
+                {
+                    Some((key, value))
+                } else {
+                    None
                 }
-                None
             })
             .collect(),
         _ => Vec::new(),
@@ -292,6 +290,7 @@ where
 }
 
 /// Builder for MovieData - deserializes directly from CSV
+#[allow(dead_code)]
 #[derive(Debug, Clone, Deserialize)]
 pub struct MovieDataBuilder {
     pub movie_id: i64,
@@ -349,6 +348,7 @@ pub struct MovieDataBuilder {
     pub production_countries: Vec<String>,
 }
 
+#[allow(dead_code)]
 impl MovieDataBuilder {
     /// Create a new builder with required fields
     pub fn new(movie_id: i64, title: String, runtime: i64) -> Self {

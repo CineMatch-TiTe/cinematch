@@ -19,7 +19,7 @@ use super::{
 
 use crate::AppState;
 
-use cinematch_db::{Database, DbError};
+use cinematch_db::DbError;
 
 use cinematch_common::{ErrorResponse, extract_user_id};
 

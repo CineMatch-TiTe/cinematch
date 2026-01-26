@@ -1,3 +1,5 @@
+#![allow(clippy::await_holding_lock)]
+
 use actix_identity::Identity;
 use actix_web::{HttpRequest, HttpResponse, get, rt::spawn, web::Payload};
 
@@ -24,6 +26,12 @@ use cinematch_common::models::ErrorResponse;
 pub struct WsStore {
     pub broadcaster: Arc<RwLock<Broadcaster>>,
     pub conn_map: Arc<RwLock<HashMap<String, Uuid>>>,
+}
+
+impl Default for WsStore {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl WsStore {
@@ -221,7 +229,7 @@ pub async fn websocket_controller(
                     let cont_cont = Item::Continue(r"continue".into());
                     let _ = room.continuation(cont_cont).await;
                     let last = Item::Last(r"end".into());
-                    let _ = room.continuation(last);
+                    let _ = room.continuation(last).await;
                 }
                 _ => {}
             }

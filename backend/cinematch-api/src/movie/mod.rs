@@ -3,13 +3,11 @@ pub mod handlers;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
-use uuid::Uuid;
 
 // Re-export types that are used in responses
 pub use crate::AppState;
 pub use cinematch_common::ErrorResponse;
 pub use cinematch_common::extract_user_id;
-pub use cinematch_db::DbError;
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct MovieResponse {
@@ -30,35 +28,32 @@ pub struct MovieResponse {
     pub cast: Vec<CastMemberResponse>,
 }
 
-impl Into<MovieResponse> for cinematch_db::MovieData {
-    fn into(self) -> MovieResponse {
+impl From<cinematch_db::MovieData> for MovieResponse {
+    fn from(val: cinematch_db::MovieData) -> Self {
         MovieResponse {
-            movie_id: self.movie_id,
-            title: self.title,
-            director: self.director.get(0).cloned(),
-            genres: self.genres,
-            overview: self.overview,
-            release_date: if self.release_date > 0 {
-                Some({
-                    let naive = chrono::NaiveDateTime::from_timestamp(self.release_date, 0);
-                    chrono::DateTime::<Utc>::from_naive_utc_and_offset(naive, Utc)
-                })
+            movie_id: val.movie_id,
+            title: val.title,
+            director: val.director.first().cloned(),
+            genres: val.genres,
+            overview: val.overview,
+            release_date: if val.release_date > 0 {
+                chrono::DateTime::from_timestamp(val.release_date, 0)
             } else {
                 None
             },
-            poster_url: self.poster_url,
-            runtime: Some(self.runtime as i32),
-            imdb_id: self.imdb_id,
-            mediawiki_id: self.mediawiki_id,
-            rating: self.rating,
-            tagline: self.tagline,
-            popularity: Some(self.popularity),
-            trailers: self
+            poster_url: val.poster_url,
+            runtime: Some(val.runtime as i32),
+            imdb_id: val.imdb_id,
+            mediawiki_id: val.mediawiki_id,
+            rating: val.rating,
+            tagline: val.tagline,
+            popularity: Some(val.popularity),
+            trailers: val
                 .video_keys
                 .into_iter()
                 .map(|video_id| format!("https://www.youtube.com/watch?v={}", video_id))
                 .collect(),
-            cast: self
+            cast: val
                 .cast
                 .into_iter()
                 .map(|member| CastMemberResponse {
