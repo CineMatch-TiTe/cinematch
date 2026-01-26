@@ -141,7 +141,7 @@ export default function PartyViewClient({
 
       {party.state === 'voting' && (
         <div style={{ display: isVotingView ? 'block' : 'none' }}>
-          <VotingFlow partyId={party.id} totalMembers={members.length} />
+          <VotingFlow partyId={party.id} />
         </div>
       )}
 

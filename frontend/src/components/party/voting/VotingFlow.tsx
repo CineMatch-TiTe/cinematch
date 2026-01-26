@@ -3,7 +3,7 @@
 import { useEffect, useState, useTransition, useRef } from 'react'
 import { toast } from 'sonner'
 import Image from 'next/image'
-import { ThumbsUp, ThumbsDown } from 'lucide-react'
+import { ThumbsUp } from 'lucide-react'
 
 import { MovieResponse } from '@/model/movieResponse'
 import { GetVoteResponseVoteTotals } from '@/model/getVoteResponseVoteTotals'

@@ -246,7 +246,7 @@ export function useMoviePicker({ partyId }: UseMoviePickerOptions): UseMoviePick
 
     setProcessing(true)
     try {
-      const result = await pickMovieAction(partyId, currentMovie.movie_id, true)
+      const result = await pickMovieAction(partyId, currentMovie.movie_id)
       if (result.error) {
         toast.error(result.error)
       } else {
