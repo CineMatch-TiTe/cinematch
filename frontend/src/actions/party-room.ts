@@ -81,9 +81,9 @@ export async function getRecommendedMoviesAction() {
   }
 }
 
-export async function pickMovieAction(partyId: string, movieId: number) {
+export async function pickMovieAction(partyId: string, movieId: number, liked?: boolean | null) {
   try {
-    const response = await pickMovie(partyId, movieId)
+    const response = await pickMovie(partyId, movieId, { liked })
     if (response.status !== 200) {
       return { error: 'Failed to pick movie' }
     }
@@ -94,19 +94,6 @@ export async function pickMovieAction(partyId: string, movieId: number) {
   }
 }
 
-export async function deletePickAction(partyId: string, movieId: number) {
-  try {
-    const { deletePick } = await import('@/server/party/party')
-    const response = await deletePick(partyId, movieId)
-    if (response.status !== 200) {
-      return { error: 'Failed to remove pick' }
-    }
-    return { success: true }
-  } catch (error) {
-    console.error('Delete Pick Error', error)
-    return { error: 'Failed to remove pick' }
-  }
-}
 
 export async function getMyPartyIdAction() {
   try {

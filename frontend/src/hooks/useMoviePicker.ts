@@ -5,8 +5,7 @@ import { toast } from 'sonner'
 import {
   getUserPreferencesAction,
   pickMovieAction,
-  searchMoviesAction,
-  deletePickAction
+  searchMoviesAction
 } from '@/actions/party-room'
 import { MovieResponse } from '@/model/movieResponse'
 import { SearchFilter } from '@/model/searchFilter'
@@ -26,7 +25,7 @@ interface UseMoviePickerReturn {
   noNewMovies: boolean
   handleLike: () => Promise<void>
   handleDislike: () => Promise<void>
-  handleSkip: () => void
+  handleSkip: () => Promise<void>
   hasFinishedAllMovies: boolean
 }
 
@@ -252,7 +251,7 @@ export function useMoviePicker({ partyId }: UseMoviePickerOptions): UseMoviePick
 
     setProcessing(true)
     try {
-      const result = await pickMovieAction(partyId, currentMovie.movie_id)
+      const result = await pickMovieAction(partyId, currentMovie.movie_id, true)
       if (result.error) {
         toast.error(result.error)
       } else {
@@ -274,8 +273,7 @@ export function useMoviePicker({ partyId }: UseMoviePickerOptions): UseMoviePick
 
     setProcessing(true)
     try {
-      // Use deletePickAction (which calls DELETE) for veto/dislike
-      const result = await deletePickAction(partyId, currentMovie.movie_id)
+      const result = await pickMovieAction(partyId, currentMovie.movie_id, false)
       if (result.error) {
         toast.error(result.error)
       } else {
@@ -290,10 +288,26 @@ export function useMoviePicker({ partyId }: UseMoviePickerOptions): UseMoviePick
     }
   }
 
-  const handleSkip = () => {
+  const handleSkip = async () => {
     if (processing) return
-    markCurrentAsSeen()
-    setCurrentIndex((prev) => prev + 1)
+    const currentMovie = movies[currentIndex]
+    if (!currentMovie) return
+
+    setProcessing(true)
+    try {
+      const result = await pickMovieAction(partyId, currentMovie.movie_id, null)
+      if (result.error) {
+        toast.error(result.error)
+      } else {
+        markCurrentAsSeen()
+        setCurrentIndex((prev) => prev + 1)
+      }
+    } catch (error) {
+      console.error('Skip error', error)
+      toast.error('Something went wrong')
+    } finally {
+      setProcessing(false)
+    }
   }
 
   const currentMovie = movies[currentIndex]
