@@ -3,10 +3,10 @@
 import React, { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { MovieGenre, UserPreferences, PreferenceStep } from '../../types/types'
+import { editUserPreferences } from '../../server/user/user'
 import GenreSelection from './GenreSelection'
 import DecadeSelection from './DecadeSelection'
 import StudyStatusSelection from './StudyStatusSelection'
-import { submitPreferences } from '../../app/preferences/api'
 
 interface PreferencesFlowProps {
   joinCode: string
@@ -59,7 +59,25 @@ const PreferencesFlow: React.FC<PreferencesFlowProps> = ({ joinCode }) => {
 
     setIsSubmitting(true)
     try {
-      await submitPreferences(joinCode, preferences)
+      const decadeYears = preferences.decades.map((d) => Number.parseInt(d))
+      let target_release_year: number | null = null
+      let release_year_flex: number | null = null
+
+      if (decadeYears.length > 0) {
+        const minYear = Math.min(...decadeYears)
+        const maxYear = Math.max(...decadeYears) + 9
+        target_release_year = Math.round((minYear + maxYear) / 2)
+        release_year_flex = Math.ceil((maxYear - minYear) / 2)
+      }
+
+      await editUserPreferences({
+        include_genres: preferences.genres,
+        is_tite: preferences.isStudying,
+        target_release_year,
+        release_year_flex,
+        exclude_genres: [] // Explicitly sending empty array if needed, or omit if undefined is fine. Request says nullable.
+      })
+
       // Redirect to party or success page
       router.push(`/party/${joinCode}`)
     } catch (error) {
