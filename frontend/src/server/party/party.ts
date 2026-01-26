@@ -15,6 +15,7 @@ import type {
   ReadyStateResponse,
   SetReadyRequest,
   TransferLeadershipRequest,
+  UpdateTasteRequest,
   VoteMovieRequest,
   VoteMovieResponse
 } from '../../model';
@@ -528,6 +529,11 @@ export type pickMovieResponse200 = {
   status: 200
 }
 
+export type pickMovieResponse400 = {
+  data: ErrorResponse
+  status: 400
+}
+
 export type pickMovieResponse401 = {
   data: ErrorResponse
   status: 401
@@ -546,7 +552,7 @@ export type pickMovieResponse500 = {
 export type pickMovieResponseSuccess = (pickMovieResponse200) & {
   headers: Headers;
 };
-export type pickMovieResponseError = (pickMovieResponse401 | pickMovieResponse403 | pickMovieResponse500) & {
+export type pickMovieResponseError = (pickMovieResponse400 | pickMovieResponse401 | pickMovieResponse403 | pickMovieResponse500) & {
   headers: Headers;
 };
 
@@ -562,14 +568,16 @@ export const getPickMovieUrl = (partyId: string,
 }
 
 export const pickMovie = async (partyId: string,
-    movieId: number, options?: RequestInit): Promise<pickMovieResponse> => {
+    movieId: number,
+    updateTasteRequest: UpdateTasteRequest, options?: RequestInit): Promise<pickMovieResponse> => {
   
   return customInstance<pickMovieResponse>(getPickMovieUrl(partyId,movieId),
   {      
     ...options,
-    method: 'PUT'
-    
-    
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      updateTasteRequest,)
   }
 );}
 

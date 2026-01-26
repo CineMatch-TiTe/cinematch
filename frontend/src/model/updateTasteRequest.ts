@@ -9,6 +9,9 @@
  * Request to update user taste for a movie
  */
 export interface UpdateTasteRequest {
-  /** Whether the user liked the movie (true = like, false = dislike) */
-  liked: boolean;
+  /**
+   * Whether the user liked the movie (true = like, false = dislike), if missing, the movie is skipped
+   * @nullable
+   */
+  liked?: boolean | null;
 }
