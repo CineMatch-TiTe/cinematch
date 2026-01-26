@@ -1,4 +1,4 @@
-name: CI
+name: Cargo fmt & clippy
 
 on:
   push:
@@ -27,10 +27,10 @@ jobs:
         with:
           components: rustfmt
       - uses: mbrobbel/rustfmt-check@master
-        working-directory: ./backend
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           mode: review
+          args: --manifest-path ./backend/Cargo.toml --all
 
   lint:
     name: Lint & Code Analysis
