@@ -1,16 +1,23 @@
 import { defineConfig } from 'orval';
 
 export default defineConfig({
-  partyApi: {
+
+  serverApi: {
     output: {
       mode: 'tags-split',
-      target: 'src/party-api.ts',
+      target: 'src/server/api.ts',
       schemas: 'src/model',
-      client: 'swr',
-      mock: true,
+      client: 'fetch',
+      mock: false,
+      override: {
+        mutator: {
+          path: './src/lib/orval-client.ts',
+          name: 'customInstance',
+        },
+      },
     },
     input: {
-      target: './openapi.json',
+      target: 'https://api.cinematch.space/api-docs/openapi.json',
     },
   },
 });

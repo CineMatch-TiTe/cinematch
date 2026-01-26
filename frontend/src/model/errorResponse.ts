@@ -9,5 +9,6 @@
  * Standard error response
  */
 export interface ErrorResponse {
+  /** Human-readable error message */
   error: string;
 }
