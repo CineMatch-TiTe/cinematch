@@ -47,7 +47,7 @@ export function DashboardClient({ user }: DashboardClientProps) {
                 : 'text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800'
             }`}
           >
-            Party
+            Home
           </Button>
           <Button
             variant={view === 'picking' ? 'secondary' : 'ghost'}
@@ -59,7 +59,7 @@ export function DashboardClient({ user }: DashboardClientProps) {
                 : 'text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800'
             }`}
           >
-            For Me
+            Picking
           </Button>
         </div>
       </div>
