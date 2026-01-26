@@ -27,6 +27,7 @@ jobs:
         with:
           components: rustfmt
       - uses: mbrobbel/rustfmt-check@master
+        working-directory: ./backend
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           mode: review
