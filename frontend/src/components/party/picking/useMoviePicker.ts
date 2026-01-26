@@ -2,21 +2,28 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
-import { Loader2, X } from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import MovieCard from './MovieCard'
 import { getUserPreferencesAction, pickMovieAction, searchMoviesAction } from '@/actions/party-room'
 import { MovieResponse } from '@/model/movieResponse'
-
-interface PickingFlowProps {
-  partyId: string
-  onClose: () => void
-}
 
 // Number of movies remaining before triggering prefetch
 const PREFETCH_THRESHOLD = 3
 
-export default function PickingFlow({ partyId, onClose }: PickingFlowProps) {
+interface UseMoviePickerOptions {
+  partyId: string
+}
+
+interface UseMoviePickerReturn {
+  currentMovie: MovieResponse | undefined
+  loading: boolean
+  refetching: boolean
+  processing: boolean
+  noNewMovies: boolean
+  handleLike: () => Promise<void>
+  handleSkip: () => void
+  hasFinishedAllMovies: boolean
+}
+
+export function useMoviePicker({ partyId }: UseMoviePickerOptions): UseMoviePickerReturn {
   const [movies, setMovies] = useState<MovieResponse[]>([])
   const [seenMovieIds, setSeenMovieIds] = useState<Set<number>>(new Set())
   const [loading, setLoading] = useState(true)
@@ -237,63 +244,17 @@ export default function PickingFlow({ partyId, onClose }: PickingFlowProps) {
     setCurrentIndex((prev) => prev + 1)
   }
 
-  if (loading || refetching) {
-    return (
-      <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-zinc-950/90 backdrop-blur-md">
-        <Loader2 className="w-10 h-10 text-white animate-spin mb-4" />
-        <p className="text-zinc-400 animate-pulse">
-          {refetching ? 'Finding more movies...' : 'Finding movies for you...'}
-        </p>
-      </div>
-    )
-  }
-
-  // If no movies available or truly no new movies
-  if (movies.length === 0 || (currentIndex >= movies.length && noNewMovies)) {
-    return (
-      <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-zinc-950/90 backdrop-blur-md p-6 text-center">
-        <h2 className="text-2xl font-bold text-white mb-2">That&apos;s all for now!</h2>
-        <p className="text-zinc-400 mb-8 max-w-xs">
-          We&apos;ve run out of movies based on your preferences. Check back later or wait for
-          others!
-        </p>
-        <div className="flex gap-3">
-          <Button
-            onClick={onClose}
-            size="lg"
-            className="bg-red-600 text-white hover:bg-red-700 shadow-lg shadow-red-500/20"
-          >
-            Return to Party
-          </Button>
-        </div>
-      </div>
-    )
-  }
-
-  // Still processing refetch, show nothing here (loading state handles it)
-  if (currentIndex >= movies.length) {
-    return null
-  }
-
   const currentMovie = movies[currentIndex]
+  const hasFinishedAllMovies = movies.length === 0 || (currentIndex >= movies.length && noNewMovies)
 
-  return (
-    <div className="relative z-50">
-      <Button
-        size="icon"
-        variant="secondary"
-        className="fixed top-4 right-4 z-60 rounded-full bg-black/50 hover:bg-black/70 text-white backdrop-blur-md border border-white/10"
-        onClick={onClose}
-      >
-        <X className="w-5 h-5" />
-      </Button>
-
-      <MovieCard
-        movie={currentMovie}
-        onLike={handleLike}
-        onSkip={handleSkip}
-        disabled={processing}
-      />
-    </div>
-  )
+  return {
+    currentMovie,
+    loading,
+    refetching,
+    processing,
+    noNewMovies,
+    handleLike,
+    handleSkip,
+    hasFinishedAllMovies
+  }
 }

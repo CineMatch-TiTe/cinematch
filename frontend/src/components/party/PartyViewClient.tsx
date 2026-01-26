@@ -19,7 +19,7 @@ import {
 import { PartyResponse } from '@/model/partyResponse'
 import { MemberInfo } from '@/model/memberInfo'
 import { CurrentUserResponse } from '@/model/currentUserResponse'
-import PickingFlow from './PickingFlow'
+import PickingFlow from './picking/PickingFlow'
 
 interface PartyViewClientProps {
   party: PartyResponse
