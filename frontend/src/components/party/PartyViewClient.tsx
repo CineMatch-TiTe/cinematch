@@ -137,21 +137,6 @@ export default function PartyViewClient({
           </header>
 
           <main className="flex-1 w-full relative space-y-6">
-            {party.state === 'picking' && (
-              <Button
-                size="lg"
-                className="w-full py-8 text-xl font-bold bg-linear-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 shadow-xl shadow-indigo-500/20 border border-white/10"
-                onClick={() => setActiveView('picking')}
-              >
-                <div className="flex flex-col items-center">
-                  <span className="flex items-center gap-2">Match your movie taste</span>
-                  <span className="text-xs font-normal opacity-80 mt-1 text-white/80">
-                    Swipe movies to help us recommend better
-                  </span>
-                </div>
-              </Button>
-            )}
-
             <div>
               <h3 className="text-sm font-semibold text-zinc-500 mb-3 px-1 uppercase tracking-wider">
                 Members ({members.length})
