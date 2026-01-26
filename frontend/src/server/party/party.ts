@@ -18,9 +18,9 @@ import type {
   UpdateTasteRequest,
   VoteMovieRequest,
   VoteMovieResponse
-} from '../../model';
+} from '@/model';
 
-import { customInstance } from '../../lib/orval-client';
+import { customInstance } from '@/lib/orval-client';
 
 export type getMyPartyResponse200 = {
   data: PartyResponse
