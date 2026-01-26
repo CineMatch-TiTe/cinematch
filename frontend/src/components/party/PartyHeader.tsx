@@ -8,7 +8,7 @@ interface PartyHeaderProps {
   partyCode: string | null | undefined
 }
 
-export function PartyHeader({ partyCode }: PartyHeaderProps) {
+export function PartyHeader({ partyCode }: Readonly<PartyHeaderProps>) {
   const handleShare = async () => {
     if (!partyCode) return
 
@@ -39,20 +39,22 @@ export function PartyHeader({ partyCode }: PartyHeaderProps) {
   return (
     <div className="flex flex-col gap-4 items-center justify-center py-6 w-full">
       <div className="flex flex-col items-center gap-2">
-        <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
-          Party Code
-        </h2>
+        <h2 className="text-sm font-medium text-zinc-500 uppercase tracking-wider">Party Code</h2>
         <button
           onClick={handleCopyCode}
           type="button"
-          className="flex items-center gap-2 text-4xl font-black tracking-widest cursor-pointer hover:opacity-80 transition-opacity bg-transparent border-none p-0"
+          className="flex items-center gap-2 text-4xl font-black tracking-widest cursor-pointer hover:opacity-80 transition-opacity bg-transparent border-none p-0 text-white"
         >
           {partyCode}
-          <Copy className="w-5 h-5 text-muted-foreground" />
+          <Copy className="w-5 h-5 text-zinc-600 hover:text-zinc-400 transition-colors" />
         </button>
       </div>
 
-      <Button variant="outline" className="gap-2 rounded-full" onClick={handleShare}>
+      <Button
+        variant="outline"
+        className="gap-2 rounded-full border-zinc-700 bg-zinc-900/50 text-zinc-300 hover:bg-zinc-800 hover:text-white"
+        onClick={handleShare}
+      >
         <Share2 className="w-4 h-4" />
         Share Invite Link
       </Button>

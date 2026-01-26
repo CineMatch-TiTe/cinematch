@@ -19,12 +19,12 @@ export function PartyMemberList({
   isCurrentUserLeader,
   onKick,
   onPromote
-}: PartyMemberListProps) {
+}: Readonly<PartyMemberListProps>) {
   if (loading && members.length === 0) {
     return (
       <div className="flex flex-col gap-3 w-full">
         {[1, 2, 3].map((i) => (
-          <div key={i} className="h-16 bg-muted animate-pulse rounded-xl" />
+          <div key={i} className="h-16 bg-zinc-800/50 animate-pulse rounded-xl" />
         ))}
       </div>
     )
@@ -37,8 +37,7 @@ export function PartyMemberList({
   return (
     <div className="flex flex-col gap-3 w-full pb-20">
       {members
-        .sort((a, b) => {
-          // Sort Leader first, then current user, then others
+        .toSorted((a, b) => {
           if (a.is_leader) return -1
           if (b.is_leader) return 1
           if (a.user_id === currentUserId) return -1
