@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { UserPreferences, PreferenceStep } from '../../types/types'
 import { submitUserPreferencesAction } from '../../actions/user-actions'
@@ -25,7 +25,7 @@ const PreferencesFlow: React.FC<PreferencesFlowProps> = ({ joinCode }) => {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [availableGenres, setAvailableGenres] = useState<string[]>([])
 
-  React.useEffect(() => {
+  useEffect(() => {
     const fetchGenres = async () => {
       const genres = await getGenresAction()
       setAvailableGenres(genres)
@@ -89,24 +89,18 @@ const PreferencesFlow: React.FC<PreferencesFlowProps> = ({ joinCode }) => {
         exclude_genres: []
       })
 
-      // Get correct party ID for redirection
       const partyResult = await getMyPartyIdAction()
 
       if (partyResult.error || !partyResult.id) {
         console.error('Failed to get party ID for redirection')
-        // Fallback to join code if fetching ID fails (though likely to fail 404)
-        // or just error out. For now, try joinCode as last resort or show error?
-        // Let's stick to the plan: if we can't get the ID, something is wrong.
-        // But to be safe, maybe just log and try the joinCode or reload.
+
         router.push(`/party-room/${joinCode}`)
         return
       }
 
-      // Redirect to party with correct UUID
       router.push(`/party-room/${partyResult.id}`)
     } catch (error) {
       console.error('Failed to submit preferences', error)
-      // Handle error (toast, etc.)
     } finally {
       setIsSubmitting(false)
     }

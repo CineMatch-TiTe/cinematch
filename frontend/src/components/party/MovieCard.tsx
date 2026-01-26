@@ -10,7 +10,7 @@ interface MovieCardProps {
   disabled?: boolean
 }
 
-export default function MovieCard({ movie, onLike, onSkip, disabled }: MovieCardProps) {
+export default function MovieCard({ movie, onLike, onSkip, disabled }: Readonly<MovieCardProps>) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
       <div className="w-full max-w-md h-[80vh] flex flex-col bg-zinc-900 rounded-3xl overflow-hidden shadow-2xl ring-1 ring-white/10 relative">

@@ -185,7 +185,6 @@ export default function PartyViewClient({
           title="Leave Party?"
           description="Are you sure you want to leave this party? You will need to rejoin if you want to come back."
           confirmText="Leave"
-          variant="destructive"
           onConfirm={confirmLeave}
         />
 

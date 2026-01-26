@@ -3,7 +3,8 @@
 import { X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import MovieCard from '../MovieCard'
-import { PickingLoadingState, PickingEmptyState, useMoviePicker } from '.'
+import { PickingLoadingState, PickingEmptyState } from '.'
+import { useMoviePicker } from '@/hooks/useMoviePicker'
 
 interface PickingFlowProps {
   partyId: string
