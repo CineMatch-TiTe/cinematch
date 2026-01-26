@@ -13,14 +13,15 @@ import type {
   PartyMembersResponse,
   PartyResponse,
   ReadyStateResponse,
+  RecommendedMoviesResponse,
   SetReadyRequest,
   TransferLeadershipRequest,
   UpdateTasteRequest,
   VoteMovieRequest,
   VoteMovieResponse
-} from '@/model';
+} from '../../model';
 
-import { customInstance } from '@/lib/orval-client';
+import { customInstance } from '../../lib/orval-client';
 
 export type getMyPartyResponse200 = {
   data: PartyResponse
@@ -739,6 +740,60 @@ export const setReady = async (partyId: string,
     headers: { 'Content-Type': 'application/json', ...options?.headers },
     body: JSON.stringify(
       setReadyRequest,)
+  }
+);}
+
+
+export type getPartyRecommendationsResponse200 = {
+  data: RecommendedMoviesResponse
+  status: 200
+}
+
+export type getPartyRecommendationsResponse401 = {
+  data: ErrorResponse
+  status: 401
+}
+
+export type getPartyRecommendationsResponse403 = {
+  data: ErrorResponse
+  status: 403
+}
+
+export type getPartyRecommendationsResponse404 = {
+  data: ErrorResponse
+  status: 404
+}
+
+export type getPartyRecommendationsResponse500 = {
+  data: ErrorResponse
+  status: 500
+}
+    
+export type getPartyRecommendationsResponseSuccess = (getPartyRecommendationsResponse200) & {
+  headers: Headers;
+};
+export type getPartyRecommendationsResponseError = (getPartyRecommendationsResponse401 | getPartyRecommendationsResponse403 | getPartyRecommendationsResponse404 | getPartyRecommendationsResponse500) & {
+  headers: Headers;
+};
+
+export type getPartyRecommendationsResponse = (getPartyRecommendationsResponseSuccess | getPartyRecommendationsResponseError)
+
+export const getGetPartyRecommendationsUrl = (partyId: string,) => {
+
+
+  
+
+  return `/api/party/${partyId}/recommend`
+}
+
+export const getPartyRecommendations = async (partyId: string, options?: RequestInit): Promise<getPartyRecommendationsResponse> => {
+  
+  return customInstance<getPartyRecommendationsResponse>(getGetPartyRecommendationsUrl(partyId),
+  {      
+    ...options,
+    method: 'GET'
+    
+    
   }
 );}
 

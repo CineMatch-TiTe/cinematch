@@ -36,14 +36,35 @@ export async function getUserPreferencesAction() {
   }
 }
 
-export async function renameUserAction(userId: string, data: RenameUserRequest) {
+export type ActionState = {
+  error?: string
+  success?: boolean
+}
+
+export async function renameUserAction(
+  userId: string,
+  prevState: ActionState | null,
+  formData: FormData
+): Promise<ActionState> {
   try {
+    const rawUsername = formData.get('username')
+
+    if (!rawUsername || typeof rawUsername !== 'string') {
+      return { error: 'Please enter a valid username' }
+    }
+
+    if (rawUsername.length > 32) {
+      return { error: 'Username must be less than 32 characters' }
+    }
+
+    const data: RenameUserRequest = {
+      new_username: rawUsername
+    }
+
     const response = await renameUser(userId, data)
     if (response.status === 200) {
       revalidatePath('/dashboard')
       revalidatePath(`/party-room/[id]`, 'page')
-      // Revalidating party room might be broad but safest to ensure name updates everywhere?
-      // Actually simpler to just return success and let client update for now, or revalidate path where user is.
       return { success: true }
     }
     return { error: 'Failed to rename user' }

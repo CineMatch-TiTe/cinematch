@@ -36,11 +36,11 @@ const fetchPrefs = async () => {
   throw new Error(res.error || 'Failed to fetch prefs')
 }
 
-export function PreferencesDialog({ trigger, open, onOpenChangeAction }: {
+export function PreferencesDialog({ trigger, open, onOpenChangeAction }: Readonly<{
   trigger?: React.ReactNode
   open?: boolean
   onOpenChangeAction?: (open: boolean) => void
-}) {
+}>) {
   const { data: userData, mutate: mutateUser, isLoading: isUserLoading } = useSWR('/api/user', fetchUser)
   const { data: prefData, mutate: mutatePref, isLoading: isPrefLoading } = useSWR('/api/user/pref', fetchPrefs)
 
