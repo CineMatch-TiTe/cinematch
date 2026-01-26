@@ -4,7 +4,13 @@ use uuid::Uuid;
 
 impl Database {
     /// Add or update a global taste (user, movie, liked)
-    pub async fn add_taste(&self, user_id: Uuid, movie_id: i64, liked: bool) -> DbResult<()> {
+    /// liked: Some(true) = like, Some(false) = dislike, None = skip
+    pub async fn add_taste(
+        &self,
+        user_id: Uuid,
+        movie_id: i64,
+        liked: Option<bool>,
+    ) -> DbResult<()> {
         use crate::schema::user_tastes::dsl as ut;
         use diesel::prelude::*;
         use diesel_async::RunQueryDsl;
@@ -27,7 +33,8 @@ impl Database {
         Ok(())
     }
 
-    pub async fn get_taste(&self, user_id: Uuid) -> DbResult<(Vec<i64>, Vec<i64>)> {
+    /// Get user taste: (positive, negative, skipped)
+    pub async fn get_taste(&self, user_id: Uuid) -> DbResult<(Vec<i64>, Vec<i64>, Vec<i64>)> {
         use crate::schema::user_tastes::dsl as ut;
         use diesel::prelude::*;
         use diesel_async::RunQueryDsl;
@@ -37,25 +44,28 @@ impl Database {
             .filter(ut::user_id.eq(user_id))
             .filter(ut::party_id.is_null())
             .select((ut::movie_id, ut::liked))
-            .load::<(i64, bool)>(&mut conn)
+            .load::<(i64, Option<bool>)>(&mut conn)
             .await
             .map_err(DbError::from)?;
-        let positive: Vec<i64> = results
-            .iter()
-            .filter(|(_, liked)| *liked)
-            .map(|(id, _)| *id)
-            .collect();
-        let negative: Vec<i64> = results
-            .iter()
-            .filter(|(_, liked)| !*liked)
-            .map(|(id, _)| *id)
-            .collect();
-        Ok((positive, negative))
+        let mut positive: Vec<i64> = Vec::new();
+        let mut negative: Vec<i64> = Vec::new();
+        let mut skipped: Vec<i64> = Vec::new();
+        for (id, liked_opt) in results {
+            match liked_opt {
+                Some(true) => positive.push(id),
+                Some(false) => negative.push(id),
+                None => skipped.push(id),
+            }
+        }
+        Ok((positive, negative, skipped))
     }
 
     /// List party picks for ballot building: (user_id, movie_id, liked) for all members.
-    /// Use positive picks (liked = true) for "own" and "others" pools.
-    pub async fn get_party_taste(&self, party_id: Uuid) -> DbResult<Vec<(Uuid, i64, bool)>> {
+    /// Use positive picks (liked = Some(true)) for "own" and "others" pools.
+    pub async fn get_party_taste(
+        &self,
+        party_id: Uuid,
+    ) -> DbResult<Vec<(Uuid, i64, Option<bool>)>> {
         use crate::schema::user_tastes::dsl as ut;
         use diesel::prelude::*;
         use diesel_async::RunQueryDsl;
@@ -63,19 +73,20 @@ impl Database {
         let results = ut::user_tastes
             .filter(ut::party_id.eq(Some(party_id)))
             .select((ut::user_id, ut::movie_id, ut::liked))
-            .load::<(Uuid, i64, bool)>(&mut conn)
+            .load::<(Uuid, i64, Option<bool>)>(&mut conn)
             .await
             .map_err(DbError::from)?;
         Ok(results)
     }
 
     /// Add or update a party-specific taste (user, party, movie, liked)
+    /// liked: Some(true) = like, Some(false) = dislike, None = skip
     pub async fn add_party_taste(
         &self,
         user_id: Uuid,
         party_id: Uuid,
         movie_id: i64,
-        liked: bool,
+        liked: Option<bool>,
     ) -> DbResult<()> {
         use crate::schema::user_tastes::dsl as ut;
         use diesel::prelude::*;
@@ -108,7 +119,7 @@ impl Database {
         let ids = ut::user_tastes
             .filter(ut::party_id.eq(Some(party_id)))
             .filter(ut::user_id.eq(user_id))
-            .filter(ut::liked.eq(true))
+            .filter(ut::liked.eq(Some(true)))
             .select(ut::movie_id)
             .load::<i64>(&mut conn)
             .await

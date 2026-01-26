@@ -215,7 +215,7 @@ diesel::table! {
         user_id -> Uuid,
         party_id -> Nullable<Uuid>,
         movie_id -> Int8,
-        liked -> Bool,
+        liked -> Nullable<Bool>,
         updated_at -> Timestamptz,
         review -> Nullable<Int4>,
     }

@@ -20,7 +20,7 @@ pub async fn recommend_from_pool(
         return Ok(vec![]);
     }
 
-    let (positive, negative) = db.get_taste(user_id).await?;
+    let (positive, negative, skipped) = db.get_taste(user_id).await?;
     let genre_map = db.get_genres().await?;
     let prefs = db.get_user_preferences(user_id).await?;
     let prefs_filter = crate::utils::filter_from_prefs(&prefs, &genre_map);
@@ -31,12 +31,20 @@ pub async fn recommend_from_pool(
         positive = popular_movies.into_iter().map(|m| m.movie_id).collect();
     }
 
-    let filter = crate::utils::filter_pool_and_prefs(pool, prefs_filter.as_ref());
+    // Exclude skipped movies from pool
+    let skipped_set: std::collections::HashSet<i64> = skipped.into_iter().collect();
+    let filtered_pool: Vec<i64> = pool
+        .iter()
+        .copied()
+        .filter(|id| !skipped_set.contains(id))
+        .collect();
+
+    let filter = crate::utils::filter_pool_and_prefs(&filtered_pool, prefs_filter.as_ref());
 
     let client = db.vector.client.clone();
     let positive_ids: Vec<PointId> = positive
         .iter()
-        .filter(|&id| pool.contains(id))
+        .filter(|&id| filtered_pool.contains(id))
         .map(|&id| PointId {
             point_id_options: Some(qdrant_client::qdrant::point_id::PointIdOptions::Num(
                 id as u64,
@@ -45,7 +53,8 @@ pub async fn recommend_from_pool(
         .collect();
 
     let positive_ids = if positive_ids.is_empty() {
-        pool.iter()
+        filtered_pool
+            .iter()
             .take(5)
             .map(|&id| PointId {
                 point_id_options: Some(qdrant_client::qdrant::point_id::PointIdOptions::Num(
@@ -85,7 +94,7 @@ pub async fn recommend_from_pool(
         score_threshold: None,
         offset: None,
         using: Some("combined_vector".to_string()),
-        strategy: Some(RecommendStrategy::BestScore.into()),
+        strategy: Some(RecommendStrategy::AverageVector.into()),
         ..Default::default()
     };
 
@@ -104,7 +113,11 @@ pub async fn recommend_from_pool(
                 .and_then(|pid| pid.point_id_options.as_ref())
             {
                 let mid = *id as i64;
-                if pool.contains(&mid) { Some(mid) } else { None }
+                if filtered_pool.contains(&mid) {
+                    Some(mid)
+                } else {
+                    None
+                }
             } else {
                 None
             }
@@ -136,11 +149,11 @@ pub async fn build_voting_ballots_for_party(db: &Database, party_id: Uuid) -> Db
     let mut picks_by_user: HashMap<Uuid, Vec<i64>> = HashMap::new();
     let mut party_pool_set: HashSet<i64> = HashSet::new();
     for (uid, mid, liked) in party_taste {
-        if !liked {
-            continue;
+        // Only include positive picks (liked = Some(true))
+        if liked == Some(true) {
+            picks_by_user.entry(uid).or_default().push(mid);
+            party_pool_set.insert(mid);
         }
-        picks_by_user.entry(uid).or_default().push(mid);
-        party_pool_set.insert(mid);
     }
     let party_pool: Vec<i64> = party_pool_set.into_iter().collect();
 
@@ -235,7 +248,7 @@ pub async fn build_round2_ballots_for_party(
 
 /// Recommend movies for a user using Qdrant vector search, based on their taste profile.
 pub async fn recommend_movies(db: &Database, user_id: Uuid, limit: usize) -> DbResult<Vec<i64>> {
-    let (positive, negative) = db.get_taste(user_id).await?;
+    let (positive, negative, skipped) = db.get_taste(user_id).await?;
 
     // get users prefs
 
@@ -271,12 +284,38 @@ pub async fn recommend_movies(db: &Database, user_id: Uuid, limit: usize) -> DbR
         })
         .collect();
 
+    // Exclude skipped movies from filter
+    let mut final_filter = filter;
+    if !skipped.is_empty() {
+        let skipped_ids: Vec<PointId> = skipped
+            .iter()
+            .map(|&id| PointId {
+                point_id_options: Some(qdrant_client::qdrant::point_id::PointIdOptions::Num(
+                    id as u64,
+                )),
+            })
+            .collect();
+        let mut must_not = final_filter
+            .as_ref()
+            .map(|f| f.must_not.clone())
+            .unwrap_or_default();
+        must_not.push(qdrant_client::qdrant::Condition::has_id(skipped_ids));
+        final_filter = Some(qdrant_client::qdrant::Filter {
+            must: final_filter
+                .as_ref()
+                .map(|f| f.must.clone())
+                .unwrap_or_default(),
+            must_not,
+            ..Default::default()
+        });
+    }
+
     // Build the recommend request
     let request = RecommendPoints {
         collection_name: "movies".to_string(),
         positive: positive_ids,
         negative: negative_ids,
-        filter,
+        filter: final_filter,
         limit: limit as u64,
         with_payload: Some(WithPayloadSelector {
             selector_options: Some(
@@ -291,7 +330,7 @@ pub async fn recommend_movies(db: &Database, user_id: Uuid, limit: usize) -> DbR
         score_threshold: None,
         offset: None,
         using: Some("combined_vector".to_string()),
-        strategy: Some(RecommendStrategy::BestScore.into()),
+        strategy: Some(RecommendStrategy::AverageVector.into()),
         ..Default::default()
     };
 

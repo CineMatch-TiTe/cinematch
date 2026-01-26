@@ -272,6 +272,7 @@ pub async fn update_taste(
         }
     }
 
+    // liked is already a bool, wrap it in Some() for Option<bool>
     match db.add_taste(user_id, movie_id, like.liked).await {
         Ok(_) => HttpResponse::Ok().finish(),
         Err(e) => {

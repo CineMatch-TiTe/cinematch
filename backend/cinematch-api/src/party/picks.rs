@@ -1,4 +1,7 @@
 use super::{AppState, DbError, ErrorResponse, GetPicksResponse, PartyState, extract_user_id};
+
+use crate::user::UpdateTasteRequest;
+
 use actix_identity::Identity;
 use actix_web::{HttpResponse, delete, get, put, web};
 use log::{error, trace};
@@ -56,8 +59,10 @@ pub async fn get_picks(db: AppState, user: Identity, party_id: web::Path<Uuid>) 
 }
 
 #[utoipa::path(
+    request_body = UpdateTasteRequest,
     responses(
-        (status = 200, description = "Movie picked"),
+        (status = 200, description = "Movie action registered"),
+        (status = 400, description = "Invalid action", body = ErrorResponse),
         (status = 401, description = "Unauthorized", body = ErrorResponse),
         (status = 403, description = "Not a member or picking not allowed", body = ErrorResponse),
         (status = 500, description = "Internal server error", body = ErrorResponse)
@@ -75,9 +80,11 @@ pub async fn pick_movie(
     db: AppState,
     user: Identity,
     path: web::Path<(Uuid, i64)>,
+    body: web::Json<UpdateTasteRequest>,
 ) -> HttpResponse {
     let (party_id, movie_id) = path.into_inner();
     let user_id = extract_user_id!(user);
+    let liked = body.into_inner().liked;
 
     if let Ok(false) | Err(_) = db.is_party_member(party_id, user_id).await {
         return HttpResponse::Forbidden().json(ErrorResponse::new("Not a member of this party"));
@@ -94,18 +101,31 @@ pub async fn pick_movie(
                 .json(ErrorResponse::new(format!("DB error: {e}")));
         }
     }
-
-    match db.add_party_taste(user_id, party_id, movie_id, true).await {
-        Ok(_) => HttpResponse::Ok().finish(),
+    // Store party taste
+    match db.add_party_taste(user_id, party_id, movie_id, liked).await {
+        Ok(_) => {}
         Err(e) => {
             error!(
                 "Failed to register pick for user {} in party {}: {}",
                 user_id, party_id, e
             );
-            HttpResponse::InternalServerError()
-                .json(ErrorResponse::new("Failed to register movie pick"))
+            return HttpResponse::InternalServerError()
+                .json(ErrorResponse::new("Failed to register movie pick"));
         }
     }
+
+    // If skip, also store as global taste so it's excluded from all recommendations
+    if liked.is_none()
+        && let Err(e) = db.add_taste(user_id, movie_id, None).await
+    {
+        error!(
+            "Failed to register global skip for user {} movie {}: {}",
+            user_id, movie_id, e
+        );
+        // Don't fail the request, but log the error
+    }
+
+    HttpResponse::Ok().finish()
 }
 
 #[utoipa::path(

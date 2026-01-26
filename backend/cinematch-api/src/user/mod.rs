@@ -75,8 +75,8 @@ pub struct RenameUserRequest {
 /// Request to update user taste for a movie
 #[derive(Debug, Deserialize, ToSchema)]
 pub struct UpdateTasteRequest {
-    /// Whether the user liked the movie (true = like, false = dislike)
-    pub liked: bool,
+    /// Whether the user liked the movie (true = like, false = dislike), if missing, the movie is skipped
+    pub liked: Option<bool>,
 }
 
 /// User-facing update struct: genre names instead of UUIDs

@@ -310,7 +310,7 @@ async fn run_end_voting_internal(
             .unwrap_or_default();
         for v in user_votes {
             let _ = db
-                .add_party_taste(member.user_id, party.id, v.movie_id, v.vote_value)
+                .add_party_taste(member.user_id, party.id, v.movie_id, Some(v.vote_value))
                 .await;
         }
     }
