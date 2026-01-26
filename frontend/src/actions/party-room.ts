@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
+import { cookies } from 'next/headers'
 import {
   advancePhase,
   kickMember,
@@ -9,17 +10,14 @@ import {
   transferLeadership,
   getMyParty
 } from '@/server/party/party'
+import { logoutUser } from '@/server/user/user'
 
 export async function leavePartyAction(partyId: string) {
   try {
-    const response = await leaveParty(partyId)
-    // We don't necessarily need to check response status if the error throws,
-    // but Orval generated client might not throw on non-200.
-    // Based on orval-client implementation, it catches errors and returns { data, status }.
-
-    if (response.status !== 200) {
-      throw new Error('Failed to leave party')
-    }
+    await leaveParty(partyId)
+    await logoutUser()
+    const cookieStore = await cookies()
+    cookieStore.delete('id')
   } catch (error) {
     console.error('Leave Party Error', error)
     return { error: 'Failed to leave party' }

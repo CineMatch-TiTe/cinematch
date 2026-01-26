@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useTransition } from 'react'
+import { useEffect, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { LogOut, Play } from 'lucide-react'
@@ -30,12 +30,11 @@ export default function PartyViewClient({
   currentUser
 }: Readonly<PartyViewClientProps>) {
   const router = useRouter()
-  const [isPending, startTransition] = useTransition()
-
-  // Auto-refetch using router.refresh()
+  const [isManualPending, startManualTransition] = useTransition()
+  const [, startPollingTransition] = useTransition()
   useEffect(() => {
     const interval = setInterval(() => {
-      startTransition(() => {
+      startPollingTransition(() => {
         router.refresh()
       })
     }, 5000)
@@ -46,15 +45,11 @@ export default function PartyViewClient({
   const isLeader = party.leader_id === currentUser.user_id
 
   const handleLeave = async () => {
-    try {
-      await leavePartyAction(party.id)
-    } catch {
-      toast.error('Failed to leave party')
-    }
+    await leavePartyAction(party.id)
   }
 
   const handleKick = async (memberId: string) => {
-    startTransition(async () => {
+    startManualTransition(async () => {
       const result = await kickMemberAction(party.id, memberId)
       if (result.error) toast.error(result.error)
       else toast.success('Member kicked')
@@ -62,7 +57,7 @@ export default function PartyViewClient({
   }
 
   const handlePromote = async (memberId: string) => {
-    startTransition(async () => {
+    startManualTransition(async () => {
       const result = await promoteMemberAction(party.id, memberId)
       if (result.error) toast.error(result.error)
       else toast.success('Leadership transferred')
@@ -70,7 +65,7 @@ export default function PartyViewClient({
   }
 
   const handleStartVoting = async () => {
-    startTransition(async () => {
+    startManualTransition(async () => {
       const result = await startVotingAction(party.id)
       if (result.error) toast.error(result.error)
       else toast.success('Voting started!')
@@ -89,7 +84,7 @@ export default function PartyViewClient({
           <h3 className="text-sm font-semibold text-muted-foreground mb-3 px-1 uppercase tracking-wider">
             Members ({members.length})
           </h3>
-          <div className={isPending ? 'opacity-70 transition-opacity' : 'transition-opacity'}>
+          <div className={isManualPending ? 'opacity-70 transition-opacity' : 'transition-opacity'}>
             <PartyMemberList
               members={members}
               loading={false}
@@ -106,7 +101,7 @@ export default function PartyViewClient({
             {isLeader && (
               <Button
                 size="lg"
-                disabled={isPending}
+                disabled={isManualPending}
                 className="w-full font-semibold text-lg py-6 shadow-lg animate-in fade-in slide-in-from-bottom-4"
                 onClick={handleStartVoting}
               >
@@ -117,7 +112,7 @@ export default function PartyViewClient({
             <Button
               variant="ghost"
               size="lg"
-              disabled={isPending}
+              disabled={isManualPending}
               className="w-full text-muted-foreground hover:text-destructive hover:bg-destructive/10"
               onClick={handleLeave}
             >
