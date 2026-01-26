@@ -8,8 +8,10 @@ import {
   kickMember,
   leaveParty,
   transferLeadership,
-  getMyParty
+  getMyParty,
+  pickMovie
 } from '@/server/party/party'
+import { getRecommendations } from '@/server/movie/movie'
 import { logoutUser } from '@/server/user/user'
 
 export async function leavePartyAction(partyId: string) {
@@ -54,17 +56,43 @@ export async function promoteMemberAction(partyId: string, memberId: string) {
   }
 }
 
-export async function startVotingAction(partyId: string) {
+export async function advancePhaseAction(partyId: string) {
   try {
     const response = await advancePhase(partyId)
     if (response.status !== 200) {
-      return { error: 'Failed to start voting' }
+      return { error: 'Failed to advance phase' }
     }
     revalidatePath(`/party-room/${partyId}`)
     return { success: true }
   } catch (error) {
-    console.error('Start Voting Error', error)
-    return { error: 'Failed to start voting' }
+    console.error('Advance Phase Error', error)
+    return { error: 'Failed to advance phase' }
+  }
+}
+
+export async function getRecommendedMoviesAction() {
+  try {
+    const response = await getRecommendations()
+    if (response.status === 200) {
+      return { data: response.data.recommended_movies }
+    }
+    return { error: 'Failed to fetch recommendations' }
+  } catch (error) {
+    console.error('Get Recommendations Error', error)
+    return { error: 'Failed to fetch recommendations' }
+  }
+}
+
+export async function pickMovieAction(partyId: string, movieId: number, like: boolean) {
+  try {
+    const response = await pickMovie(partyId, movieId)
+    if (response.status !== 200) {
+      return { error: 'Failed to pick movie' }
+    }
+    return { success: true }
+  } catch (error) {
+    console.error('Pick Movie Error', error)
+    return { error: 'Failed to pick movie' }
   }
 }
 
@@ -78,5 +106,33 @@ export async function getMyPartyIdAction() {
   } catch (error) {
     console.error('Get My Party Error', error)
     return { error: 'Failed to fetch party' }
+  }
+}
+
+export async function searchMoviesAction(query: string, page?: number) {
+  const { searchMovies } = await import('@/server/movie/movie')
+  try {
+    const response = await searchMovies({ query, page })
+    if (response.status === 200) {
+      return { data: response.data.movies }
+    }
+    return { error: 'Failed to search movies' }
+  } catch (error) {
+    console.error('Search Movies Error', error)
+    return { error: 'Failed to search movies' }
+  }
+}
+
+export async function getUserPreferencesAction() {
+  const { getUserPreferences } = await import('@/server/user/user')
+  try {
+    const response = await getUserPreferences()
+    if (response.status === 200) {
+      return { data: response.data }
+    }
+    return { error: 'Failed to fetch preferences' }
+  } catch (error) {
+    console.error('Get User Preferences Error', error)
+    return { error: 'Failed to fetch preferences' }
   }
 }

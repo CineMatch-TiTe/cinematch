@@ -13,11 +13,12 @@ import {
   kickMemberAction,
   leavePartyAction,
   promoteMemberAction,
-  startVotingAction
+  advancePhaseAction
 } from '@/actions/party-room'
 import { PartyResponse } from '@/model/partyResponse'
 import { MemberInfo } from '@/model/memberInfo'
 import { CurrentUserResponse } from '@/model/currentUserResponse'
+import PickingFlow from './PickingFlow'
 
 interface PartyViewClientProps {
   party: PartyResponse
@@ -44,24 +45,25 @@ export default function PartyViewClient({
   }, [router])
 
   const [leaveDialogOpen, setLeaveDialogOpen] = useState(false)
-  const [voteDialogOpen, setVoteDialogOpen] = useState(false)
+  const [advanceDialogOpen, setAdvanceDialogOpen] = useState(false)
+  const [pickingFlowOpen, setPickingFlowOpen] = useState(false)
 
   const isLeader = party.leader_id === currentUser.user_id
 
   const handleLeaveClick = () => setLeaveDialogOpen(true)
-  const handleVoteClick = () => setVoteDialogOpen(true)
+  const handleAdvanceClick = () => setAdvanceDialogOpen(true)
 
   const confirmLeave = async () => {
     await leavePartyAction(party.id)
     setLeaveDialogOpen(false)
   }
 
-  const confirmVote = async () => {
+  const confirmAdvance = async () => {
     startManualTransition(async () => {
-      const result = await startVotingAction(party.id)
+      const result = await advancePhaseAction(party.id)
       if (result.error) toast.error(result.error)
-      else toast.success('Voting started!')
-      setVoteDialogOpen(false)
+      else toast.success('Phase advanced!')
+      setAdvanceDialogOpen(false)
     })
   }
 
@@ -81,6 +83,31 @@ export default function PartyViewClient({
     })
   }
 
+  if (pickingFlowOpen) {
+    return <PickingFlow partyId={party.id} onClose={() => setPickingFlowOpen(false)} />
+  }
+
+  const renderAdvanceButton = () => {
+    if (!isLeader) return null
+
+    let text = ''
+    if (party.state === 'created') text = 'Start Picking'
+    if (party.state === 'picking') text = 'Start Voting'
+
+    if (!text) return null
+
+    return (
+      <Button
+        size="lg"
+        disabled={isManualPending}
+        className="w-full font-semibold text-lg py-6 shadow-lg shadow-red-500/20 bg-red-600 hover:bg-red-700 text-white animate-in fade-in slide-in-from-bottom-4"
+        onClick={handleAdvanceClick}
+      >
+        <Play className="mr-2 w-5 h-5 fill-current" /> {text}
+      </Button>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-zinc-950 font-sans text-zinc-100 selection:bg-red-500/30 flex flex-col items-center relative">
       <div className="fixed inset-0 z-0 pointer-events-none">
@@ -91,36 +118,49 @@ export default function PartyViewClient({
         <header className="flex flex-col items-center mb-6">
           <h1 className="text-2xl font-bold tracking-tight mb-2 text-white">Party Room</h1>
           <PartyHeader partyCode={party.code} />
+          <div className="mt-2 text-zinc-500 text-sm uppercase tracking-wider font-medium">
+            {party.state} Phase
+          </div>
         </header>
 
-        <main className="flex-1 w-full relative">
-          <h3 className="text-sm font-semibold text-zinc-500 mb-3 px-1 uppercase tracking-wider">
-            Members ({members.length})
-          </h3>
-          <div className={isManualPending ? 'opacity-70 transition-opacity' : 'transition-opacity'}>
-            <PartyMemberList
-              members={members}
-              loading={false}
-              currentUserId={currentUser.user_id}
-              isCurrentUserLeader={isLeader}
-              onKick={handleKick}
-              onPromote={handlePromote}
-            />
+        <main className="flex-1 w-full relative space-y-6">
+          {party.state === 'picking' && (
+            <Button
+              size="lg"
+              className="w-full py-8 text-xl font-bold bg-linear-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 shadow-xl shadow-indigo-500/20 border border-white/10"
+              onClick={() => setPickingFlowOpen(true)}
+            >
+              <div className="flex flex-col items-center">
+                <span className="flex items-center gap-2">Match your movie taste</span>
+                <span className="text-xs font-normal opacity-80 mt-1 text-white/80">
+                  Swipe movies to help us recommend better
+                </span>
+              </div>
+            </Button>
+          )}
+
+          <div>
+            <h3 className="text-sm font-semibold text-zinc-500 mb-3 px-1 uppercase tracking-wider">
+              Members ({members.length})
+            </h3>
+            <div
+              className={isManualPending ? 'opacity-70 transition-opacity' : 'transition-opacity'}
+            >
+              <PartyMemberList
+                members={members}
+                loading={false}
+                currentUserId={currentUser.user_id}
+                isCurrentUserLeader={isLeader}
+                onKick={handleKick}
+                onPromote={handlePromote}
+              />
+            </div>
           </div>
         </main>
 
         <footer className="fixed bottom-0 left-0 right-0 p-4 bg-zinc-950/80 backdrop-blur-md border-t border-zinc-900 flex justify-center z-20">
           <div className="w-full max-w-md flex flex-col gap-3">
-            {isLeader && (
-              <Button
-                size="lg"
-                disabled={isManualPending}
-                className="w-full font-semibold text-lg py-6 shadow-lg shadow-red-500/20 bg-red-600 hover:bg-red-700 text-white animate-in fade-in slide-in-from-bottom-4"
-                onClick={handleVoteClick}
-              >
-                <Play className="mr-2 w-5 h-5 fill-current" /> Start Voting
-              </Button>
-            )}
+            {renderAdvanceButton()}
 
             <Button
               variant="ghost"
@@ -146,12 +186,12 @@ export default function PartyViewClient({
         />
 
         <ActionConfirmationDialog
-          open={voteDialogOpen}
-          onOpenChange={setVoteDialogOpen}
-          title="Start Voting?"
-          description="Are you sure you want to start the voting phase? Ensure all members have joined."
-          confirmText="Start Voting"
-          onConfirm={confirmVote}
+          open={advanceDialogOpen}
+          onOpenChange={setAdvanceDialogOpen}
+          title="Advance Party Phase?"
+          description={`Are you sure you want to advance the party state? This will move everyone to the next phase.`}
+          confirmText="Advance"
+          onConfirm={confirmAdvance}
         />
         <div className="h-32" />
       </div>
