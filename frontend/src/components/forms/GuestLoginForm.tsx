@@ -9,7 +9,7 @@ import { guestLoginAction } from '@/actions/onboarding'
 
 const initialState = {
   message: '',
-  errors: undefined
+  errors: null
 }
 
 export function GuestLoginForm({ initialJoinCode }: Readonly<{ initialJoinCode?: string }>) {

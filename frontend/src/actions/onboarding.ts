@@ -26,142 +26,178 @@ const guestLoginFormSchema = z.object({
   joinCode: joinCodeSchema
 })
 
-export async function guestLoginAction(prevState: unknown, formData: FormData) {
-  const username = formData.get('username') as string
-  const joinCode = formData.get('joinCode') as string
-
-  // Validate inputs
-  const result = guestLoginFormSchema.safeParse({ username, joinCode })
-
-  if (!result.success) {
-    return {
-      errors: result.error.flatten().fieldErrors,
-      message: 'Validation failed'
-    }
-  }
-
-  try {
-    const response = await loginGuest({
-      username: result.data.username
-    })
-
-    if (response.status === 201) {
-      const setCookieHeader = response.headers.get('set-cookie')
-
-      if (setCookieHeader) {
-        const [cookiePart] = setCookieHeader.split(';')
-        const [name, value] = cookiePart.split('=')
-        if (name && value) {
-          // Attempt to join the party using the new session cookie
-          const cookieString = `${name.trim()}=${value.trim()}`
-          const joinResponse = await joinParty(result.data.joinCode, {
-            headers: {
-              Cookie: cookieString
-            }
-          })
-
-          if (joinResponse.status === 200) {
-            const cookieStore = await cookies()
-            cookieStore.set(name.trim(), value.trim(), {
-              httpOnly: true, // Should match what backend sent, but let's be safe
-              sameSite: 'lax',
-              path: '/'
-            })
-          } else {
-            return {
-              message: 'Login successful, but failed to join party. Please check the code.'
-            }
-          }
-        }
-      }
-    } else {
-      return {
-        message: 'Login failed. Please try again.'
-      }
-    }
-  } catch (error) {
-    console.error('Login Error', error)
-    return {
-      message: 'An unexpected error occurred'
-    }
-  }
-
-  // Redirect on success (outside try-catch to avoid catching the redirect() error which is intended behavior in Next.js)
-  redirect(`/preferences?joinCode=${encodeURIComponent(result.data.joinCode)}`)
-}
-
 const createPartyFormSchema = z.object({
   username: usernameSchema
 })
 
-export async function createPartyAction(prevState: unknown, formData: FormData) {
-  const username = formData.get('username') as string
+type LoginResult = {
+  success: boolean
+  cookieName?: string
+  cookieValue?: string
+  status?: number
+}
 
-  // Validate inputs
-  const result = createPartyFormSchema.safeParse({ username })
+async function performGuestLogin(username: string): Promise<LoginResult> {
+  const response = await loginGuest({ username })
+  console.log('[GuestLogin] Login response status:', response.status)
+
+  if (response.status === 201) {
+    const setCookieHeader = response.headers.get('set-cookie')
+    if (setCookieHeader) {
+      const [cookiePart] = setCookieHeader.split(';')
+      const [name, value] = cookiePart.split('=')
+      if (name && value) {
+        return { success: true, cookieName: name.trim(), cookieValue: value.trim() }
+      }
+    }
+    console.error('[GuestLogin] No Set-Cookie header or invalid format')
+    return { success: false, status: response.status }
+  }
+
+  return { success: false, status: response.status }
+}
+
+async function setSessionCookie(name: string, value: string) {
+  const cookieStore = await cookies()
+  cookieStore.set(name, value, {
+    httpOnly: true,
+    sameSite: 'lax',
+    path: '/'
+  })
+}
+
+export async function guestLoginAction(prevState: unknown, formData: FormData) {
+  const username = formData.get('username') as string
+  const joinCode = formData.get('joinCode') as string
+
+  console.log('[GuestLogin] Attempt:', { username, joinCode })
+
+  const result = guestLoginFormSchema.safeParse({ username, joinCode })
 
   if (!result.success) {
+    console.log('[GuestLogin] Validation failed:', result.error.flatten().fieldErrors)
     return {
       errors: result.error.flatten().fieldErrors,
       message: 'Validation failed'
     }
   }
 
-  let fullPartyId = ''
-  let joinCode = ''
-
   try {
-    const loginResponse = await loginGuest({
-      username: result.data.username
-    })
+    const loginResult = await performGuestLogin(result.data.username)
 
-    if (loginResponse.status === 201) {
-      const setCookieHeader = loginResponse.headers.get('set-cookie')
-
-      if (setCookieHeader) {
-        const [cookiePart] = setCookieHeader.split(';')
-        const [name, value] = cookiePart.split('=')
-
-        if (name && value) {
-          const cookieString = `${name.trim()}=${value.trim()}`
-
-          // Create the party
-          const createResponse = await createParty({
-            headers: {
-              Cookie: cookieString
-            }
-          })
-
-          if (createResponse.status === 201) {
-            const cookieStore = await cookies()
-            cookieStore.set(name.trim(), value.trim(), {
-              httpOnly: true,
-              sameSite: 'lax',
-              path: '/'
-            })
-
-            fullPartyId = createResponse.data.party_id
-            joinCode = createResponse.data.code
-          } else {
-            return {
-              message: 'Login successful, but failed to create party.'
-            }
+    if (!loginResult.success || !loginResult.cookieName || !loginResult.cookieValue) {
+      console.error('[GuestLogin] Login failed', loginResult.status)
+      if (loginResult.status === 409) {
+        return {
+          message: 'Validation failed',
+          errors: {
+            username: ['Username is not available or you are already logged in.']
           }
         }
       }
-    } else {
       return {
-        message: 'Login failed. Please try again.'
+        message: 'Login failed. Please try again.',
+        errors: null
+      }
+    }
+
+    const { cookieName, cookieValue } = loginResult
+    const cookieString = `${cookieName}=${cookieValue}`
+
+    const joinResponse = await joinParty(result.data.joinCode, {
+      headers: { Cookie: cookieString }
+    })
+
+    console.log('[GuestLogin] Join response status:', joinResponse.status)
+
+    if (joinResponse.status === 200) {
+      await setSessionCookie(cookieName, cookieValue)
+    } else {
+      console.error('[GuestLogin] Join failed', joinResponse.status)
+      return {
+        message: 'Login successful, but failed to join party. Please check the code.',
+        errors: null
       }
     }
   } catch (error) {
-    console.error('Create Party Error', error)
+    console.error('[GuestLogin] Error', error)
     return {
-      message: 'An unexpected error occurred'
+      message: 'An unexpected error occurred',
+      errors: null
+    }
+  }
+
+  redirect(`/preferences?joinCode=${encodeURIComponent(result.data.joinCode)}`)
+}
+
+export async function createPartyAction(prevState: unknown, formData: FormData) {
+  const username = formData.get('username') as string
+
+  console.log('[CreateParty] Attempt:', { username })
+
+  const result = createPartyFormSchema.safeParse({ username })
+
+  if (!result.success) {
+    console.log('[CreateParty] Validation failed:', result.error.flatten().fieldErrors)
+    return {
+      errors: result.error.flatten().fieldErrors,
+      message: 'Validation failed'
+    }
+  }
+
+  let joinCode = ''
+
+  try {
+    const loginResult = await performGuestLogin(result.data.username)
+
+    if (!loginResult.success || !loginResult.cookieName || !loginResult.cookieValue) {
+      console.error('[CreateParty] Login failed', loginResult.status)
+      if (loginResult.status === 409) {
+        return {
+          message: 'Validation failed',
+          errors: {
+            username: ['Username is not available or you are already logged in.']
+          }
+        }
+      }
+      return {
+        message: 'Login failed. Please try again.',
+        errors: null
+      }
+    }
+
+    const { cookieName, cookieValue } = loginResult
+    const cookieString = `${cookieName}=${cookieValue}`
+
+    const createResponse = await createParty({
+      headers: { Cookie: cookieString }
+    })
+
+    console.log('[CreateParty] Create response status:', createResponse.status)
+
+    if (createResponse.status === 201) {
+      await setSessionCookie(cookieName, cookieValue)
+      joinCode = createResponse.data.code
+    } else {
+      return {
+        message: 'Login successful, but failed to create party.',
+        errors: null
+      }
+    }
+  } catch (error) {
+    console.error('[CreateParty] Error', error)
+    return {
+      message: 'An unexpected error occurred',
+      errors: null
     }
   }
 
   if (joinCode) {
     redirect(`/preferences?joinCode=${encodeURIComponent(joinCode)}`)
+  } else {
+    return {
+      message: 'Failed to create party (Code missing)',
+      errors: null
+    }
   }
 }

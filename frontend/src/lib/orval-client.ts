@@ -26,8 +26,14 @@ export const customInstance = async <T>(
       .getAll()
       .map((c) => `${c.name}=${c.value}`)
       .join('; ')
+
     if (allCookies) {
-      reqHeaders['Cookie'] = allCookies
+      const existingCookie = reqHeaders['Cookie'] as string | undefined
+      if (existingCookie) {
+        reqHeaders['Cookie'] = `${existingCookie}; ${allCookies}`
+      } else {
+        reqHeaders['Cookie'] = allCookies
+      }
     }
   }
 
@@ -42,7 +48,7 @@ export const customInstance = async <T>(
   // Helper to handle body parsing safely
   let data: unknown
   const contentType = response.headers.get('content-type')
-  if (contentType && contentType.includes('application/json')) {
+  if (contentType?.includes('application/json')) {
     try {
       data = await response.json()
     } catch {

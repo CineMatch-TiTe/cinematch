@@ -7,7 +7,7 @@ networks:
 
 services:
   cinematch-server:
-    image: ghcr.io/cinematch-tite/react_hackathon_2026-backend:pr-19
+    image: ghcr.io/cinematch-tite/react_hackathon_2026-backend:latest
     ports:
       - "8085:8085"
     environment:
