@@ -1,12 +1,11 @@
-use crate::models::{Genre, NewUserPreferences, UpdateUserPreferences, UserPreferences};
+use crate::models::{NewUserPreferences, UserPreferences};
 
 use diesel::prelude::*;
 use diesel_async::RunQueryDsl;
 
 use crate::models::{NewUser, UpdateUser, User};
-use crate::schema::parties;
 use crate::{Database, DbError, DbResult};
-use crate::{Party, schema};
+use crate::schema;
 
 use uuid::Uuid;
 
@@ -25,8 +24,6 @@ impl Database {
             .await
             .map_err(DbError::from)
     }
-
-    ///!User database operations
 
     /// Create a new oneshot (temporary) user
     pub async fn create_oneshot_user(&self, username: &str) -> DbResult<User> {
@@ -94,8 +91,10 @@ impl Database {
             .ok_or(DbError::UserNotFound(user_id))
     }
 
-    /// Get a users party which they are in (this can only return one ongoing party)
+    /// Get a users party which they are in (this can only return one ongoing party).
+    /// Excludes Disbanded parties so WS and "my party" never use disbanded parties.
     pub async fn get_user_active_party(&self, user_id: Uuid) -> DbResult<Uuid> {
+        use crate::models::PartyState;
         use schema::parties::dsl as p;
         use schema::party_members::dsl as pm;
 
@@ -103,6 +102,7 @@ impl Database {
         pm::party_members
             .inner_join(p::parties.on(p::id.eq(pm::party_id)))
             .filter(pm::user_id.eq(user_id))
+            .filter(p::state.ne(PartyState::Disbanded))
             .select(p::id)
             .first::<Uuid>(&mut conn)
             .await

@@ -180,6 +180,23 @@ impl Database {
         Ok(Some(movie_data))
     }
 
+    /// Movie IDs by popularity desc, for ballot fallback when picks are insufficient.
+    pub async fn get_popular_movie_ids(&self, limit: i64) -> DbResult<Vec<i64>> {
+        use crate::schema::movies;
+        use diesel::prelude::*;
+        use diesel_async::RunQueryDsl;
+
+        let mut conn = self.conn().await?;
+        let ids = movies::table
+            .order(movies::popularity.desc())
+            .limit(limit)
+            .select(movies::movie_id)
+            .load::<i64>(&mut conn)
+            .await
+            .map_err(DbError::from)?;
+        Ok(ids)
+    }
+
     pub async fn get_popular_movies(&self, limit: i64) -> DbResult<Vec<MovieData>> {
         use crate::schema::movies;
         use diesel::prelude::*;

@@ -1,31 +1,50 @@
+//! Thin HTTP handlers for party leader actions. Logic in `crate::handler::party`.
+//! Advance is leader-only force-skip; transitions also happen automatically (all ready, all voted).
+
 use super::{
-    AppState, DbError, ErrorResponse, KickMemberRequest, NewRoundResponse, PartyState,
-    PhaseAdvanceResponse, TransferLeadershipRequest, extract_user_id,
+    AppState, DbError, ErrorResponse, KickMemberRequest, TransferLeadershipRequest, extract_user_id,
 };
+use crate::WsStoreData;
+use crate::handler::party::{EndVotingTransition, Party, PartyAdvanceOutcome, PartyError};
+use crate::websocket::broadcast_party_timeout;
+use crate::websocket::models::{ServerMessage, VotingRoundStarted};
 use actix_identity::Identity;
 use actix_web::{HttpResponse, post, web};
 use log::{debug, error, trace};
 use uuid::Uuid;
 
+fn map_party_error(e: PartyError) -> HttpResponse {
+    match e {
+        PartyError::NotFound => {
+            HttpResponse::NotFound().json(ErrorResponse::new("Party not found"))
+        }
+        PartyError::Forbidden(msg) => HttpResponse::Forbidden().json(ErrorResponse::new(msg)),
+        PartyError::BadRequest(msg) => HttpResponse::BadRequest().json(ErrorResponse::new(msg)),
+        PartyError::Db(msg) => {
+            error!("Party handler DB error: {}", msg);
+            HttpResponse::InternalServerError().json(ErrorResponse::new(msg))
+        }
+    }
+}
+
 #[utoipa::path(
     responses(
-        (status = 200, description = "Phase advanced successfully", body = PhaseAdvanceResponse),
+        (status = 200, description = "Phase advanced (force skip)"),
         (status = 400, description = "Invalid state transition", body = ErrorResponse),
         (status = 401, description = "Unauthorized", body = ErrorResponse),
-        (status = 403, description = "Only party leader can advance phase", body = ErrorResponse),
+        (status = 403, description = "Only party leader can advance", body = ErrorResponse),
         (status = 404, description = "Party not found", body = ErrorResponse),
         (status = 500, description = "Internal server error", body = ErrorResponse)
     ),
-    params(
-        ("party_id" = Uuid, Path, description = "The party ID")
-    ),
+    params(("party_id" = Uuid, Path, description = "The party ID")),
     tags = ["party"],
-    security(("bearer_auth" = [])),
+    security(("cookie_auth" = [])),
     operation_id = "advance_phase"
 )]
 #[post("/{party_id}/advance")]
 pub async fn advance_phase(
     db: AppState,
+    store: WsStoreData,
     user: Identity,
     party_id: web::Path<Uuid>,
 ) -> HttpResponse {
@@ -34,155 +53,55 @@ pub async fn advance_phase(
 
     trace!("POST /{}/advance - leader_id={}", party_id, leader_id);
 
-    // Get current state first
-    let current_party = match db.get_party(party_id).await {
-        Ok(party) => party,
-        Err(DbError::PartyNotFound(_)) => {
-            trace!("Party {} not found", party_id);
-            return HttpResponse::NotFound().json(ErrorResponse::new("Party not found"));
-        }
-        Err(e) => {
-            error!("Failed to get party: {}", e);
-            return HttpResponse::InternalServerError()
-                .json(ErrorResponse::new(format!("Failed to get party: {}", e)));
-        }
+    let mut party = match Party::load(db.as_ref(), party_id).await {
+        Ok(p) => p,
+        Err(e) => return map_party_error(e),
     };
 
-    // Verify requester is a member
-    match db.is_party_member(party_id, leader_id).await {
-        Ok(false) => {
-            trace!("Leader {} not member of party {}", leader_id, party_id);
-            return HttpResponse::Forbidden()
-                .json(ErrorResponse::new("Not a member of this party"));
-        }
-        Err(e) => {
-            error!("Failed to check membership: {}", e);
-            return HttpResponse::InternalServerError()
-                .json(ErrorResponse::new("Failed to check membership"));
-        }
-        Ok(true) => {}
-    }
-
-    // Verify requester is the leader
-    if current_party.party_leader_id != leader_id {
-        trace!(
-            "Authorization failed: {} is not leader {}",
-            leader_id, current_party.party_leader_id
-        );
-        return HttpResponse::Forbidden()
-            .json(ErrorResponse::new("Only party leader can advance phase"));
-    }
-
-    debug!(
-        "Auth passed - advancing party {} phase from {:?}",
-        party_id, current_party.state
-    );
-
-    let next = match current_party.state {
-        PartyState::Created => PartyState::Picking,
-        PartyState::Picking => PartyState::Voting,
-        PartyState::Voting => PartyState::Watching,
-        PartyState::Watching => PartyState::Review,
-        PartyState::Review => {
-            return HttpResponse::BadRequest()
-                .json(ErrorResponse::new("Cannot advance phase from Review state"));
-        }
-        PartyState::Disbanded => {
-            return HttpResponse::BadRequest().json(ErrorResponse::new(
-                "Cannot advance phase of a disbanded party",
-            ));
-        }
-    };
-
-    match db.set_phase(party_id, next).await {
-        Ok(updated_party) => {
-            debug!(
-                "Party {} phase advanced to {:?}",
-                party_id, updated_party.state
-            );
+    match party.advance_phase(db.as_ref(), leader_id).await {
+        Ok(outcome) => {
+            match &outcome {
+                PartyAdvanceOutcome::PhaseChanged(s) => {
+                    debug!("Party {} phase advanced to {:?}", party_id, s);
+                    let _ = store
+                        .send_message_to_party(
+                            party_id.to_string(),
+                            &ServerMessage::PartyStateChanged(*s),
+                            None,
+                        )
+                        .await;
+                    let _ = broadcast_party_timeout(db.as_ref(), store.as_ref(), party_id).await;
+                }
+                PartyAdvanceOutcome::VotingEnded(EndVotingTransition::Round2Started) => {
+                    debug!("Party {} voting round 2 started", party_id);
+                    let _ = store
+                        .send_message_to_party(
+                            party_id.to_string(),
+                            &ServerMessage::VotingRoundStarted(VotingRoundStarted { round: 2 }),
+                            None,
+                        )
+                        .await;
+                    let _ = broadcast_party_timeout(db.as_ref(), store.as_ref(), party_id).await;
+                }
+                PartyAdvanceOutcome::VotingEnded(EndVotingTransition::PhaseChanged(s)) => {
+                    debug!("Party {} voting ended -> {:?}", party_id, s);
+                    let _ = store
+                        .send_message_to_party(
+                            party_id.to_string(),
+                            &ServerMessage::PartyStateChanged(*s),
+                            None,
+                        )
+                        .await;
+                    let _ = broadcast_party_timeout(db.as_ref(), store.as_ref(), party_id).await;
+                }
+            }
             HttpResponse::Ok().finish()
         }
-        Err(e) => {
-            error!("Failed to advance phase: {}", e);
-            HttpResponse::InternalServerError().json(ErrorResponse::new(format!(
-                "Failed to advance phase: {}",
-                e
-            )))
-        }
+        Err(e) => map_party_error(e),
     }
 }
 
-/// Start a new movie round
-///
-/// Starts a new movie round from the Review state.
-/// Only the party leader can start a new round.
-/// This resets the party to Created state and generates a new join code.
-/// All members' ready states are reset to false.
-///
-/// **Auth**: Only the party leader can start a new round.
-#[utoipa::path(
-    responses(
-        (status = 200, description = "New round started", body = NewRoundResponse),
-        (status = 400, description = "Party is not in Review state", body = ErrorResponse),
-        (status = 401, description = "Unauthorized", body = ErrorResponse),
-        (status = 403, description = "Only party leader can start new round", body = ErrorResponse),
-        (status = 404, description = "Party not found", body = ErrorResponse),
-        (status = 500, description = "Internal server error", body = ErrorResponse)
-    ),
-    params(
-        ("party_id" = Uuid, Path, description = "The party ID")
-    ),
-    tags = ["party"],
-    security(("bearer_auth" = [])),
-    operation_id = "start_new_round"
-)]
-#[post("/{party_id}/new-round")]
-pub async fn start_new_round(
-    db: AppState,
-    user: Identity,
-    party_id: web::Path<Uuid>,
-) -> HttpResponse {
-    let party_id = party_id.into_inner();
-    let user_id = extract_user_id!(user);
-
-    // Verify requester is the leader
-    match db.get_party(party_id).await {
-        Ok(party) if party.party_leader_id != user_id => {
-            return HttpResponse::Forbidden()
-                .json(ErrorResponse::new("Only party leader can start new round"));
-        }
-        Err(e) => {
-            error!("Failed to get party: {}", e);
-            return HttpResponse::InternalServerError()
-                .json(ErrorResponse::new("Failed to get party"));
-        }
-        _ => {}
-    }
-
-    match db.start_new_round(party_id).await {
-        Ok(code) => {
-            let response = NewRoundResponse { code: code.code };
-            HttpResponse::Ok().json(response)
-        }
-        Err(DbError::PartyNotFound(_)) => {
-            HttpResponse::NotFound().json(ErrorResponse::new("Party not found"))
-        }
-        Err(e) => {
-            error!("Failed to start new round: {}", e);
-            HttpResponse::InternalServerError().json(ErrorResponse::new(format!(
-                "Failed to start new round: {}",
-                e
-            )))
-        }
-    }
-}
-
-/// Disband party
-///
-/// Disbands the party completely. Only the party leader can disband.
-/// This sets the party state to Disbanded and removes the join code.
-///
-/// **Auth**: Only the party leader can disband the party.
+/// Disband party (leader only).
 #[utoipa::path(
     responses(
         (status = 200, description = "Party disbanded"),
@@ -191,11 +110,9 @@ pub async fn start_new_round(
         (status = 404, description = "Party not found", body = ErrorResponse),
         (status = 500, description = "Internal server error", body = ErrorResponse)
     ),
-    params(
-        ("party_id" = Uuid, Path, description = "The party ID")
-    ),
+    params(("party_id" = Uuid, Path, description = "The party ID")),
     tags = ["party"],
-    security(("bearer_auth" = [])),
+    security(("cookie_auth" = [])),
     operation_id = "disband_party"
 )]
 #[post("/{party_id}/disband")]
@@ -209,7 +126,6 @@ pub async fn disband_party(
 
     trace!("POST /{}/disband - leader_id={}", party_id, user_id);
 
-    // Verify requester is the leader
     match db.get_party(party_id).await {
         Ok(party) if party.party_leader_id != user_id => {
             trace!(
@@ -229,7 +145,7 @@ pub async fn disband_party(
 
     debug!("Auth passed - disbanding party {}", party_id);
     match db.disband_party(party_id).await {
-        Ok(_party) => {
+        Ok(_) => {
             debug!("Party {} disbanded successfully", party_id);
             HttpResponse::Ok().finish()
         }
@@ -244,27 +160,20 @@ pub async fn disband_party(
     }
 }
 
-/// Kick a member from the party
-///
-/// Removes a member from the party. Only the party leader can kick members.
-/// The leader cannot kick themselves (use leave instead).
-///
-/// **Auth**: Only the party leader can kick members.
+/// Kick a member (leader only).
 #[utoipa::path(
     request_body = KickMemberRequest,
     responses(
-        (status = 200, description = "Member kicked successfully"),
+        (status = 200, description = "Member kicked"),
         (status = 400, description = "Cannot kick self or invalid request", body = ErrorResponse),
         (status = 401, description = "Unauthorized", body = ErrorResponse),
-        (status = 403, description = "Only party leader can kick members", body = ErrorResponse),
+        (status = 403, description = "Only party leader can kick", body = ErrorResponse),
         (status = 404, description = "Party or member not found", body = ErrorResponse),
         (status = 500, description = "Internal server error", body = ErrorResponse)
     ),
-    params(
-        ("party_id" = Uuid, Path, description = "The party ID")
-    ),
+    params(("party_id" = Uuid, Path, description = "The party ID")),
     tags = ["party"],
-    security(("bearer_auth" = [])),
+    security(("cookie_auth" = [])),
     operation_id = "kick_member"
 )]
 #[post("/{party_id}/kick")]
@@ -283,13 +192,8 @@ pub async fn kick_member(
         party_id, requester_id, target_user_id
     );
 
-    // Verify requester is a member
     match db.is_party_member(party_id, requester_id).await {
         Ok(false) => {
-            trace!(
-                "Requester {} not member of party {}",
-                requester_id, party_id
-            );
             return HttpResponse::Forbidden()
                 .json(ErrorResponse::new("Not a member of this party"));
         }
@@ -301,33 +205,24 @@ pub async fn kick_member(
         Ok(true) => {}
     }
 
-    // Get party to find leader
     let party = match db.get_party(party_id).await {
-        Ok(party) => party,
+        Ok(p) => p,
         Err(DbError::PartyNotFound(_)) => {
-            trace!("Party {} not found", party_id);
             return HttpResponse::NotFound().json(ErrorResponse::new("Party not found"));
         }
         Err(e) => {
             error!("Failed to get party: {}", e);
             return HttpResponse::InternalServerError()
-                .json(ErrorResponse::new(format!("Failed to get party: {}", e)));
+                .json(ErrorResponse::new("Failed to get party"));
         }
     };
 
     if party.party_leader_id != requester_id {
-        trace!(
-            "Authorization failed: requester {} is not leader {}",
-            requester_id, party.party_leader_id
-        );
         return HttpResponse::Forbidden()
             .json(ErrorResponse::new("Only party leader can kick members"));
     }
 
-    debug!(
-        "Auth passed - kicking user {} from party {}",
-        target_user_id, party_id
-    );
+    debug!("Kicking user {} from party {}", target_user_id, party_id);
     match db.remove_party_member(party_id, target_user_id).await {
         Ok(()) => {
             debug!("User {} kicked from party {}", target_user_id, party_id);
@@ -344,27 +239,20 @@ pub async fn kick_member(
     }
 }
 
-/// Transfer party leadership
-///
-/// Transfers leadership to another party member.
-/// Only the current leader can transfer leadership.
-///
-/// **Auth**: Only the party leader can transfer leadership.
+/// Transfer leadership (leader only).
 #[utoipa::path(
     request_body = TransferLeadershipRequest,
     responses(
         (status = 200, description = "Leadership transferred"),
-        (status = 400, description = "New leader is not a party member", body = ErrorResponse),
+        (status = 400, description = "New leader not a member", body = ErrorResponse),
         (status = 401, description = "Unauthorized", body = ErrorResponse),
-        (status = 403, description = "Only party leader can transfer leadership", body = ErrorResponse),
+        (status = 403, description = "Only leader can transfer", body = ErrorResponse),
         (status = 404, description = "Party not found", body = ErrorResponse),
         (status = 500, description = "Internal server error", body = ErrorResponse)
     ),
-    params(
-        ("party_id" = Uuid, Path, description = "The party ID")
-    ),
+    params(("party_id" = Uuid, Path, description = "The party ID")),
     tags = ["party"],
-    security(("bearer_auth" = [])),
+    security(("cookie_auth" = [])),
     operation_id = "transfer_leadership"
 )]
 #[post("/{party_id}/transfer-leadership")]
@@ -378,7 +266,6 @@ pub async fn transfer_leadership(
     let new_leader_id = body.new_leader_id;
     let requester_id = extract_user_id!(user);
 
-    // Verify requester is the current leader
     match db.get_party(party_id).await {
         Ok(party) if party.party_leader_id != requester_id => {
             return HttpResponse::Forbidden().json(ErrorResponse::new(
@@ -396,7 +283,6 @@ pub async fn transfer_leadership(
         _ => {}
     }
 
-    // Verify new leader is a party member
     match db.is_party_member(party_id, new_leader_id).await {
         Ok(true) => {}
         Ok(false) => {
@@ -412,7 +298,7 @@ pub async fn transfer_leadership(
     }
 
     match db.transfer_party_leadership(party_id, new_leader_id).await {
-        Ok(_party) => HttpResponse::Ok().finish(),
+        Ok(_) => HttpResponse::Ok().finish(),
         Err(DbError::PartyNotFound(_)) => {
             HttpResponse::NotFound().json(ErrorResponse::new("Party not found"))
         }

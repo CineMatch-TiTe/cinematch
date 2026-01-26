@@ -1,7 +1,32 @@
-use std::collections::HashMap;
-use qdrant_client::qdrant::{Filter, Condition};
 use cinematch_common::models::FullUserPreferences;
+use qdrant_client::qdrant::{Condition, Filter, PointId};
+use std::collections::HashMap;
 use uuid::Uuid;
+
+/// Build a Filter that restricts to `pool` (HasId) and merges with optional prefs filter.
+pub fn filter_pool_and_prefs(pool: &[i64], prefs_filter: Option<&Filter>) -> Filter {
+    let pool_ids: Vec<PointId> = pool
+        .iter()
+        .map(|&id| PointId {
+            point_id_options: Some(qdrant_client::qdrant::point_id::PointIdOptions::Num(
+                id as u64,
+            )),
+        })
+        .collect();
+    let mut must = vec![Condition::has_id(pool_ids)];
+    let must_not = match prefs_filter {
+        Some(f) => {
+            must.extend(f.must.iter().cloned());
+            f.must_not.clone()
+        }
+        None => vec![],
+    };
+    Filter {
+        must,
+        must_not,
+        ..Default::default()
+    }
+}
 
 /// Generate a Qdrant Filter from FullUserPreferences and a genre name-to-id map
 pub fn filter_from_prefs(
@@ -15,7 +40,13 @@ pub fn filter_from_prefs(
     if !prefs.included_genres.is_empty() {
         let include_genre_names: Vec<String> = genre_map
             .iter()
-            .filter_map(|(name, &id)| if prefs.included_genres.contains(&id) { Some(name.clone()) } else { None })
+            .filter_map(|(name, &id)| {
+                if prefs.included_genres.contains(&id) {
+                    Some(name.clone())
+                } else {
+                    None
+                }
+            })
             .collect();
         if !include_genre_names.is_empty() {
             must_clauses.push(Condition::matches("genres", include_genre_names));
@@ -26,7 +57,13 @@ pub fn filter_from_prefs(
     if !prefs.excluded_genres.is_empty() {
         let exclude_genre_names: Vec<String> = genre_map
             .iter()
-            .filter_map(|(name, &id)| if prefs.excluded_genres.contains(&id) { Some(name.clone()) } else { None })
+            .filter_map(|(name, &id)| {
+                if prefs.excluded_genres.contains(&id) {
+                    Some(name.clone())
+                } else {
+                    None
+                }
+            })
             .collect();
         if !exclude_genre_names.is_empty() {
             must_not_clauses.push(Condition::matches("genres", exclude_genre_names));

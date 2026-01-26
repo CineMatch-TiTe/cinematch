@@ -1,15 +1,88 @@
 use super::{
-    AppState, CreatePartyResponse, DbError, ErrorResponse, PartyCode, PartyResponse, PartyState,
-    extract_user_id, VoteMovieRequest, VoteMovieResponse,
+    AppState, DbError, ErrorResponse, GetVoteResponse, PartyState, VoteMovieRequest,
+    VoteMovieResponse, VoteTotals, extract_user_id,
 };
 use actix_identity::Identity;
 use actix_web::{HttpResponse, get, post, web};
-use log::{debug, error, trace};
+use log::{error, trace};
+use std::collections::HashMap;
 use uuid::Uuid;
 
+use crate::WsStoreData;
+use crate::handler::party::{EndVotingTransition, try_auto_end_voting};
+use crate::websocket::broadcast_party_timeout;
+use crate::websocket::models::{MovieVotes, ServerMessage, VotingRoundStarted};
 
-use crate::WsBroadcaster;
-use crate::websocket::models::{MovieVotes, ServerMessage};
+#[utoipa::path(
+    responses(
+        (status = 200, description = "Ballot and vote info", body = GetVoteResponse),
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 403, description = "Not a party member", body = ErrorResponse),
+        (status = 404, description = "Party not in Voting or not found", body = ErrorResponse),
+        (status = 500, description = "Internal server error", body = ErrorResponse)
+    ),
+    params(("party_id" = Uuid, Path, description = "The party ID")),
+    tags = ["party"],
+    security(("cookie_auth" = [])),
+    operation_id = "get_vote"
+)]
+#[get("/{party_id}/vote")]
+pub async fn get_vote(db: AppState, user: Identity, party_id: web::Path<Uuid>) -> HttpResponse {
+    let party_id = party_id.into_inner();
+    let user_id = extract_user_id!(user);
+
+    trace!("GET /{}/vote - user_id={}", party_id, user_id);
+
+    if let Ok(false) | Err(_) = db.is_party_member(party_id, user_id).await {
+        return HttpResponse::Forbidden().json(ErrorResponse::new("Not a member of this party"));
+    }
+
+    let party = match db.get_party(party_id).await {
+        Ok(p) => p,
+        Err(DbError::PartyNotFound(_)) => {
+            return HttpResponse::NotFound().json(ErrorResponse::new("Party not found"));
+        }
+        Err(e) => {
+            error!("get_vote: get_party failed: {}", e);
+            return HttpResponse::InternalServerError()
+                .json(ErrorResponse::new("Failed to load party"));
+        }
+    };
+
+    if party.state != PartyState::Voting {
+        return HttpResponse::NotFound().json(ErrorResponse::new("Party is not in Voting"));
+    }
+
+    let movie_ids = match db.get_user_ballot(party_id, user_id).await {
+        Ok(ids) => ids,
+        Err(e) => {
+            error!("get_vote: get_user_ballot failed: {}", e);
+            return HttpResponse::InternalServerError()
+                .json(ErrorResponse::new("Failed to load ballot"));
+        }
+    };
+
+    let vote_totals: HashMap<i64, VoteTotals> =
+        match db.get_party_votes(party_id, Some(user_id)).await {
+            Ok(m) => m
+                .into_iter()
+                .map(|(mid, (likes, dislikes))| (mid, VoteTotals { likes, dislikes }))
+                .collect(),
+            Err(e) => {
+                error!("get_vote: get_party_votes failed: {}", e);
+                return HttpResponse::InternalServerError()
+                    .json(ErrorResponse::new("Failed to load vote totals"));
+            }
+        };
+
+    let response = GetVoteResponse {
+        movie_ids,
+        voting_round: party.voting_round,
+        can_vote: party.can_vote,
+        vote_totals,
+    };
+    HttpResponse::Ok().json(response)
+}
 
 #[utoipa::path(
     request_body = VoteMovieRequest,
@@ -26,12 +99,12 @@ use crate::websocket::models::{MovieVotes, ServerMessage};
         ("vote_value" = bool, Query, description = "true for like, false for dislike")
     ),
     tags = ["party"],
-    security(("bearer_auth" = []))
+    security(("cookie_auth" = []))
 )]
 #[post("/{party_id}/vote/{movie_id}")]
 pub async fn vote_movie(
     db: AppState,
-    rooms: WsBroadcaster,
+    store: WsStoreData,
     user: Identity,
     path: web::Path<(Uuid, i64)>,
     vote: web::Json<VoteMovieRequest>,
@@ -51,10 +124,13 @@ pub async fn vote_movie(
     // 3. Check user can vote for this movie
     match db.can_vote(party_id, user_id, movie_id).await {
         Ok(false) => {
-            return HttpResponse::Forbidden().json(ErrorResponse::new("You cannot vote for this movie. Or voting is disabled."));
+            return HttpResponse::Forbidden().json(ErrorResponse::new(
+                "You cannot vote for this movie. Or voting is disabled.",
+            ));
         }
         Err(e) => {
-            return HttpResponse::InternalServerError().json(ErrorResponse::new(format!("DB error: {e}")));
+            return HttpResponse::InternalServerError()
+                .json(ErrorResponse::new(format!("DB error: {e}")));
         }
         Ok(true) => {}
     }
@@ -64,24 +140,36 @@ pub async fn vote_movie(
         Ok(_) => {
             let (likes, dislikes) = match db.get_vote_totals(movie_id, Some(party_id)).await {
                 Ok((likes, dislikes)) => (likes as u32, dislikes as u32),
-                Err(e) => return HttpResponse::InternalServerError().json(ErrorResponse::new(format!("DB error: {e}"))),
-            };
-            // Notify via WebSocket
-            // send websocket update to party members
-            let ws_message = ServerMessage::MovieVoteUpdate(
-                MovieVotes {
-                    movie_id,
-                    likes,
-                    dislikes,
+                Err(e) => {
+                    return HttpResponse::InternalServerError()
+                        .json(ErrorResponse::new(format!("DB error: {e}")));
                 }
-            );
-        
-            crate::websocket::send_message_to_party(&rooms, party_id.to_string(), &ws_message, Some(&[user_id])).await;
+            };
+            let ws_message = ServerMessage::MovieVoteUpdate(MovieVotes {
+                movie_id,
+                likes,
+                dislikes,
+            });
+            let _ = store
+                .send_message_to_party(party_id.to_string(), &ws_message, Some(&[user_id]))
+                .await;
+
+            if let Ok(Some(trans)) = try_auto_end_voting(db.as_ref(), party_id).await {
+                let msg = match trans {
+                    EndVotingTransition::Round2Started => {
+                        ServerMessage::VotingRoundStarted(VotingRoundStarted { round: 2 })
+                    }
+                    EndVotingTransition::PhaseChanged(s) => ServerMessage::PartyStateChanged(s),
+                };
+                let _ = store
+                    .send_message_to_party(party_id.to_string(), &msg, None)
+                    .await;
+                let _ = broadcast_party_timeout(db.as_ref(), store.as_ref(), party_id).await;
+            }
 
             HttpResponse::Ok().json(VoteMovieResponse { likes, dislikes })
-
-
         }
-        Err(e) => HttpResponse::InternalServerError().json(ErrorResponse::new(format!("Failed to cast vote: {e}"))),
+        Err(e) => HttpResponse::InternalServerError()
+            .json(ErrorResponse::new(format!("Failed to cast vote: {e}"))),
     }
 }

@@ -801,6 +801,7 @@ dependencies = [
  "actix-web",
  "chrono",
  "serde",
+ "serde_json",
  "utoipa",
  "uuid",
 ]
@@ -857,6 +858,7 @@ dependencies = [
  "cinematch-common",
  "cinematch-db",
  "qdrant-client",
+ "rand 0.9.2",
  "uuid",
 ]
 

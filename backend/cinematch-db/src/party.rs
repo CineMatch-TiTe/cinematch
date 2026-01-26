@@ -1,3 +1,4 @@
+use chrono::Utc;
 use diesel::prelude::*;
 use diesel_async::RunQueryDsl;
 use rand::Rng;
@@ -60,7 +61,7 @@ impl Database {
 
     /// Get the party a user is currently in (if any)
     pub async fn get_user_party(&self, user_id: Uuid) -> DbResult<Option<Party>> {
-        use crate::schema::{party_members, parties};
+        use crate::schema::{parties, party_members};
         let mut conn = self.conn().await?;
         let result = party_members::table
             .inner_join(parties::table.on(party_members::party_id.eq(parties::id)))
@@ -213,22 +214,53 @@ impl Database {
 // ============================================================================
 
 impl Database {
-    /// Set the party's state and reset all members' ready states
+    /// Set the party's state, phase_entered_at = now(), and reset all members' ready states.
     pub async fn set_phase(&self, party_id: Uuid, new_state: PartyState) -> DbResult<Party> {
         use schema::parties::dsl::*;
 
-        // Update state
+        let now = Utc::now();
         let mut conn = self.conn().await?;
         let updated_party = diesel::update(parties.find(party_id))
-            .set(state.eq(new_state))
+            .set((state.eq(new_state), phase_entered_at.eq(now)))
             .returning(Party::as_returning())
             .get_result(&mut conn)
             .await?;
 
-        // Reset all members' ready state
         self.reset_all_ready_states(party_id).await?;
 
         Ok(updated_party)
+    }
+
+    /// Set phase_entered_at to now() (e.g. when starting round 2, still in Voting).
+    pub async fn set_phase_entered_at_now(&self, party_id: Uuid) -> DbResult<()> {
+        use schema::parties::dsl::*;
+
+        let now = Utc::now();
+        let mut conn = self.conn().await?;
+        diesel::update(parties.find(party_id))
+            .set(phase_entered_at.eq(now))
+            .execute(&mut conn)
+            .await
+            .map_err(DbError::from)?;
+        Ok(())
+    }
+
+    /// Party IDs in the given state whose phase_entered_at is before `deadline` (for timeout checks).
+    pub async fn get_parties_for_timeout(
+        &self,
+        party_state: PartyState,
+        deadline: chrono::DateTime<Utc>,
+    ) -> DbResult<Vec<Uuid>> {
+        use schema::parties::dsl::*;
+
+        let mut conn = self.conn().await?;
+        let ids = parties
+            .filter(state.eq(party_state))
+            .filter(phase_entered_at.lt(deadline))
+            .select(id)
+            .load::<Uuid>(&mut conn)
+            .await?;
+        Ok(ids)
     }
 
     pub async fn get_state(&self, party_id: Uuid) -> DbResult<PartyState> {
@@ -244,20 +276,54 @@ impl Database {
         Ok(party_state)
     }
 
-    /// Start a new movie round
-    /// Resets to Created state with a new join code, keeps existing members
-    pub async fn start_new_round(&self, party_id: Uuid) -> DbResult<PartyCode> {
-        // Reset to Created state
+    pub async fn get_voting_round(&self, party_id: Uuid) -> DbResult<Option<i16>> {
+        use schema::parties::dsl::*;
+
         let mut conn = self.conn().await?;
-
-        // Generate new join code
-        let code = self
-            .generate_party_code_internal(&mut conn, party_id)
+        let round = parties
+            .filter(id.eq(party_id))
+            .select(voting_round)
+            .first::<Option<i16>>(&mut conn)
             .await?;
+        Ok(round)
+    }
 
-        // Reset all members' ready state
-        self.reset_all_ready_states(party_id).await?;
+    pub async fn set_voting_round(&self, party_id: Uuid, round: Option<i16>) -> DbResult<()> {
+        use schema::parties::dsl::*;
 
+        let mut conn = self.conn().await?;
+        diesel::update(parties.find(party_id))
+            .set(voting_round.eq(round))
+            .execute(&mut conn)
+            .await
+            .map_err(DbError::from)?;
+        Ok(())
+    }
+
+    pub async fn set_selected_movie_id(
+        &self,
+        party_id: Uuid,
+        movie_id: Option<i64>,
+    ) -> DbResult<()> {
+        use schema::parties::dsl::*;
+
+        let mut conn = self.conn().await?;
+        diesel::update(parties.find(party_id))
+            .set(selected_movie_id.eq(movie_id))
+            .execute(&mut conn)
+            .await
+            .map_err(DbError::from)?;
+        Ok(())
+    }
+
+    /// Start a new movie round from Review.
+    /// Clears votes/shown_movies/selected_movie_id/voting_round, sets state to Created, new join code, resets ready. Keeps party tastes.
+    pub async fn start_new_round(&self, party_id: Uuid) -> DbResult<PartyCode> {
+        self.clear_shown_movies_for_party(party_id).await?;
+        self.set_selected_movie_id(party_id, None).await?;
+        self.set_voting_round(party_id, None).await?;
+        self.set_phase(party_id, PartyState::Created).await?;
+        let code = self.regenerate_party_code(party_id).await?;
         Ok(code)
     }
 

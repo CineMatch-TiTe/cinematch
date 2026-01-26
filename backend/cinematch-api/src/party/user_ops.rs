@@ -1,17 +1,16 @@
 use super::{
     CreatePartyResponse, DbError, ErrorResponse, MemberInfo, PartyMembersResponse, PartyState,
-    ReadyStateResponse, SetReadyRequest, VoteMovieRequest, extract_user_id,
+    ReadyStateResponse, SetReadyRequest, extract_user_id,
 };
 
-use crate::{AppState, WsBroadcaster};
+use crate::{AppState, WsStoreData};
 use actix_identity::Identity;
-use actix_web::{HttpResponse, get, post, web};
+use actix_web::{HttpResponse, get, patch, post, web};
 use log::{debug, error, trace};
 use uuid::Uuid;
 
-use crate::websocket::models::{MemberJoined, MovieVotes, ServerMessage};
-
-use crate::websocket::send_message_to_party;
+use crate::websocket::broadcast_party_timeout;
+use crate::websocket::models::{MemberJoined, ServerMessage};
 
 #[utoipa::path(
     responses(
@@ -25,11 +24,16 @@ use crate::websocket::send_message_to_party;
         ("code" = String, Path, description = "The 4-character party join code")
     ),
     tags = ["party"],
-    security(("bearer_auth" = [])),
+    security(("cookie_auth" = [])),
     operation_id = "join_party"
 )]
 #[post("/join/{code}")]
-pub async fn join_party(db: AppState, user: Identity, room: WsBroadcaster, code: web::Path<String>) -> HttpResponse {
+pub async fn join_party(
+    db: AppState,
+    user: Identity,
+    store: WsStoreData,
+    code: web::Path<String>,
+) -> HttpResponse {
     let code = code.into_inner();
     let user_id = extract_user_id!(user);
 
@@ -60,12 +64,14 @@ pub async fn join_party(db: AppState, user: Identity, room: WsBroadcaster, code:
     // Check if user is already in a party
     match db.get_user_party(user_id).await {
         Ok(Some(_)) => {
-            return HttpResponse::BadRequest().json(ErrorResponse::new("User is already in a party"));
+            return HttpResponse::BadRequest()
+                .json(ErrorResponse::new("User is already in a party"));
         }
         Ok(None) => {}
         Err(e) => {
             error!("Failed to check user party: {}", e);
-            return HttpResponse::InternalServerError().json(ErrorResponse::new("Failed to check user party"));
+            return HttpResponse::InternalServerError()
+                .json(ErrorResponse::new("Failed to check user party"));
         }
     }
     // Check if user is already a member
@@ -92,7 +98,6 @@ pub async fn join_party(db: AppState, user: Identity, room: WsBroadcaster, code:
         Ok(_) => {
             debug!("User {} successfully joined party {}", user_id, party.id);
 
-
             let username = match db.get_user(user_id).await {
                 Ok(user) => user.username,
                 Err(e) => {
@@ -101,13 +106,10 @@ pub async fn join_party(db: AppState, user: Identity, room: WsBroadcaster, code:
                 }
             };
 
-            let msg = ServerMessage::PartyMemberJoined(
-                MemberJoined {
-                    user_id,
-                    username,
-                }
-            );
-            let _ = send_message_to_party(&room, party.id.to_string(), &msg, Some(&[user_id])).await;
+            let msg = ServerMessage::PartyMemberJoined(MemberJoined { user_id, username });
+            let _ = store
+                .send_message_to_party(party.id.to_string(), &msg, Some(&[user_id]))
+                .await;
 
             let response = CreatePartyResponse {
                 party_id: party.id,
@@ -143,11 +145,16 @@ pub async fn join_party(db: AppState, user: Identity, room: WsBroadcaster, code:
         ("party_id" = Uuid, Path, description = "The party ID to leave")
     ),
     tags = ["party"],
-    security(("bearer_auth" = [])),
+    security(("cookie_auth" = [])),
     operation_id = "leave_party"
 )]
 #[post("/{party_id}/leave")]
-pub async fn leave_party(db: AppState, user: Identity, room: WsBroadcaster, party_id: web::Path<Uuid>) -> HttpResponse {
+pub async fn leave_party(
+    db: AppState,
+    user: Identity,
+    store: WsStoreData,
+    party_id: web::Path<Uuid>,
+) -> HttpResponse {
     let party_id = party_id.into_inner();
     let user_id = extract_user_id!(user);
 
@@ -156,7 +163,9 @@ pub async fn leave_party(db: AppState, user: Identity, room: WsBroadcaster, part
             debug!("User {} left party {}", user_id, party_id);
             // Notify remaining members
             let msg = ServerMessage::PartyMemberLeft(user_id);
-            let _ = send_message_to_party(&room, party_id.to_string(), &msg, None).await;
+            let _ = store
+                .send_message_to_party(party_id.to_string(), &msg, None)
+                .await;
             HttpResponse::Ok().finish()
         }
         Err(DbError::NotPartyMember) => {
@@ -183,7 +192,7 @@ pub async fn leave_party(db: AppState, user: Identity, room: WsBroadcaster, part
         ("party_id" = Uuid, Path, description = "The party ID")
     ),
     tags = ["party"],
-    security(("bearer_auth" = []))
+    security(("cookie_auth" = []))
 )]
 #[get("/{party_id}/members")]
 pub async fn get_party_members(
@@ -293,12 +302,13 @@ pub async fn get_party_members(
         ("party_id" = Uuid, Path, description = "The party ID")
     ),
     tags = ["party"],
-    security(("bearer_auth" = [])),
+    security(("cookie_auth" = [])),
     operation_id = "toggle_ready"
 )]
-#[post("/{party_id}/ready")]
+#[patch("/{party_id}/ready")]
 pub async fn set_ready(
     db: AppState,
+    store: WsStoreData,
     user: Identity,
     party_id: web::Path<Uuid>,
     body: web::Json<SetReadyRequest>,
@@ -331,7 +341,23 @@ pub async fn set_ready(
     match db.set_member_ready(party_id, user_id, ready.is_ready).await {
         Ok(_) => {
             debug!("Ready state toggled for user {}", user_id);
-            // Get the ready status for the party
+            // Auto-advance when all ready (Created→Picking or Picking→Voting or Review→Created).
+            // Advancing resets readiness, so we must return all_ready from *before* the reset.
+            let advanced =
+                match crate::handler::party::try_auto_advance_on_ready(db.as_ref(), party_id).await
+                {
+                    Ok(Some(s)) => Some(s),
+                    _ => None,
+                };
+            if let Some(new_state) = advanced {
+                let msg = ServerMessage::PartyStateChanged(new_state);
+                let _ = store
+                    .send_message_to_party(party_id.to_string(), &msg, None)
+                    .await;
+                let _ = broadcast_party_timeout(db.as_ref(), store.as_ref(), party_id).await;
+                // We advanced because everyone was ready; readiness is now reset. Return all_ready: true.
+                return HttpResponse::Ok().json(ReadyStateResponse { all_ready: true });
+            }
             match db.get_ready_status(party_id).await {
                 Ok((ready_count, total)) => {
                     let response = ReadyStateResponse {
@@ -341,7 +367,6 @@ pub async fn set_ready(
                 }
                 Err(e) => {
                     error!("Failed to get ready status: {}", e);
-                    // Still return success since the toggle worked
                     let response = ReadyStateResponse { all_ready: false };
                     HttpResponse::Ok().json(response)
                 }

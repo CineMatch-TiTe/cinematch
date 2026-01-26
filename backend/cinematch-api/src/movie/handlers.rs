@@ -20,7 +20,7 @@ use log::error;
         ("movie_id" = i64, Path, description = "The movie's unique ID")
     ),
     tags = ["movie"],
-    security(("bearer_auth" = [])),
+    security(("cookie_auth" = [])),
     operation_id = "movie_get_info"
 )]
 #[get("/info/{movie_id}")]
@@ -53,7 +53,7 @@ pub async fn get_movie(
         (status = 500, description = "Internal server error", body = ErrorResponse)
     ),
     tags = ["movie"],
-    security(("bearer_auth" = [])),
+    security(("cookie_auth" = [])),
     operation_id = "get_genres"
 )]
 #[get("/genres")]
@@ -85,7 +85,7 @@ pub async fn get_genres(db: AppState, user: Option<Identity>) -> HttpResponse {
         (status = 500, description = "Internal server error", body = ErrorResponse)
     ),
     tags = ["movie"],
-    security(("bearer_auth" = [])),
+    security(("cookie_auth" = [])),
     operation_id = "get_recommendations"
 )]
 #[get("/recommend")]
@@ -152,7 +152,7 @@ pub async fn get_recommendations(db: AppState, user: Option<Identity>) -> HttpRe
         ("page" = Option<i64>, Query, description = "The page number for pagination")
     ),
     tags = ["movie"],
-    security(("bearer_auth" = [])),
+    security(("cookie_auth" = [])),
     operation_id = "search_movies"
 )]
 #[get("/search")]

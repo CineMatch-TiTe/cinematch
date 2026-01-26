@@ -27,25 +27,25 @@ use cinematch_common::{ErrorResponse, extract_user_id};
 // User Management Endpoints
 // ============================================================================
 
-/// Create a guest user
+/// Create a guest user (login as guest)
 ///
 /// Creates a new temporary (oneshot) user with an auto-generated username.
 /// This user can join parties but will be ephemeral to that party's lifetime.
 /// To become persistent, the user must link an external OAuth account.
 ///
-/// This is the entry point for users without an account. Use the returned `user_id`
-/// for subsequent API requests that require authentication.
+/// **Session**: On success, the server sets an `id` cookie (httpOnly, path=/, samesite=Lax, secure).
+/// Send this cookie on all subsequent requests; protected endpoints use `cookie_auth`.
+/// Use `GET /api/user/token` to obtain your `user_id` for clients that need it.
 ///
-/// **Auth**: No authentication required.
+/// **Auth**: None required.
 #[utoipa::path(
     request_body = GuestUserRequest,
     responses(
-        (status = 201, description = "Guest user created successfully", body = GuestLoginResponse),
+        (status = 201, description = "Guest user created; `id` cookie set", body = GuestLoginResponse),
         (status = 400, description = "Invalid username", body = ErrorResponse),
         (status = 409, description = "Already logged in", body = ErrorResponse),
         (status = 500, description = "Internal server error", body = ErrorResponse)
     ),
-
     tags = ["user"],
     operation_id = "login_guest"
 )]
@@ -124,7 +124,7 @@ pub async fn login_guest(
         ("user_id" = Uuid, Path, description = "The user ID")
     ),
     tags = ["user"],
-    security(("bearer_auth" = [])),
+    security(("cookie_auth" = [])),
     operation_id = "rename_user"
 )]
 #[patch("/rename/{user_id}")]
@@ -178,7 +178,7 @@ pub async fn rename_user(
         (status = 500, description = "Internal server error", body = ErrorResponse)
     ),
     tags = ["user"],
-    security(("bearer_auth" = [])),
+    security(("cookie_auth" = [])),
     operation_id = "get_current_user"
 )]
 #[get("")]
@@ -254,7 +254,7 @@ pub async fn logout_user(user: Option<Identity>) -> HttpResponse {
         ("movie_id" = i64, Path, description = "The movie ID")
     ),
     tags = ["user"],
-    security(("bearer_auth" = [])),
+    security(("cookie_auth" = [])),
     operation_id = "update_taste"
 )]
 #[put("/like/{movie_id}")]

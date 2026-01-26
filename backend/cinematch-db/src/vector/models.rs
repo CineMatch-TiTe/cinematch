@@ -94,16 +94,12 @@ impl MovieData {
             parts.push(format!("Genres: {}", self.genres.join(", ")));
         }
 
-        if let Some(tagline) = &self.tagline {
-            if !tagline.trim().is_empty() {
-                parts.push(tagline.trim().to_string());
-            }
+        if let Some(tagline) = &self.tagline && !tagline.trim().is_empty() {
+            parts.push(tagline.trim().to_string());
         }
 
-        if let Some(overview) = &self.overview {
-            if !overview.trim().is_empty() {
-                parts.push(overview.trim().to_string());
-            }
+        if let Some(overview) = &self.overview && !overview.trim().is_empty() {
+            parts.push(overview.trim().to_string());
         }
 
         if !self.keywords.is_empty() {
@@ -224,10 +220,8 @@ impl MovieData {
             parts.push(format!("Genres: {}", self.genres.join(", ")));
         }
 
-        if let Some(tagline) = &self.tagline {
-            if !tagline.trim().is_empty() {
-                parts.push(tagline.trim().to_string());
-            }
+        if let Some(tagline) = &self.tagline && !tagline.trim().is_empty() {
+            parts.push(tagline.trim().to_string());
         }
 
         if !self.director.is_empty() {
@@ -247,10 +241,8 @@ impl MovieData {
             parts.push(format!("Cast: {}", cast_preview.trim()));
         }
 
-        if let Some(overview) = &self.overview {
-            if !overview.trim().is_empty() {
-                parts.push(overview.trim().to_string());
-            }
+        if let Some(overview) = &self.overview && !overview.trim().is_empty() {
+            parts.push(overview.trim().to_string());
         }
 
         if !self.keywords.is_empty() {

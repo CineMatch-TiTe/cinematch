@@ -23,10 +23,6 @@ macro_rules! extract_and_validate_username {
     }};
 }
 
-use serde::{Deserialize, Serialize};
-use utoipa::ToSchema;
-
-pub mod vote_store;
 pub mod models;
 
 // Re-export models for easier access
@@ -49,20 +45,23 @@ macro_rules! extract_user_id {
                     Ok(uuid) => uuid,
                     Err(_) => {
                         error!("Invalid user ID in identity: {}", &id_str);
-                        return HttpResponse::InternalServerError()
-                            .json(cinematch_common::models::ErrorResponse::new("Invalid user ID"));
+                        return HttpResponse::InternalServerError().json(
+                            cinematch_common::models::ErrorResponse::new("Invalid user ID"),
+                        );
                     }
                 },
                 Err(_) => {
                     trace!("No user ID found in identity");
-                    return HttpResponse::Unauthorized()
-                        .json(cinematch_common::models::ErrorResponse::new("No user ID found"));
+                    return HttpResponse::Unauthorized().json(
+                        cinematch_common::models::ErrorResponse::new("No user ID found"),
+                    );
                 }
             },
             None => {
                 trace!("No identity provided");
-                return HttpResponse::Unauthorized()
-                    .json(cinematch_common::models::ErrorResponse::new("No user ID found"));
+                return HttpResponse::Unauthorized().json(
+                    cinematch_common::models::ErrorResponse::new("No user ID found"),
+                );
             }
         }
     }};

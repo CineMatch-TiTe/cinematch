@@ -4,8 +4,8 @@ use diesel::prelude::*;
 use diesel_async::RunQueryDsl;
 use uuid::Uuid;
 
-use cinematch_common::FullUserPreferences;
 use crate::{Database, DbError, DbResult};
+use cinematch_common::FullUserPreferences;
 
 impl Database {
     /// Get user preferences

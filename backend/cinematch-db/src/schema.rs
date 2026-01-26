@@ -136,6 +136,8 @@ diesel::table! {
         disbanded_at -> Nullable<Timestamptz>,
         selected_movie_id -> Nullable<Int8>,
         can_vote -> Bool,
+        voting_round -> Nullable<Int2>,
+        phase_entered_at -> Timestamptz,
     }
 }
 

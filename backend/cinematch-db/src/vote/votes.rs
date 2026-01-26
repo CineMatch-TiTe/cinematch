@@ -1,28 +1,182 @@
-use crate::models::{Vote, NewVote, NewShownMovie};
-use crate::schema::{votes, shown_movies};
+use crate::models::{NewShownMovie, NewVote, Vote};
+use crate::schema::{shown_movies, votes};
 use crate::{Database, DbError, DbResult};
 use diesel::prelude::*;
 use diesel_async::RunQueryDsl;
+use rand::seq::SliceRandom;
 use uuid::Uuid;
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
+
+const BALLOT_SIZE: usize = 5;
+const OWN_PICKS: usize = 2;
+const OTHERS_PICKS: usize = 3;
+const POPULAR_FALLBACK_LIMIT: i64 = 30;
 
 impl Database {
+    /// Clear shown_movies (and thus votes via FK) for a party. Call before building new ballots.
+    pub async fn clear_shown_movies_for_party(&self, party_id: Uuid) -> DbResult<()> {
+        use crate::schema::shown_movies::dsl;
+        let mut conn = self.conn().await?;
+        diesel::delete(dsl::shown_movies.filter(dsl::party_id.eq(party_id)))
+            .execute(&mut conn)
+            .await
+            .map_err(DbError::from)?;
+        Ok(())
+    }
+
+    /// Build per-user ballots when entering Voting: 5 movies each (2 own, 3 others when possible).
+    /// Clears existing shown_movies for the party, then inserts new ballots and enables voting.
+    pub async fn build_voting_ballots(&self, party_id: Uuid) -> DbResult<()> {
+        self.clear_shown_movies_for_party(party_id).await?;
+
+        let members = self.get_party_members(party_id).await?;
+        if members.is_empty() {
+            return Ok(());
+        }
+
+        let party_taste = self.get_party_taste(party_id).await?;
+        let mut picks_by_user: HashMap<Uuid, Vec<i64>> = HashMap::new();
+        for (uid, mid, liked) in party_taste {
+            if !liked {
+                continue;
+            }
+            picks_by_user.entry(uid).or_default().push(mid);
+        }
+
+        let popular = self
+            .get_popular_movie_ids(POPULAR_FALLBACK_LIMIT)
+            .await
+            .unwrap_or_default();
+        let mut rng = rand::rng();
+
+        for member in &members {
+            let user_id = member.user_id;
+            let own: Vec<i64> = picks_by_user
+                .get(&user_id)
+                .map(|v| v.iter().copied().take(OWN_PICKS).collect())
+                .unwrap_or_default();
+            let mut need_own = OWN_PICKS.saturating_sub(own.len());
+            let mut own_pool = own;
+            if need_own > 0 {
+                let (global_pos, _) = self.get_taste(user_id).await.unwrap_or_default();
+                for &mid in global_pos.iter().take(need_own + own_pool.len()) {
+                    if !own_pool.contains(&mid) {
+                        own_pool.push(mid);
+                        if own_pool.len() >= OWN_PICKS {
+                            break;
+                        }
+                    }
+                }
+            }
+            need_own = OWN_PICKS.saturating_sub(own_pool.len());
+            if need_own > 0 {
+                for &mid in &popular {
+                    if !own_pool.contains(&mid) {
+                        own_pool.push(mid);
+                        if own_pool.len() >= OWN_PICKS {
+                            break;
+                        }
+                    }
+                }
+            }
+
+            let mut others_picks: Vec<i64> = picks_by_user
+                .iter()
+                .filter(|(uid, _)| *uid != &user_id)
+                .flat_map(|(_, ids)| ids.iter().copied())
+                .collect::<HashSet<_>>()
+                .into_iter()
+                .filter(|mid| !own_pool.contains(mid))
+                .collect();
+            others_picks.shuffle(&mut rng);
+            let mut others_pool: Vec<i64> = others_picks.into_iter().take(OTHERS_PICKS).collect();
+            let need_others = OTHERS_PICKS.saturating_sub(others_pool.len());
+            if need_others > 0 {
+                let used: HashSet<i64> = own_pool
+                    .iter()
+                    .copied()
+                    .chain(others_pool.iter().copied())
+                    .collect();
+                for &mid in &popular {
+                    if !used.contains(&mid) {
+                        others_pool.push(mid);
+                        if others_pool.len() >= OTHERS_PICKS {
+                            break;
+                        }
+                    }
+                }
+            }
+
+            let mut ballot: Vec<i64> = own_pool;
+            ballot.extend(others_pool);
+            ballot.shuffle(&mut rng);
+            let take = BALLOT_SIZE.min(ballot.len());
+            let ballot = ballot.into_iter().take(take).collect::<Vec<_>>();
+            if !ballot.is_empty() {
+                self.add_shown_movies(party_id, user_id, &ballot).await?;
+            }
+        }
+
+        self.enable_voting(party_id).await?;
+        self.set_voting_round(party_id, Some(1)).await?;
+        Ok(())
+    }
+
+    /// Build round-2 ballots: only top 3 movies, same for all users. Clears existing, inserts, enables voting, sets round 2.
+    pub async fn build_round2_ballots(&self, party_id: Uuid, top3: &[i64]) -> DbResult<()> {
+        self.clear_shown_movies_for_party(party_id).await?;
+
+        let members = self.get_party_members(party_id).await?;
+        for member in &members {
+            if !top3.is_empty() {
+                self.add_shown_movies(party_id, member.user_id, top3)
+                    .await?;
+            }
+        }
+
+        self.enable_voting(party_id).await?;
+        self.set_voting_round(party_id, Some(2)).await?;
+        self.set_phase_entered_at_now(party_id).await?;
+        Ok(())
+    }
+
     /// Add movies to shown_movies for a user in a party
     /// User can only vote for movies in this list
-    pub async fn add_shown_movies(&self, party_id: Uuid, user_id: Uuid, movie_ids: &[i64]) -> DbResult<()> {
+    pub async fn add_shown_movies(
+        &self,
+        party_id: Uuid,
+        user_id: Uuid,
+        movie_ids: &[i64],
+    ) -> DbResult<()> {
         let mut conn = self.conn().await?;
-        let new_shown: Vec<NewShownMovie> = movie_ids.iter().map(|&movie_id| NewShownMovie {
-            party_id,
-            user_id,
-            movie_id,
-        }).collect();
+        let new_shown: Vec<NewShownMovie> = movie_ids
+            .iter()
+            .map(|&movie_id| NewShownMovie {
+                party_id,
+                user_id,
+                movie_id,
+            })
+            .collect();
         diesel::insert_into(shown_movies::table)
             .values(&new_shown)
             .on_conflict_do_nothing()
             .execute(&mut conn)
             .await?;
         Ok(())
+    }
+
+    /// Movie IDs on the user's ballot (what they can vote on) for this party. Empty when not in Voting or no ballot.
+    pub async fn get_user_ballot(&self, party_id: Uuid, user_id: Uuid) -> DbResult<Vec<i64>> {
+        let mut conn = self.conn().await?;
+        let ids = shown_movies::table
+            .filter(shown_movies::party_id.eq(party_id))
+            .filter(shown_movies::user_id.eq(user_id))
+            .select(shown_movies::movie_id)
+            .order_by(shown_movies::shown_at)
+            .load::<i64>(&mut conn)
+            .await?;
+        Ok(ids)
     }
 
     /// Check if a user can vote for a movie in a party
@@ -50,12 +204,23 @@ impl Database {
     }
 
     /// Cast a vote (insert or update)
-    pub async fn cast_vote(&self, party_id: Uuid, user_id: Uuid, movie_id: i64, vote_value: bool) -> DbResult<Vote> {
+    pub async fn cast_vote(
+        &self,
+        party_id: Uuid,
+        user_id: Uuid,
+        movie_id: i64,
+        vote_value: bool,
+    ) -> DbResult<Vote> {
         if !self.can_vote(party_id, user_id, movie_id).await? {
             return Err(DbError::Other("User cannot vote for this movie".into()));
         }
         let mut conn = self.conn().await?;
-        let new_vote = NewVote { party_id, user_id, movie_id, vote_value };
+        let new_vote = NewVote {
+            party_id,
+            user_id,
+            movie_id,
+            vote_value,
+        };
         let vote = diesel::insert_into(votes::table)
             .values(&new_vote)
             .on_conflict((votes::party_id, votes::user_id, votes::movie_id))
@@ -67,10 +232,16 @@ impl Database {
     }
 
     /// Get like/dislike totals for a movie in a party (or all parties if party_id is None)
-    pub async fn get_vote_totals(&self, movie_id: i64, party_id: Option<Uuid>) -> DbResult<(i64, i64)> {
-        use diesel::dsl::{count_star};
+    pub async fn get_vote_totals(
+        &self,
+        movie_id: i64,
+        party_id: Option<Uuid>,
+    ) -> DbResult<(i64, i64)> {
+        use diesel::dsl::count_star;
         let mut conn = self.conn().await?;
-        let mut base = votes::table.filter(votes::movie_id.eq(movie_id)).into_boxed();
+        let mut base = votes::table
+            .filter(votes::movie_id.eq(movie_id))
+            .into_boxed();
         if let Some(pid) = party_id {
             base = base.filter(votes::party_id.eq(pid));
         }
@@ -79,7 +250,9 @@ impl Database {
             .select(count_star())
             .first(&mut conn)
             .await?;
-        let mut base = votes::table.filter(votes::movie_id.eq(movie_id)).into_boxed();
+        let mut base = votes::table
+            .filter(votes::movie_id.eq(movie_id))
+            .into_boxed();
         if let Some(pid) = party_id {
             base = base.filter(votes::party_id.eq(pid));
         }
@@ -89,6 +262,21 @@ impl Database {
             .first(&mut conn)
             .await?;
         Ok((likes, dislikes))
+    }
+
+    /// True if every current party member has cast at least one vote (for this round).
+    pub async fn have_all_members_voted(&self, party_id: Uuid) -> DbResult<bool> {
+        let members = self.get_party_members(party_id).await?;
+        if members.is_empty() {
+            return Ok(false);
+        }
+        for m in &members {
+            let user_votes = self.get_user_votes(party_id, m.user_id).await?;
+            if user_votes.is_empty() {
+                return Ok(false);
+            }
+        }
+        Ok(true)
     }
 
     /// Get all votes for a user in a party
@@ -104,7 +292,11 @@ impl Database {
 
     /// Get all votes in a party, hashmap of movie_id -> (likes, dislikes)
     /// If user_id is Some, only include movies the user can vote for
-    pub async fn get_party_votes(&self, party_id: Uuid, user_id: Option<Uuid>) -> DbResult<HashMap<i64, (u32, u32)>> {
+    pub async fn get_party_votes(
+        &self,
+        party_id: Uuid,
+        user_id: Option<Uuid>,
+    ) -> DbResult<HashMap<i64, (u32, u32)>> {
         let mut conn = self.conn().await?;
         let votes = votes::table
             .filter(votes::party_id.eq(party_id))

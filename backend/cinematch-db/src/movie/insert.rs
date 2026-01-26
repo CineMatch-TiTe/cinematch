@@ -1,4 +1,3 @@
-const BATCH_SIZE: usize = 20;
 use crate::schema::{
     cast_members, genres, keywords, movie_cast, movie_genres, movie_keywords,
     movie_production_countries, movies, production_countries,
@@ -23,7 +22,8 @@ pub enum MovieCrudError {
 pub type MovieCrudResult<T> = Result<T, MovieCrudError>;
 
 fn unix_to_naive_datetime(secs: i64) -> Result<chrono::NaiveDateTime, MovieCrudError> {
-    chrono::NaiveDateTime::from_timestamp_opt(secs, 0)
+    chrono::DateTime::from_timestamp(secs, 0)
+        .map(|dt| dt.naive_utc())
         .ok_or(MovieCrudError::Diesel(DieselError::NotFound))
 }
 

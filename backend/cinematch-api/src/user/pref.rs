@@ -20,12 +20,13 @@ use super::{UpdateUserPreferencesRequest, UserPreferencesResponse};
 		(status = 500, description = "Internal server error", body = ErrorResponse)
 	),
 	tags = ["user"],
+	security(("cookie_auth" = [])),
 	operation_id = "get_user_preferences"
 )]
 #[get("/pref")]
 pub async fn get_user_pref(db: AppState, user: Option<Identity>) -> HttpResponse {
     let user_id = extract_user_id!(user);
-    
+
     let prefs_result: Result<FullUserPreferences, DbError> = db.get_user_preferences(user_id).await;
 
     let genre_map = match db.get_genres().await {
@@ -41,8 +42,24 @@ pub async fn get_user_pref(db: AppState, user: Option<Identity>) -> HttpResponse
         Ok(prefs) => HttpResponse::Ok().json(UserPreferencesResponse {
             target_release_year: prefs.preferred_year,
             release_year_flex: prefs.year_flexibility,
-            include_genres: prefs.included_genres.iter().filter_map(|gid| genre_map.iter().find_map(|(name, &id)| if id == *gid { Some(name.clone()) } else { None })).collect(),
-            exclude_genres: prefs.excluded_genres.iter().filter_map(|gid| genre_map.iter().find_map(|(name, &id)| if id == *gid { Some(name.clone()) } else { None })).collect(),
+            include_genres: prefs
+                .included_genres
+                .iter()
+                .filter_map(|gid| {
+                    genre_map
+                        .iter()
+                        .find_map(|(name, &id)| if id == *gid { Some(name.clone()) } else { None })
+                })
+                .collect(),
+            exclude_genres: prefs
+                .excluded_genres
+                .iter()
+                .filter_map(|gid| {
+                    genre_map
+                        .iter()
+                        .find_map(|(name, &id)| if id == *gid { Some(name.clone()) } else { None })
+                })
+                .collect(),
             updated_at: prefs.updated_at,
             created_at: prefs.created_at,
         }),
@@ -52,7 +69,6 @@ pub async fn get_user_pref(db: AppState, user: Option<Identity>) -> HttpResponse
                 .json(ErrorResponse::new("Failed to retrieve user preferences"))
         }
     }
-
 }
 /// Edit the current user's preferences
 #[utoipa::path(
@@ -65,6 +81,7 @@ pub async fn get_user_pref(db: AppState, user: Option<Identity>) -> HttpResponse
 		(status = 500, description = "Internal server error", body = ErrorResponse)
 	),
 	tags = ["user"],
+	security(("cookie_auth" = [])),
 	operation_id = "edit_user_preferences"
 )]
 #[patch("/pref")]
@@ -145,8 +162,24 @@ pub async fn edit_user_pref(
         Ok(prefs) => HttpResponse::Ok().json(UserPreferencesResponse {
             target_release_year: prefs.preferred_year,
             release_year_flex: prefs.year_flexibility,
-            include_genres: prefs.included_genres.iter().filter_map(|gid| genre_map.iter().find_map(|(name, &id)| if id == *gid { Some(name.clone()) } else { None })).collect(),
-            exclude_genres: prefs.excluded_genres.iter().filter_map(|gid| genre_map.iter().find_map(|(name, &id)| if id == *gid { Some(name.clone()) } else { None })).collect(),
+            include_genres: prefs
+                .included_genres
+                .iter()
+                .filter_map(|gid| {
+                    genre_map
+                        .iter()
+                        .find_map(|(name, &id)| if id == *gid { Some(name.clone()) } else { None })
+                })
+                .collect(),
+            exclude_genres: prefs
+                .excluded_genres
+                .iter()
+                .filter_map(|gid| {
+                    genre_map
+                        .iter()
+                        .find_map(|(name, &id)| if id == *gid { Some(name.clone()) } else { None })
+                })
+                .collect(),
             updated_at: prefs.updated_at,
             created_at: prefs.created_at,
         }),

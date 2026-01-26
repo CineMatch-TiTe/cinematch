@@ -1,5 +1,7 @@
 // Minimal models for movie metadata tables for ergonomic queries
-use crate::schema::{cast_members, directors, genres, keywords, production_countries, trailers, shown_movies, votes};
+use crate::schema::{
+    cast_members, directors, genres, keywords, production_countries, shown_movies, trailers, votes,
+};
 
 // Re-export movie/vector models for easy access from crate root
 pub use crate::vector::models::{CastMember, MovieData};
@@ -133,6 +135,8 @@ pub struct Party {
     pub disbanded_at: Option<DateTime<Utc>>,
     pub selected_movie_id: Option<i64>,
     pub can_vote: bool,
+    pub voting_round: Option<i16>,
+    pub phase_entered_at: DateTime<Utc>,
 }
 
 /// For inserting a new party
@@ -153,6 +157,9 @@ pub struct UpdateParty {
     pub can_vote: Option<bool>,
     pub updated_at: Option<DateTime<Utc>>,
     pub disbanded_at: Option<DateTime<Utc>>,
+    pub selected_movie_id: Option<Option<i64>>,
+    pub voting_round: Option<Option<i16>>,
+    pub phase_entered_at: Option<DateTime<Utc>>,
 }
 
 // ============================================================================

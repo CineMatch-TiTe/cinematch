@@ -4,6 +4,7 @@ pub mod pref;
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use serde_json::json;
 use utoipa::ToSchema;
 use uuid::Uuid;
 
@@ -87,7 +88,7 @@ pub struct UpdateUserPreferencesRequest {
     #[schema(example = json!(["Horror", "Comedy"]))]
     pub exclude_genres: Option<Vec<String>>,
     #[schema(example = json!(2020))]
-    pub target_release_year: Option<Option<i32>>, 
+    pub target_release_year: Option<Option<i32>>,
     #[schema(example = json!(2))]
     pub release_year_flex: Option<i32>,
     #[schema(example = json!(true))]

@@ -16,6 +16,24 @@ pub enum ServerMessage {
 
     // Voting phase
     MovieVoteUpdate(MovieVotes),
+    /// Emitted when voting round 2 (top 3) starts. Party stays in Voting; clients should refetch ballot.
+    VotingRoundStarted(VotingRoundStarted),
+
+    /// Timeout config for the current phase. Sent whenever phase changes (or round 2). Clients use for countdown.
+    PartyTimeoutUpdate(PartyTimeoutUpdate),
+}
+
+/// Timeout info for the current phase. Use with phase_entered_at for client countdown.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, ToSchema)]
+pub struct PartyTimeoutUpdate {
+    pub phase_entered_at: chrono::DateTime<chrono::Utc>,
+    pub voting_timeout_secs: u32,
+    pub watching_timeout_secs: u32,
+}
+
+#[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize, ToSchema)]
+pub struct VotingRoundStarted {
+    pub round: u16,
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize, ToSchema)]

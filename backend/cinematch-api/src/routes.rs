@@ -17,7 +17,6 @@ pub fn configure_user() -> impl FnOnce(&mut ServiceConfig) {
             .service(user::handlers::update_taste)
             .service(user::pref::get_user_pref)
             .service(user::pref::edit_user_pref);
-
     }
 }
 
@@ -25,6 +24,9 @@ pub fn configure_party() -> impl FnOnce(&mut ServiceConfig) {
     |cfg: &mut ServiceConfig| {
         cfg.service(party::crud::create_party)
             .service(party::crud::get_party)
+            .service(party::picks::get_picks)
+            .service(party::picks::pick_movie)
+            .service(party::picks::delete_pick)
             .service(party::user_ops::join_party)
             .service(party::user_ops::leave_party)
             .service(party::user_ops::get_party_members)
@@ -32,8 +34,8 @@ pub fn configure_party() -> impl FnOnce(&mut ServiceConfig) {
             .service(party::leader_ops::transfer_leadership)
             .service(party::user_ops::set_ready)
             .service(party::leader_ops::advance_phase)
-            .service(party::leader_ops::start_new_round)
             .service(party::leader_ops::disband_party)
+            .service(party::votes::get_vote)
             .service(party::votes::vote_movie)
             .service(party::crud::get_my_party);
     }

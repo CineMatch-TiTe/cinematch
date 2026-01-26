@@ -2,6 +2,7 @@ use super::{
     AppState, CreatePartyResponse, DbError, ErrorResponse, PartyCode, PartyResponse, PartyState,
     extract_user_id,
 };
+use crate::handler::party::get_timeout_secs;
 use actix_identity::Identity;
 use actix_web::{HttpResponse, get, post, web};
 use log::{debug, error, trace};
@@ -16,7 +17,7 @@ use uuid::Uuid;
         (status = 500, description = "Internal server error", body = ErrorResponse)
     ),
     tags = ["party"],
-    security(("bearer_auth" = [])),
+    security(("cookie_auth" = [])),
     operation_id = "create_party"
 )]
 #[post("")]
@@ -42,12 +43,14 @@ pub async fn create_party(db: AppState, user: Option<Identity>) -> HttpResponse 
     // Check if user is already in a party
     match db.get_user_party(user_id).await {
         Ok(Some(_)) => {
-            return HttpResponse::Forbidden().json(ErrorResponse::new("User is already in a party"));
+            return HttpResponse::Forbidden()
+                .json(ErrorResponse::new("User is already in a party"));
         }
         Ok(None) => {}
         Err(e) => {
             error!("Failed to check user party: {}", e);
-            return HttpResponse::InternalServerError().json(ErrorResponse::new("Failed to check user party"));
+            return HttpResponse::InternalServerError()
+                .json(ErrorResponse::new("Failed to check user party"));
         }
     }
 
@@ -92,14 +95,10 @@ pub async fn create_party(db: AppState, user: Option<Identity>) -> HttpResponse 
         ("party_id" = Uuid, Path, description = "The party's unique ID")
     ),
     tags = ["party"],
-    security(("bearer_auth" = []))
+    security(("cookie_auth" = []))
 )]
 #[get("/{party_id}")]
-pub async fn get_party(
-    db: AppState,
-    user: Identity,
-    party_id: web::Path<Uuid>,
-) -> HttpResponse {
+pub async fn get_party(db: AppState, user: Identity, party_id: web::Path<Uuid>) -> HttpResponse {
     let party_id = party_id.into_inner();
     let user_id = extract_user_id!(user);
 
@@ -135,6 +134,7 @@ pub async fn get_party(
                 Ok(votes) if party.state == PartyState::Voting => Some(votes),
                 _ => None,
             };
+            let (voting_timeout_secs, watching_timeout_secs) = get_timeout_secs();
 
             let response = PartyResponse {
                 id: party.id,
@@ -143,6 +143,10 @@ pub async fn get_party(
                 created_at: party.created_at,
                 code,
                 vote_status,
+                selected_movie_id: party.selected_movie_id,
+                phase_entered_at: party.phase_entered_at,
+                voting_timeout_secs,
+                watching_timeout_secs,
             };
             HttpResponse::Ok().json(response)
         }
@@ -165,7 +169,7 @@ pub async fn get_party(
         (status = 500, description = "Internal server error", body = ErrorResponse)
     ),
     tags = ["party"],
-    security(("bearer_auth" = [])),
+    security(("cookie_auth" = [])),
     operation_id = "get_my_party"
 )]
 #[get("")]
@@ -194,6 +198,7 @@ pub async fn get_my_party(db: AppState, user: Identity) -> HttpResponse {
                         Ok(votes) if party.state == PartyState::Voting => Some(votes),
                         _ => None,
                     };
+                    let (voting_timeout_secs, watching_timeout_secs) = get_timeout_secs();
                     let response = PartyResponse {
                         id: party.id,
                         leader_id: party.party_leader_id,
@@ -201,6 +206,10 @@ pub async fn get_my_party(db: AppState, user: Identity) -> HttpResponse {
                         created_at: party.created_at,
                         code,
                         vote_status,
+                        selected_movie_id: party.selected_movie_id,
+                        phase_entered_at: party.phase_entered_at,
+                        voting_timeout_secs,
+                        watching_timeout_secs,
                     };
                     HttpResponse::Ok().json(response)
                 }

@@ -1,4 +1,5 @@
-
+#[allow(unused_imports)]
+use serde_json::json;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
@@ -17,7 +18,9 @@ pub struct FullUserPreferences {
 
 /// Standard error response
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
+#[schema(example = json!({"error": "Not a member of this party"}))]
 pub struct ErrorResponse {
+    /// Human-readable error message
     pub error: String,
 }
 
