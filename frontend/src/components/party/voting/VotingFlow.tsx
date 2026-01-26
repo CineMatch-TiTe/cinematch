@@ -2,14 +2,11 @@
 
 import { useEffect, useState, useTransition, useRef } from 'react'
 import { toast } from 'sonner'
-import Image from 'next/image'
-import { ThumbsUp } from 'lucide-react'
 
-import { MovieResponse } from '@/model/movieResponse'
 import { GetVoteResponseVoteTotals } from '@/model/getVoteResponseVoteTotals'
 import { voteMovieAction, getPartyVotesAction, getMoviesByIdsAction } from '@/actions/party-room'
-import { Card } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
+import { MovieResponse } from '@/model'
+import VotingCard from './VotingCard'
 
 interface VotingFlowProps {
   partyId: string
@@ -136,7 +133,7 @@ export default function VotingFlow({ partyId }: Readonly<VotingFlowProps>) {
 
     const interval = setInterval(fetchVotes, 5000)
     return () => clearInterval(interval)
-  }, [partyId, transitionData, votingRound])
+  }, [handleBallotChange, partyId, transitionData, votingRound])
 
   const handleVote = async (movieId: number, like: boolean) => {
     // Optimistic update could go here if needed, but for now we rely on polling/server response
@@ -220,76 +217,9 @@ export default function VotingFlow({ partyId }: Readonly<VotingFlowProps>) {
         </div>
 
         {movies.map((movie) => {
-          const totals = voteTotals[movie.movie_id.toString()]
-          const voteCount = (totals?.likes || 0) + (totals?.dislikes || 0)
-
-          return (
-            <VoteCard
-              key={movie.movie_id}
-              movie={movie}
-              voteCount={voteCount}
-              onVote={handleVote}
-            />
-          )
+          return <VotingCard key={movie.movie_id} movie={movie} onVote={handleVote} />
         })}
       </div>
     </div>
-  )
-}
-
-function VoteCard({
-  movie,
-  voteCount,
-  onVote
-}: {
-  movie: MovieResponse
-  voteCount: number
-  onVote: (id: number, like: boolean) => void
-}) {
-  return (
-    <Card className="bg-zinc-900/50 border-zinc-800 overflow-hidden hover:border-zinc-700 transition-colors">
-      <div className="flex flex-row h-40 sm:h-48 px-">
-        <div className="relative w-28 sm:w-36 shrink-0 bg-zinc-800">
-          {movie.poster_url ? (
-            <Image
-              src={`https://image.tmdb.org/t/p/w200${movie.poster_url}`}
-              alt={movie.title}
-              fill
-              className="object-cover"
-            />
-          ) : (
-            <div className="w-full h-full flex items-center justify-center text-zinc-600">
-              No Poster
-            </div>
-          )}
-        </div>
-        <div className="flex-1 p-4 flex flex-col justify-between">
-          <div>
-            <h3 className="text-l text-white font-semibold line-clamp-1">{movie.title}</h3>
-            <div className="text-sm text-zinc-400 mt-1 flex items-center gap-2">
-              <span>{movie.release_date?.split('-')[0]}</span>
-            </div>
-            <p className="text-sm text-zinc-500 mt-2 line-clamp-2">{movie.overview}</p>
-          </div>
-
-          <div className="flex items-center justify-between mt-3">
-            <div className="flex items-center gap-2 text-zinc-300">
-              <div className="bg-zinc-800 px-2 py-1 rounded text-xs font-medium">
-                {voteCount} votes
-              </div>
-            </div>
-            <div className="flex gap-2">
-              <Button
-                size="sm"
-                className="bg-red-600 hover:bg-red-700 text-white"
-                onClick={() => onVote(movie.movie_id, true)}
-              >
-                <ThumbsUp className="w-4 h-4 mr-2" /> Like
-              </Button>
-            </div>
-          </div>
-        </div>
-      </div>
-    </Card>
   )
 }
