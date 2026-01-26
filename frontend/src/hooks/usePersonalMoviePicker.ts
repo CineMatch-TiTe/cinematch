@@ -132,9 +132,26 @@ export function usePersonalMoviePicker(): UsePersonalMoviePickerReturn {
 
     if (hasFinishedMovies) {
       if (prefetchedMovies.length > 0) {
-        setMovies(prefetchedMovies)
-        setPrefetchedMovies([])
-        setCurrentIndex(0)
+        const filtered = filterNewMovies(prefetchedMovies, seenMovieIds)
+        if (filtered.length > 0) {
+          setMovies(filtered)
+          setPrefetchedMovies([])
+          setCurrentIndex(0)
+        } else {
+          setPrefetchedMovies([])
+          setRefetching(true)
+          fetchRecommendations().then((movies) => {
+            const newFiltered = filterNewMovies(movies, seenMovieIds)
+            if (newFiltered.length > 0) {
+              setMovies(newFiltered)
+              setCurrentIndex(0)
+              setNoNewMovies(false)
+            } else {
+              setNoNewMovies(true)
+            }
+            setRefetching(false)
+          })
+        }
       } else if (!isPrefetching && !noNewMovies) {
         setRefetching(true)
         fetchRecommendations().then((movies) => {

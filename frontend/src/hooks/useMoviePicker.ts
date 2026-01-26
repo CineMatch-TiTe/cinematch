@@ -110,10 +110,17 @@ export function useMoviePicker({ partyId }: UseMoviePickerOptions): UseMoviePick
       if (newMovies.length > 0) {
         setPrefetchedMovies(newMovies)
       } else {
-        // If no new movies returned, maybe we are done
-        // Check if we already have some prefetched, if so, we can wait.
-        // But if empty, try again? Or just mark noNewMovies?
-        // Let's assume empty list means no more recommendations.
+        // If no new movies returned, and we tried fetching, it means we are likely done.
+        // To avoid infinite loop, we must stop prefetching.
+        // However, we only mark noNewMovies if we are sure.
+        // But if we don't, the effect will trigger again immediately.
+        // So we MUST set it to true or handle it.
+        // Setting it to true will stop prefetching.
+        // When the user finishes current movies, it will try one last refetch (in the other useEffect)
+        // or just accept noNewMovies.
+        // Actually the other useEffect checks !noNewMovies.
+        // So setting it here is correct.
+        setNoNewMovies(true)
       }
     } finally {
       setIsPrefetching(false)
@@ -155,10 +162,28 @@ export function useMoviePicker({ partyId }: UseMoviePickerOptions): UseMoviePick
 
     if (hasFinishedMovies) {
       if (prefetchedMovies.length > 0) {
-        // Seamlessly transition to prefetched movies
-        setMovies(prefetchedMovies)
-        setPrefetchedMovies([])
-        setCurrentIndex(0)
+        // Seamlessly transition to prefetched movies, but filter again just in case
+        const filtered = filterNewMovies(prefetchedMovies, seenMovieIds)
+        if (filtered.length > 0) {
+          setMovies(filtered)
+          setPrefetchedMovies([])
+          setCurrentIndex(0)
+        } else {
+          // All prefetched were seen, try fetching more
+          setPrefetchedMovies([])
+          setRefetching(true)
+          fetchRecommendations().then((movies) => {
+            const newFiltered = filterNewMovies(movies, seenMovieIds)
+            if (newFiltered.length > 0) {
+              setMovies(newFiltered)
+              setCurrentIndex(0)
+              setNoNewMovies(false)
+            } else {
+              setNoNewMovies(true)
+            }
+            setRefetching(false)
+          })
+        }
       } else if (!isPrefetching && !noNewMovies) {
         // Fallback: no prefetched movies ready, show loading and fetch
         setRefetching(true)

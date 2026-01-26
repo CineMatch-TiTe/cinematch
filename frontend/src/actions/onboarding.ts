@@ -30,6 +30,10 @@ const createPartyFormSchema = z.object({
   username: usernameSchema
 })
 
+const loginFormSchema = z.object({
+  username: usernameSchema
+})
+
 type LoginResult = {
   success: boolean
   cookieName?: string
@@ -197,4 +201,50 @@ export async function createPartyAction(prevState: unknown, formData: FormData) 
       errors: null
     }
   }
+}
+
+export async function loginAction(prevState: unknown, formData: FormData) {
+  const username = formData.get('username') as string
+
+  const result = loginFormSchema.safeParse({ username })
+
+  if (!result.success) {
+    const formatted = z.treeifyError(result.error)
+    return {
+      errors: {
+        username: formatted.properties?.username?.errors
+      },
+      message: 'Validation failed'
+    }
+  }
+
+  try {
+    const loginResult = await performGuestLogin(result.data.username)
+
+    if (!loginResult.success || !loginResult.cookieName || !loginResult.cookieValue) {
+      if (loginResult.status === 409) {
+        return {
+          message: 'Validation failed',
+          errors: {
+            username: ['Username is not available or you are already logged in.']
+          }
+        }
+      }
+      return {
+        message: 'Login failed. Please try again.',
+        errors: null
+      }
+    }
+
+    const { cookieName, cookieValue } = loginResult
+    await setSessionCookie(cookieName, cookieValue)
+  } catch (error) {
+    console.error('[Login] Error', error)
+    return {
+      message: 'An unexpected error occurred',
+      errors: null
+    }
+  }
+
+  redirect('/dashboard')
 }

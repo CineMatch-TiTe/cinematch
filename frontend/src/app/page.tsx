@@ -57,7 +57,7 @@ export default async function HomeRoute({
                 href="/create-party"
                 className="text-sm text-yellow-500 hover:text-yellow-400 transition-colors hover:underline"
               >
-                Want to host a new party?
+                Want to login and host a party?
               </Link>
             </div>
           </CardContent>

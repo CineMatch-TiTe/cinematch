@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { CreatePartyForm } from '@/components/forms/CreatePartyForm'
+import { LoginForm } from '@/components/forms/LoginForm'
 import Image from 'next/image'
 
 export default function CreatePartyRoute() {
@@ -22,21 +22,21 @@ export default function CreatePartyRoute() {
             loading="eager"
           />
           <h1 className="text-4xl font-bold tracking-tighter text-white mb-2">CineMatch</h1>
-          <p className="text-zinc-400">Host a party and enjoy movies with friends!</p>
+          <p className="text-zinc-400">Login to start finding movies!</p>
         </div>
 
         <Card className="border-zinc-800 bg-zinc-900/50 backdrop-blur-xl shadow-2xl">
           <CardHeader>
-            <CardTitle className="text-lg font-medium text-zinc-200">Create a party</CardTitle>
+            <CardTitle className="text-lg font-medium text-zinc-200">Login</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <CreatePartyForm />
+            <LoginForm />
             <div className="pt-2 text-center">
               <Link
                 href="/"
                 className="text-sm text-yellow-500 hover:text-yellow-400 transition-colors hover:underline"
               >
-                Join an existing party?
+                Have a join code?
               </Link>
             </div>
           </CardContent>

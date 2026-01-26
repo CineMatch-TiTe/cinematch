@@ -3,6 +3,16 @@
 import { redirect } from 'next/navigation'
 import { createParty, joinParty } from '@/server/party/party'
 
+function isRedirectError(error: unknown) {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'digest' in error &&
+    typeof (error as any).digest === 'string' &&
+    (error as any).digest.startsWith('NEXT_REDIRECT')
+  )
+}
+
 export async function createPartyInstantAction() {
   try {
     const response = await createParty()
@@ -55,6 +65,9 @@ export async function createPartyInstantAction() {
 
     return { error: 'Failed to create party' }
   } catch (error) {
+    if (isRedirectError(error)) {
+      throw error
+    }
     console.error('Create Party Instant Error', error)
     return { error: 'Failed to create party' }
   }
@@ -76,6 +89,9 @@ export async function joinPartyInstantAction(code: string) {
       return { error: 'Failed to join party' }
     }
   } catch (error) {
+    if (isRedirectError(error)) {
+      throw error
+    }
     console.error('Join Party Instant Error', error)
     return { error: 'Failed to join party' }
   }
