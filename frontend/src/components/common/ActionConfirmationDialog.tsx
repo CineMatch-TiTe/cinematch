@@ -20,7 +20,6 @@ interface ActionConfirmationDialogProps {
   confirmText?: string
   cancelText?: string
   onConfirm: () => void
-  variant?: 'default' | 'destructive'
 }
 
 export function ActionConfirmationDialog({
@@ -30,9 +29,8 @@ export function ActionConfirmationDialog({
   description,
   confirmText = 'Continue',
   cancelText = 'Cancel',
-  onConfirm,
-  variant = 'default'
-}: ActionConfirmationDialogProps) {
+  onConfirm
+}: Readonly<ActionConfirmationDialogProps>) {
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
       <AlertDialogContent className="bg-zinc-900 border-zinc-800 text-white">
