@@ -5,12 +5,7 @@ import { toast } from 'sonner'
 import { Loader2, X, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import MovieCard from './MovieCard'
-import {
-  getRecommendedMoviesAction,
-  getUserPreferencesAction,
-  pickMovieAction,
-  searchMoviesAction
-} from '@/actions/party-room'
+import { getUserPreferencesAction, pickMovieAction, searchMoviesAction } from '@/actions/party-room'
 import { MovieResponse } from '@/model/movieResponse'
 
 interface PickingFlowProps {
@@ -26,51 +21,14 @@ export default function PickingFlow({ partyId, onClose }: PickingFlowProps) {
   const [processing, setProcessing] = useState(false)
   const [currentIndex, setCurrentIndex] = useState(0)
   const [noNewMovies, setNoNewMovies] = useState(false)
-  const [usingSearch, setUsingSearch] = useState(false)
   const [searchPage, setSearchPage] = useState(1)
   const searchGenresRef = useRef<string[]>([])
-
-  const fetchMovies = useCallback(async () => {
-    try {
-      const result = await getRecommendedMoviesAction()
-      if (result.error) {
-        toast.error(result.error)
-        return null
-      } else if (result.data) {
-        return result.data
-      }
-    } catch (error) {
-      console.error('Failed to fetch movies', error)
-      toast.error('Failed to load movies')
-    }
-    return null
-  }, [])
 
   const filterNewMovies = useCallback((fetchedMovies: MovieResponse[], seenIds: Set<number>) => {
     return fetchedMovies.filter((movie) => !seenIds.has(movie.movie_id))
   }, [])
 
-  useEffect(() => {
-    const initialFetch = async () => {
-      const fetchedMovies = await fetchMovies()
-      if (fetchedMovies) {
-        setMovies(fetchedMovies)
-      }
-      setLoading(false)
-    }
-
-    initialFetch()
-  }, [fetchMovies])
-
-  // Track current movie as seen before moving to next
-  const markCurrentAsSeen = useCallback(() => {
-    const currentMovie = movies[currentIndex]
-    if (currentMovie) {
-      setSeenMovieIds((prev) => new Set(prev).add(currentMovie.movie_id))
-    }
-  }, [movies, currentIndex])
-
-  // Search movies using user preferences as fallback
+  // Search movies using user preferences
   const searchMoviesFromPreferences = useCallback(async (page: number = 1) => {
     try {
       // Get user preferences if we don't have genres yet
@@ -94,38 +52,26 @@ export default function PickingFlow({ partyId, onClose }: PickingFlowProps) {
         return searchResult.data
       }
     } catch (error) {
-      console.error('Search fallback failed', error)
+      console.error('Search failed', error)
+      toast.error('Failed to search movies')
     }
     return null
   }, [])
 
-  // Helper to set new movies and show success toast
-  const setNewMoviesWithToast = useCallback((newMovies: MovieResponse[]) => {
+  // Helper to set new movies
+  const setNewMovies = useCallback((newMovies: MovieResponse[]) => {
     setMovies(newMovies)
     setCurrentIndex(0)
   }, [])
 
-  // Try to fetch movies from recommendations
-  const tryRecommendations = useCallback(async (): Promise<boolean> => {
-    const fetchedMovies = await fetchMovies()
-    if (!fetchedMovies) return false
-
-    const newMovies = filterNewMovies(fetchedMovies, seenMovieIds)
-    if (newMovies.length > 0) {
-      setNewMoviesWithToast(newMovies)
-      return true
-    }
-    return false
-  }, [fetchMovies, filterNewMovies, seenMovieIds, setNewMoviesWithToast])
-
-  // Try to fetch movies from search with pagination
-  const trySearchWithPages = useCallback(async (): Promise<boolean> => {
+  // Fetch movies from search with pagination
+  const fetchSearchMovies = useCallback(async (): Promise<boolean> => {
     const searchedMovies = await searchMoviesFromPreferences(searchPage)
     if (!searchedMovies) return false
 
     const newMovies = filterNewMovies(searchedMovies, seenMovieIds)
     if (newMovies.length > 0) {
-      setNewMoviesWithToast(newMovies)
+      setNewMovies(newMovies)
       setSearchPage((prev) => prev + 1)
       return true
     }
@@ -137,43 +83,49 @@ export default function PickingFlow({ partyId, onClose }: PickingFlowProps) {
 
     const nextNewMovies = filterNewMovies(nextPageMovies, seenMovieIds)
     if (nextNewMovies.length > 0) {
-      setNewMoviesWithToast(nextNewMovies)
+      setNewMovies(nextNewMovies)
       setSearchPage((prev) => prev + 1)
       return true
     }
     return false
-  }, [
-    searchMoviesFromPreferences,
-    searchPage,
-    filterNewMovies,
-    seenMovieIds,
-    setNewMoviesWithToast
-  ])
+  }, [searchMoviesFromPreferences, searchPage, filterNewMovies, seenMovieIds, setNewMovies])
 
-  // Refetch recommendations and load new unseen movies, with search fallback
+  // Initial fetch using search
+  useEffect(() => {
+    const initialFetch = async () => {
+      const success = await fetchSearchMovies()
+      if (!success) {
+        setNoNewMovies(true)
+      }
+      setLoading(false)
+    }
+
+    initialFetch()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Track current movie as seen before moving to next
+  const markCurrentAsSeen = useCallback(() => {
+    const currentMovie = movies[currentIndex]
+    if (currentMovie) {
+      setSeenMovieIds((prev) => new Set(prev).add(currentMovie.movie_id))
+    }
+  }, [movies, currentIndex])
+
+  // Refetch movies when running out
   const handleRefetch = useCallback(async () => {
     setRefetching(true)
     setNoNewMovies(false)
 
     try {
-      // First try recommendations if we haven't switched to search yet
-      if (!usingSearch) {
-        const foundNew = await tryRecommendations()
-        if (foundNew) return
-
-        // Switch to search mode
-        setUsingSearch(true)
-      }
-
-      // Use search as fallback
-      const foundFromSearch = await trySearchWithPages()
-      if (!foundFromSearch) {
+      const found = await fetchSearchMovies()
+      if (!found) {
         setNoNewMovies(true)
       }
     } finally {
       setRefetching(false)
     }
-  }, [usingSearch, tryRecommendations, trySearchWithPages])
+  }, [fetchSearchMovies])
 
   // Auto-refetch when movies run out
   useEffect(() => {
@@ -228,8 +180,8 @@ export default function PickingFlow({ partyId, onClose }: PickingFlowProps) {
       <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-zinc-950/90 backdrop-blur-md p-6 text-center">
         <h2 className="text-2xl font-bold text-white mb-2">That&apos;s all for now!</h2>
         <p className="text-zinc-400 mb-8 max-w-xs">
-          We&apos;ve run out of recommendations based on current preferences. Check back later or
-          wait for others!
+          We&apos;ve run out of movies based on your preferences. Check back later or wait for
+          others!
         </p>
         <div className="flex gap-3">
           <Button

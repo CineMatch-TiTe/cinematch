@@ -1,4 +1,3 @@
-import { ActionConfirmationDialog } from '@/components/common/ActionConfirmationDialog'
 import { Button } from '@/components/ui/button'
 import { MovieResponse } from '@/model/movieResponse'
 import { ThumbsDown, ThumbsUp } from 'lucide-react'
@@ -24,7 +23,7 @@ export default function MovieCard({ movie, onLike, onSkip, disabled }: MovieCard
             className="object-cover opacity-60"
             priority
           />
-          <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-zinc-950/60 to-transparent" />
+          <div className="absolute inset-0 bg-linear-to-t from-zinc-950 via-zinc-950/60 to-transparent" />
         </div>
 
         {/* Content */}
