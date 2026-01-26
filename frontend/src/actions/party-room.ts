@@ -2,7 +2,6 @@
 
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
-import { cookies } from 'next/headers'
 import {
   advancePhase,
   kickMember,
@@ -14,21 +13,17 @@ import {
   getVote
 } from '@/server/party/party'
 import { getRecommendations } from '@/server/movie/movie'
-import { logoutUser } from '@/server/user/user'
 import { SearchFilter } from '@/model/searchFilter'
 
 export async function leavePartyAction(partyId: string) {
   try {
     await leaveParty(partyId)
-    await logoutUser()
-    const cookieStore = await cookies()
-    cookieStore.delete('id')
   } catch (error) {
     console.error('Leave Party Error', error)
     return { error: 'Failed to leave party' }
   }
 
-  redirect('/')
+  redirect('/dashboard')
 }
 
 export async function kickMemberAction(partyId: string, memberId: string) {

@@ -20,6 +20,8 @@ export default async function HomeRoute({
     const partyRes = await getMyParty().catch(() => null)
     if (partyRes?.status === 200 && partyRes.data?.id) {
       redirect(`/party-room/${partyRes.data.id}`)
+    } else {
+      redirect('/dashboard')
     }
   }
 

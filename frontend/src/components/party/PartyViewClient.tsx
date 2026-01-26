@@ -4,12 +4,13 @@ import { useEffect, useTransition, useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import Image from 'next/image'
-import { LogOut, Play } from 'lucide-react'
+import { LogOut, Play, Settings } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import { ActionConfirmationDialog } from '@/components/common/ActionConfirmationDialog'
 import { PartyHeader } from '@/components/party/PartyHeader'
 import { PartyMemberList } from '@/components/party/PartyMemberList'
+import { PreferencesDialog } from '@/components/preferences/PreferencesDialog'
 import {
   kickMemberAction,
   leavePartyAction,
@@ -164,6 +165,20 @@ export default function PartyViewClient({
             <div className="flex flex-row items-center mb-2 gap-2">
               <Image src="/Logo.png" alt="Logo" width={32} height={32} />
               <h1 className="text-2xl font-bold tracking-tight text-white">Party Room</h1>
+            </div>
+            <div className="absolute top-4 right-4 z-50">
+              <PreferencesDialog
+                trigger={
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="text-zinc-500 hover:text-white hover:bg-zinc-800"
+                  >
+                    <Settings className="h-5 w-5" />
+                    <span className="sr-only">Settings</span>
+                  </Button>
+                }
+              />
             </div>
             <PartyHeader partyCode={party.code} />
             <div className="mt-2 text-zinc-500 text-sm uppercase tracking-wider font-medium">
