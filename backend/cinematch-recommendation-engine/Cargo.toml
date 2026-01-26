@@ -4,3 +4,8 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+cinematch-common = { path = "../cinematch-common" }
+cinematch-db = { path = "../cinematch-db" }
+rand = "0.9"
+uuid = { version = "1.20", features = ["v4", "serde"] }
+qdrant-client = "1.16"

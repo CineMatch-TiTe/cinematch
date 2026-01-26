@@ -27,3 +27,4 @@ actix-ws = "0.3.1"
 
 cinematch-db = { path = "../cinematch-db" }
 cinematch-common = { path = "../cinematch-common" }
+cinematch-recommendation-engine = { path = "../cinematch-recommendation-engine" }

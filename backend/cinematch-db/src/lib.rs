@@ -12,9 +12,15 @@ pub mod models;
 pub mod schema;
 pub mod vector;
 
+// Batch size for bulk operations
+pub const BATCH_SIZE: usize = 20;
+
 mod external_account;
+mod movie;
 mod party;
+mod taste;
 mod user;
+mod vote;
 
 use diesel::Connection;
 use diesel::PgConnection;
@@ -59,6 +65,15 @@ pub enum DbError {
 
     #[error("Failed to generate unique party code after max attempts")]
     CodeGenerationFailed,
+
+    #[error("Invalid genre id: {0}")]
+    InvalidGenreId(Uuid),
+
+    #[error("Invalid user preferences: {0}")]
+    InvalidPreferences(String),
+
+    #[error("Other database error: {0}")]
+    Other(String),
 }
 
 pub type DbResult<T> = Result<T, DbError>;
@@ -69,8 +84,8 @@ pub type DbResult<T> = Result<T, DbError>;
 
 /// Async database connection pool
 pub struct Database {
-    pool: Pool<AsyncPgConnection>,
-    vector: QdrantService,
+    pub pool: Pool<AsyncPgConnection>,
+    pub vector: QdrantService,
 }
 
 impl Database {

@@ -1,5 +1,5 @@
-pub use self::handlers::*;
 pub mod handlers;
+pub mod pref;
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -26,6 +26,7 @@ pub struct GuestLoginResponse {
 }
 
 /// Response with user details
+#[allow(dead_code)]
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct UserResponse {
     /// The user's unique ID
@@ -67,5 +68,39 @@ pub struct CurrentUserResponse {
 #[derive(Debug, Deserialize, ToSchema)]
 pub struct RenameUserRequest {
     /// The new username (max 32 characters)
+    #[schema(example = "NewUsername")]
     pub new_username: String,
+}
+
+/// Request to update user taste for a movie
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct UpdateTasteRequest {
+    /// Whether the user liked the movie (true = like, false = dislike)
+    pub liked: bool,
+}
+
+/// User-facing update struct: genre names instead of UUIDs
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+pub struct UpdateUserPreferencesRequest {
+    #[schema(example = json!(["Action", "Drama"]))]
+    pub include_genres: Option<Vec<String>>,
+    #[schema(example = json!(["Horror", "Comedy"]))]
+    pub exclude_genres: Option<Vec<String>>,
+    #[schema(example = json!(2020))]
+    pub target_release_year: Option<Option<i32>>,
+    #[schema(example = json!(2))]
+    pub release_year_flex: Option<i32>,
+    #[schema(example = json!(true))]
+    pub is_tite: Option<bool>,
+}
+
+/// API-facing user preferences response (genre names, not IDs)
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+pub struct UserPreferencesResponse {
+    pub include_genres: Vec<String>,
+    pub exclude_genres: Vec<String>,
+    pub target_release_year: Option<i32>,
+    pub release_year_flex: i32,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
 }

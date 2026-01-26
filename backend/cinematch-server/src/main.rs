@@ -1,4 +1,8 @@
-use actix_web::{App, HttpServer, middleware::Logger, web};
+use actix_web::{
+    App, HttpServer,
+    middleware::{Compress, Logger},
+    web,
+};
 
 use actix_cors::Cors;
 use actix_identity::IdentityMiddleware;
@@ -6,10 +10,7 @@ use actix_session::{SessionMiddleware, storage::RedisSessionStore};
 use actix_web::cookie::Key;
 use actix_web::http;
 
-use utoipa::{
-    Modify, OpenApi,
-    openapi::security::{ApiKey, ApiKeyValue, SecurityScheme},
-};
+use utoipa::OpenApi;
 
 use std::net::Ipv4Addr;
 use std::time::Duration;
@@ -22,12 +23,11 @@ use utoipa_redoc::{Redoc, Servable};
 use utoipa_scalar::{Scalar, Servable as ScalarServable};
 use utoipa_swagger_ui::SwaggerUi;
 
-use actix_wsb::Broadcaster;
-
 // Database
 use cinematch_api::ApiDoc;
-use cinematch_common::vote_store::VoteStore;
 use cinematch_db::Database;
+
+mod handler;
 
 // use cinematch_recommendation_engine::configure_recommendation_routes;
 
@@ -62,9 +62,18 @@ async fn main() -> std::io::Result<()> {
     }
 
     let data = web::Data::new(db_pool);
+    let tick_db = data.clone();
 
-    let vote_store = VoteStore::new();
-    let vote_store_data = web::Data::new(vote_store);
+    actix_web::rt::spawn(async move {
+        let interval = std::time::Duration::from_secs(30);
+        loop {
+            tokio::time::sleep(interval).await;
+            if let Err(e) = cinematch_api::handler::party::run_timeouts_tick(tick_db.as_ref()).await
+            {
+                log::error!("Timeouts tick error: {:?}", e);
+            }
+        }
+    });
 
     let server_host = std::env::var("SERVER_HOST").unwrap_or_else(|_| "0.0.0.0".to_string());
     let server_port = std::env::var("SERVER_PORT").unwrap_or_else(|_| "8080".to_string());
@@ -94,11 +103,12 @@ async fn main() -> std::io::Result<()> {
         }
     };
 
-    let deadline_expiration = Duration::from_secs(24 * 60 * 60); // last visit this long ago will be logged out
-    let last_login_duration = Duration::from_secs(30 * 24 * 60 * 60); // last login this long ago will be logged out
+    // Identity session limits (10x previous: 10 days visit deadline, 300 days login deadline)
+    let deadline_expiration = Duration::from_secs(10 * 24 * 60 * 60);
+    let last_login_duration = Duration::from_secs(300 * 24 * 60 * 60);
 
-    let rooms = Broadcaster::new();
-    let rooms_data = web::Data::new(rooms);
+    let ws_store = std::sync::Arc::new(cinematch_api::WsStore::new());
+    let ws_store_data = web::Data::new(ws_store);
 
     let server = HttpServer::new(move || {
         let identity_mw = IdentityMiddleware::builder()
@@ -109,6 +119,7 @@ async fn main() -> std::io::Result<()> {
         App::new()
             .into_utoipa_app()
             .openapi(ApiDoc::openapi())
+            .map(|app| app.wrap(Compress::default()))
             .map(|app| app.wrap(identity_mw))
             .map(|app| {
                 app.wrap(SessionMiddleware::new(
@@ -132,8 +143,7 @@ async fn main() -> std::io::Result<()> {
             })
             .map(|app| app.wrap(Logger::default()))
             .app_data(data.clone()) // database pool
-            .app_data(rooms_data.clone()) // websocket rooms broadcaster
-            .app_data(vote_store_data.clone()) // vote store
+            .app_data(ws_store_data.clone()) // websocket store (broadcaster + conn map)
             // /api/user, /api/party, /api/ws, etc
             .service(
                 utoipa_actix_web::scope("/api/user")
@@ -146,6 +156,10 @@ async fn main() -> std::io::Result<()> {
             .service(
                 utoipa_actix_web::scope("/api/ws")
                     .configure(cinematch_api::routes::configure_websocket()),
+            )
+            .service(
+                utoipa_actix_web::scope("/api/movie")
+                    .configure(cinematch_api::routes::configure_movies()),
             )
             .openapi_service(|api| Redoc::with_url("/redoc", api))
             .openapi_service(|api| {

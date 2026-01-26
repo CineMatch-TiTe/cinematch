@@ -1,8 +1,18 @@
+// Minimal models for movie metadata tables for ergonomic queries
+use crate::schema::{
+    cast_members, directors, genres, keywords, production_countries, shown_movies, trailers, votes,
+};
+
+// Re-export movie/vector models for easy access from crate root
+pub use crate::vector::models::{CastMember, MovieData};
 use chrono::{DateTime, Utc};
 use diesel::prelude::*;
 use uuid::Uuid;
 
-use crate::schema::{external_accounts, parties, party_codes, party_members, users};
+use crate::schema::{
+    external_accounts, movies, parties, party_codes, party_members, prefs_exclude_genre,
+    prefs_include_genre, user_preferences, users,
+};
 
 // ============================================================================
 // Enums (mapped to PostgreSQL ENUMs)
@@ -123,6 +133,10 @@ pub struct Party {
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
     pub disbanded_at: Option<DateTime<Utc>>,
+    pub selected_movie_id: Option<i64>,
+    pub can_vote: bool,
+    pub voting_round: Option<i16>,
+    pub phase_entered_at: DateTime<Utc>,
 }
 
 /// For inserting a new party
@@ -131,6 +145,7 @@ pub struct Party {
 pub struct NewParty {
     pub party_leader_id: Uuid,
     pub state: PartyState,
+    pub can_vote: bool,
 }
 
 /// For updating a party
@@ -139,8 +154,12 @@ pub struct NewParty {
 pub struct UpdateParty {
     pub party_leader_id: Option<Uuid>,
     pub state: Option<PartyState>,
+    pub can_vote: Option<bool>,
     pub updated_at: Option<DateTime<Utc>>,
     pub disbanded_at: Option<DateTime<Utc>>,
+    pub selected_movie_id: Option<Option<i64>>,
+    pub voting_round: Option<Option<i16>>,
+    pub phase_entered_at: Option<DateTime<Utc>>,
 }
 
 // ============================================================================
@@ -191,4 +210,198 @@ pub struct PartyCode {
 pub struct NewPartyCode<'a> {
     pub code: &'a str,
     pub party_id: Uuid,
+}
+
+#[derive(Debug, Clone, Queryable, Selectable, Identifiable)]
+#[diesel(table_name = directors)]
+#[diesel(primary_key(director_id))]
+#[diesel(check_for_backend(diesel::pg::Pg))]
+pub struct Director {
+    pub director_id: uuid::Uuid,
+    pub name: String,
+}
+
+#[derive(Debug, Clone, Queryable, Selectable, Identifiable)]
+#[diesel(table_name = genres)]
+#[diesel(primary_key(genre_id))]
+#[diesel(check_for_backend(diesel::pg::Pg))]
+pub struct Genre {
+    pub genre_id: uuid::Uuid,
+    pub name: String,
+}
+
+#[derive(Debug, Clone, Queryable, Selectable, Identifiable)]
+#[diesel(table_name = keywords)]
+#[diesel(primary_key(keyword_id))]
+#[diesel(check_for_backend(diesel::pg::Pg))]
+pub struct Keyword {
+    pub keyword_id: uuid::Uuid,
+    pub name: String,
+}
+
+#[derive(Debug, Clone, Queryable, Selectable, Identifiable)]
+#[diesel(table_name = cast_members)]
+#[diesel(primary_key(cast_id))]
+#[diesel(check_for_backend(diesel::pg::Pg))]
+pub struct CastMemberRow {
+    pub cast_id: uuid::Uuid,
+    pub name: String,
+    pub profile_url: Option<String>,
+}
+
+#[derive(Debug, Clone, Queryable, Selectable, Identifiable)]
+#[diesel(table_name = production_countries)]
+#[diesel(primary_key(country_code))]
+#[diesel(check_for_backend(diesel::pg::Pg))]
+pub struct ProductionCountry {
+    pub country_code: String,
+}
+
+#[derive(Debug, Clone, Queryable, Selectable, Identifiable)]
+#[diesel(table_name = trailers)]
+#[diesel(primary_key(trailer_id))]
+#[diesel(check_for_backend(diesel::pg::Pg))]
+pub struct Trailer {
+    pub trailer_id: uuid::Uuid,
+    pub video_key: String,
+}
+
+// ============================================================================
+// Movie Models
+// ============================================================================
+
+/// Queryable Movie from database
+#[derive(Debug, Clone, Queryable, Selectable, Identifiable)]
+#[diesel(table_name = movies)]
+#[diesel(primary_key(movie_id))]
+#[diesel(check_for_backend(diesel::pg::Pg))]
+pub struct Movie {
+    pub movie_id: i64,
+    pub title: String,
+    pub runtime: i32,
+    pub popularity: f32,
+    pub imdb_id: Option<String>,
+    pub mediawiki_id: Option<String>,
+    pub rating: Option<String>,
+    pub release_date: chrono::NaiveDateTime,
+    pub original_language: Option<String>,
+    pub poster_url: Option<String>,
+    pub overview: Option<String>,
+    pub tagline: Option<String>,
+    pub release_year: Option<i32>,
+}
+
+// ============================================================================
+// User Preferences Models
+// ============================================================================
+
+#[derive(Debug, Clone, Queryable, Selectable, Identifiable, Associations)]
+#[diesel(table_name = user_preferences)]
+#[diesel(primary_key(user_id))]
+#[diesel(belongs_to(User))]
+#[diesel(check_for_backend(diesel::pg::Pg))]
+pub struct UserPreferences {
+    pub user_id: Uuid,
+    pub target_release_year: Option<i32>,
+    pub release_year_flex: i32,
+    pub is_tite: bool,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Insertable)]
+#[diesel(table_name = user_preferences)]
+pub struct NewUserPreferences {
+    pub user_id: Uuid,
+    pub target_release_year: Option<i32>,
+    pub release_year_flex: i32,
+    pub is_tite: bool,
+}
+
+#[derive(Debug, Clone, AsChangeset)]
+#[diesel(table_name = user_preferences)]
+pub struct UpdateUserPreferences {
+    pub target_release_year: Option<Option<i32>>,
+    pub release_year_flex: Option<i32>,
+    pub is_tite: Option<bool>,
+}
+
+// Join table models for included genres
+#[derive(Debug, Clone, Queryable, Identifiable, Associations)]
+#[diesel(table_name = prefs_include_genre)]
+#[diesel(primary_key(user_id, genre_id))]
+#[diesel(belongs_to(User, foreign_key = user_id))]
+#[diesel(belongs_to(Genre, foreign_key = genre_id))]
+pub struct PrefsIncludeGenre {
+    pub user_id: Uuid,
+    pub genre_id: Uuid,
+}
+
+#[derive(Debug, Clone, Insertable)]
+#[diesel(table_name = prefs_include_genre)]
+pub struct NewPrefsIncludeGenre {
+    pub user_id: Uuid,
+    pub genre_id: Uuid,
+}
+
+// Join table models for excluded genres
+#[derive(Debug, Clone, Queryable, Identifiable, Associations)]
+#[diesel(table_name = prefs_exclude_genre)]
+#[diesel(primary_key(user_id, genre_id))]
+#[diesel(belongs_to(User, foreign_key = user_id))]
+#[diesel(belongs_to(Genre, foreign_key = genre_id))]
+pub struct PrefsExcludeGenre {
+    pub user_id: Uuid,
+    pub genre_id: Uuid,
+}
+
+#[derive(Debug, Clone, Insertable)]
+#[diesel(table_name = prefs_exclude_genre)]
+pub struct NewPrefsExcludeGenre {
+    pub user_id: Uuid,
+    pub genre_id: Uuid,
+}
+
+#[derive(Debug, Clone, Queryable, Identifiable, Associations)]
+#[diesel(table_name = shown_movies)]
+#[diesel(primary_key(party_id, user_id, movie_id))]
+#[diesel(belongs_to(crate::models::Party, foreign_key = party_id))]
+#[diesel(belongs_to(crate::models::User, foreign_key = user_id))]
+#[diesel(belongs_to(crate::models::Movie, foreign_key = movie_id))]
+pub struct ShownMovie {
+    pub party_id: Uuid,
+    pub user_id: Uuid,
+    pub movie_id: i64,
+    pub shown_at: chrono::DateTime<chrono::Utc>,
+}
+
+#[derive(Debug, Clone, Insertable)]
+#[diesel(table_name = shown_movies)]
+pub struct NewShownMovie {
+    pub party_id: Uuid,
+    pub user_id: Uuid,
+    pub movie_id: i64,
+}
+
+#[derive(Debug, Clone, Queryable, Identifiable, Associations)]
+#[diesel(table_name = votes)]
+#[diesel(primary_key(party_id, user_id, movie_id))]
+#[diesel(belongs_to(crate::models::Party, foreign_key = party_id))]
+#[diesel(belongs_to(crate::models::User, foreign_key = user_id))]
+#[diesel(belongs_to(crate::models::Movie, foreign_key = movie_id))]
+pub struct Vote {
+    pub party_id: Uuid,
+    pub user_id: Uuid,
+    pub movie_id: i64,
+    pub vote_value: bool,
+    pub voted_at: chrono::DateTime<chrono::Utc>,
+}
+
+#[derive(Debug, Clone, Insertable)]
+#[diesel(table_name = votes)]
+pub struct NewVote {
+    pub party_id: Uuid,
+    pub user_id: Uuid,
+    pub movie_id: i64,
+    pub vote_value: bool,
 }
