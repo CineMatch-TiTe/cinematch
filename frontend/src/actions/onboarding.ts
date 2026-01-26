@@ -92,7 +92,8 @@ export async function guestLoginAction(prevState: unknown, formData: FormData) {
         return {
           message: 'Validation failed',
           errors: {
-            username: ['Username is not available or you are already logged in.']
+            username: ['Username is not available or you are already logged in.'],
+            joinCode: undefined
           }
         }
       }
