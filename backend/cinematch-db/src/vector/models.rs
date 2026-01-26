@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub enum VectorCollection {
     #[serde(rename = "movie_plot")]
     MoviePlot,
@@ -9,19 +9,19 @@ pub enum VectorCollection {
     #[serde(rename = "movie_reviews")]
     MovieReviews,
     #[serde(rename = "movie_combined")]
+    #[default]
     MovieCombined,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MovieData {
     // ===== REQUIRED FIELDS (always present) =====
-    pub movie_id: i64, // TMDB movie ID - primary identifier
+    pub movie_id: i64, // TMDB movie ID - primary identifier, same for qdrant
     pub title: String, // Movie title
     pub runtime: i64,  // Duration in minutes
 
     // ===== GUARANTEED METADATA =====
-    pub average_rating: f32, // Average user rating (TMDB)
-    pub popularity: f32,     // Popularity score (TMDB)
+    pub popularity: f32, // Popularity score (TMDB)
 
     // ===== OPTIONAL IDENTIFIERS =====
     pub imdb_id: Option<String>,      // IMDb ID if available
@@ -36,7 +36,7 @@ pub struct MovieData {
     // ===== OPTIONAL CONTENT (for semantic search) =====
     pub overview: Option<String>, // Short plot summary
     pub tagline: Option<String>,  // Movie tagline/motto
-    pub director: Option<String>, // Director name(s)
+    pub director: Vec<String>,    // Director name(s)
 
     // ===== VECTOR FIELDS (may be empty) =====
     pub genres: Vec<String>,               // List of genre labels
@@ -44,6 +44,7 @@ pub struct MovieData {
     pub cast: Vec<CastMember>,             // Cast members with name and profile URL
     pub production_countries: Vec<String>, // List of production country codes
     pub reviews: Vec<String>,              // User review texts
+    pub video_keys: Vec<String>,           // List of video keys (YouTube, etc)
 }
 
 /// Cast member with name and optional profile URL for unique identification
@@ -93,16 +94,16 @@ impl MovieData {
             parts.push(format!("Genres: {}", self.genres.join(", ")));
         }
 
-        if let Some(tagline) = &self.tagline {
-            if !tagline.trim().is_empty() {
-                parts.push(tagline.trim().to_string());
-            }
+        if let Some(tagline) = &self.tagline
+            && !tagline.trim().is_empty()
+        {
+            parts.push(tagline.trim().to_string());
         }
 
-        if let Some(overview) = &self.overview {
-            if !overview.trim().is_empty() {
-                parts.push(overview.trim().to_string());
-            }
+        if let Some(overview) = &self.overview
+            && !overview.trim().is_empty()
+        {
+            parts.push(overview.trim().to_string());
         }
 
         if !self.keywords.is_empty() {
@@ -124,9 +125,10 @@ impl MovieData {
             parts.push(format!("Genres: {}", self.genres.join(", ")));
         }
 
-        if let Some(director) = &self.director {
-            if !director.trim().is_empty() {
-                parts.push(format!("Directed by: {}", director.trim()));
+        if !self.director.is_empty() {
+            let director_str = self.director.join(", ");
+            if !director_str.trim().is_empty() {
+                parts.push(format!("Directed by: {}", director_str.trim()));
             }
         }
 
@@ -222,15 +224,16 @@ impl MovieData {
             parts.push(format!("Genres: {}", self.genres.join(", ")));
         }
 
-        if let Some(tagline) = &self.tagline {
-            if !tagline.trim().is_empty() {
-                parts.push(tagline.trim().to_string());
-            }
+        if let Some(tagline) = &self.tagline
+            && !tagline.trim().is_empty()
+        {
+            parts.push(tagline.trim().to_string());
         }
 
-        if let Some(director) = &self.director {
-            if !director.trim().is_empty() {
-                parts.push(format!("Director: {}", director.trim()));
+        if !self.director.is_empty() {
+            let director_str = self.director.join(", ");
+            if !director_str.trim().is_empty() {
+                parts.push(format!("Director: {}", director_str.trim()));
             }
         }
 
@@ -244,10 +247,10 @@ impl MovieData {
             parts.push(format!("Cast: {}", cast_preview.trim()));
         }
 
-        if let Some(overview) = &self.overview {
-            if !overview.trim().is_empty() {
-                parts.push(overview.trim().to_string());
-            }
+        if let Some(overview) = &self.overview
+            && !overview.trim().is_empty()
+        {
+            parts.push(overview.trim().to_string());
         }
 
         if !self.keywords.is_empty() {

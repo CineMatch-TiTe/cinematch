@@ -1,0 +1,14 @@
+DROP TABLE IF EXISTS movie_directors;
+DROP TABLE IF EXISTS movie_trailers;
+DROP TABLE IF EXISTS movie_cast;
+DROP TABLE IF EXISTS movie_keywords;
+DROP TABLE IF EXISTS movie_genres;
+DROP TABLE IF EXISTS movie_production_countries;
+DROP TABLE IF EXISTS user_tastes;
+DROP TABLE IF EXISTS cast_members;
+DROP TABLE IF EXISTS production_countries;
+DROP TABLE IF EXISTS keywords;
+DROP TABLE IF EXISTS genres;
+DROP TABLE IF EXISTS directors;
+DROP TABLE IF EXISTS trailers;
+DROP TABLE IF EXISTS movies;

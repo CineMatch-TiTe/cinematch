@@ -1,19 +1,18 @@
 //! User API routing configuration
-use actix_web::web;
 use utoipa_actix_web::service_config::ServiceConfig;
 
-use crate::{party, user, websocket};
+use crate::{movie, party, user, websocket};
 
 /// Configure all user API routes under /user (protected routes, already under /api scope)
-///
-///
-
 pub fn configure_user() -> impl FnOnce(&mut ServiceConfig) {
     |cfg: &mut ServiceConfig| {
         cfg.service(user::handlers::login_guest)
             .service(user::handlers::logout_user)
             .service(user::handlers::get_current_user)
-            .service(user::handlers::rename_user);
+            .service(user::handlers::rename_user)
+            .service(user::handlers::update_taste)
+            .service(user::pref::get_user_pref)
+            .service(user::pref::edit_user_pref);
     }
 }
 
@@ -21,6 +20,9 @@ pub fn configure_party() -> impl FnOnce(&mut ServiceConfig) {
     |cfg: &mut ServiceConfig| {
         cfg.service(party::crud::create_party)
             .service(party::crud::get_party)
+            .service(party::picks::get_picks)
+            .service(party::picks::pick_movie)
+            .service(party::picks::delete_pick)
             .service(party::user_ops::join_party)
             .service(party::user_ops::leave_party)
             .service(party::user_ops::get_party_members)
@@ -28,8 +30,19 @@ pub fn configure_party() -> impl FnOnce(&mut ServiceConfig) {
             .service(party::leader_ops::transfer_leadership)
             .service(party::user_ops::set_ready)
             .service(party::leader_ops::advance_phase)
-            .service(party::leader_ops::start_new_round)
-            .service(party::leader_ops::disband_party);
+            .service(party::leader_ops::disband_party)
+            .service(party::votes::get_vote)
+            .service(party::votes::vote_movie)
+            .service(party::crud::get_my_party);
+    }
+}
+
+pub fn configure_movies() -> impl FnOnce(&mut ServiceConfig) {
+    |cfg: &mut ServiceConfig| {
+        cfg.service(movie::handlers::get_movie)
+            .service(movie::handlers::get_genres)
+            .service(movie::handlers::get_recommendations)
+            .service(movie::handlers::search);
     }
 }
 

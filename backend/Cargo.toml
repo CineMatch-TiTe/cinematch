@@ -6,7 +6,7 @@ members = [
     "cinematch-recommendation-engine",
     "cinematch-api",
     "cinematch-common"
-]
+, "cinematch-importer"]
 default-members = [
     "cinematch-server",
 ]

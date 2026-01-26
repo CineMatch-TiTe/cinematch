@@ -1,4 +1,4 @@
-name: CI
+name: Cargo fmt & clippy
 
 on:
   push:
@@ -30,6 +30,7 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           mode: review
+          args: --manifest-path ./backend/Cargo.toml --all
 
   lint:
     name: Lint & Code Analysis
