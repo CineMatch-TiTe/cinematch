@@ -13,14 +13,6 @@ export default async function PartyRoom({ params }: Readonly<{ params: Promise<{
     getPartyMembers(partyId)
   ])
 
-  // Handle unauthorized or not found
-  if (userRes.status === 401) {
-    redirect('/')
-  }
-  if (partyRes.status === 404) {
-    redirect('/')
-  }
-
   // Type safety checks (Orval returns { status, data })
   const currentUser = userRes.status === 200 ? userRes.data : null
   const party = partyRes.status === 200 ? partyRes.data : null

@@ -1,8 +1,14 @@
 'use server'
 
-import { revalidateTag, revalidatePath } from 'next/cache'
+import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
-import { advancePhase, kickMember, leaveParty, transferLeadership } from '@/server/party/party'
+import {
+  advancePhase,
+  kickMember,
+  leaveParty,
+  transferLeadership,
+  getMyParty
+} from '@/server/party/party'
 
 export async function leavePartyAction(partyId: string) {
   try {
@@ -61,5 +67,18 @@ export async function startVotingAction(partyId: string) {
   } catch (error) {
     console.error('Start Voting Error', error)
     return { error: 'Failed to start voting' }
+  }
+}
+
+export async function getMyPartyIdAction() {
+  try {
+    const response = await getMyParty()
+    if (response.status === 200) {
+      return { id: response.data.id }
+    }
+    return { error: 'Failed to fetch party' }
+  } catch (error) {
+    console.error('Get My Party Error', error)
+    return { error: 'Failed to fetch party' }
   }
 }

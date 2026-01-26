@@ -24,7 +24,11 @@ interface PartyViewClientProps {
   currentUser: CurrentUserResponse
 }
 
-export default function PartyViewClient({ party, members, currentUser }: PartyViewClientProps) {
+export default function PartyViewClient({
+  party,
+  members,
+  currentUser
+}: Readonly<PartyViewClientProps>) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
 
@@ -44,7 +48,7 @@ export default function PartyViewClient({ party, members, currentUser }: PartyVi
   const handleLeave = async () => {
     try {
       await leavePartyAction(party.id)
-    } catch (err) {
+    } catch {
       toast.error('Failed to leave party')
     }
   }
@@ -121,7 +125,6 @@ export default function PartyViewClient({ party, members, currentUser }: PartyVi
             </Button>
           </div>
         </footer>
-        {/* Add padding at bottom to prevent content hiding behind fixed footer */}
         <div className="h-32" />
       </div>
     </div>

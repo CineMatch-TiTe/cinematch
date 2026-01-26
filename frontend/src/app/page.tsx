@@ -1,7 +1,10 @@
 import Link from 'next/link'
+import { redirect } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { GuestLoginForm } from '@/components/forms/GuestLoginForm'
 import Image from 'next/image'
+import { getCurrentUser } from '@/server/user/user'
+import { getMyParty } from '@/server/party/party'
 
 export default async function HomeRoute({
   searchParams
@@ -10,6 +13,15 @@ export default async function HomeRoute({
 }>) {
   const { partyCode } = await searchParams
   const initialJoinCode = Array.isArray(partyCode) ? partyCode[0] : partyCode
+
+  // Check if user is already logged in and has an active party
+  const userRes = await getCurrentUser().catch(() => null)
+  if (userRes?.status === 200) {
+    const partyRes = await getMyParty().catch(() => null)
+    if (partyRes?.status === 200 && partyRes.data?.id) {
+      redirect(`/party-room/${partyRes.data.id}`)
+    }
+  }
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-zinc-950 font-sans text-zinc-100 selection:bg-red-500/30">
