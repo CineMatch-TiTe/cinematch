@@ -9,7 +9,9 @@ import {
   leaveParty,
   transferLeadership,
   getMyParty,
-  pickMovie
+  pickMovie,
+  voteMovie,
+  getVote
 } from '@/server/party/party'
 import { getRecommendations } from '@/server/movie/movie'
 import { logoutUser } from '@/server/user/user'
@@ -135,5 +137,47 @@ export async function getUserPreferencesAction() {
   } catch (error) {
     console.error('Get User Preferences Error', error)
     return { error: 'Failed to fetch preferences' }
+  }
+}
+
+export async function voteMovieAction(partyId: string, movieId: number, like: boolean) {
+  try {
+    const response = await voteMovie(partyId, movieId, { like })
+
+    if (response.status !== 200) {
+      console.error('Vote failed with status:', response.status, response.data)
+      return { error: `Failed to vote: ${response.status}` }
+    }
+    return { success: true, data: response.data }
+  } catch (error) {
+    console.error('Vote Movie Error Details:', error)
+    return { error: 'Failed to vote (Exception)' }
+  }
+}
+
+export async function getPartyVotesAction(partyId: string) {
+  try {
+    const response = await getVote(partyId, { cache: 'no-store' })
+    if (response.status === 200) {
+      return { data: response.data }
+    }
+    return { error: 'Failed to fetch votes' }
+  } catch (error) {
+    console.error('Get Votes Error', error)
+    return { error: 'Failed to fetch votes' }
+  }
+}
+
+export async function getMoviesByIdsAction(movieIds: number[]) {
+  const { movieGetInfo } = await import('@/server/movie/movie')
+  try {
+    const promises = movieIds.map((id) => movieGetInfo(id))
+    const responses = await Promise.all(promises)
+    const movies = responses.filter((r) => r.status === 200).map((r) => r.data)
+
+    return { data: movies }
+  } catch (error) {
+    console.error('Get Movies By IDs Error', error)
+    return { error: 'Failed to fetch movie details' }
   }
 }

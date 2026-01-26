@@ -1,17 +1,28 @@
 'use client'
 
-import { Users, Clapperboard } from 'lucide-react'
+import { Users, Clapperboard, ThumbsUp, Film } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
 import { usePartyView, PartyViewType } from './PartyViewContext'
 
 export function PartyFooterNavigation() {
-  const { activeView, setActiveView } = usePartyView()
+  const { activeView, setActiveView, partyState } = usePartyView()
 
   const navItems: { id: PartyViewType; label: string; icon: React.ElementType }[] = [
-    { id: 'room', label: 'Party', icon: Users },
-    { id: 'picking', label: 'Picking', icon: Clapperboard }
+    { id: 'room', label: 'Party', icon: Users }
   ]
+
+  if (partyState !== 'voting' && partyState !== 'watching') {
+    navItems.push({ id: 'picking', label: 'Picking', icon: Clapperboard })
+  }
+
+  if (partyState === 'voting') {
+    navItems.push({ id: 'voting', label: 'Voting movies', icon: ThumbsUp })
+  }
+
+  if (partyState === 'watching') {
+    navItems.push({ id: 'watching', label: 'Current movie', icon: Film })
+  }
 
   return (
     <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-50">

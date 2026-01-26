@@ -2,11 +2,12 @@
 
 import { createContext, useContext, useState, ReactNode, useMemo } from 'react'
 
-export type PartyViewType = 'room' | 'picking'
+export type PartyViewType = 'room' | 'picking' | 'voting' | 'watching'
 
 interface PartyViewContextType {
   activeView: PartyViewType
   setActiveView: (view: PartyViewType) => void
+  partyState: string
 }
 
 const PartyViewContext = createContext<PartyViewContextType | undefined>(undefined)
@@ -14,15 +15,17 @@ const PartyViewContext = createContext<PartyViewContextType | undefined>(undefin
 interface PartyViewProviderProps {
   children: ReactNode
   initialView?: PartyViewType
+  partyState?: string
 }
 
 export function PartyViewProvider({
   children,
-  initialView = 'room'
+  initialView = 'room',
+  partyState = 'created'
 }: Readonly<PartyViewProviderProps>) {
   const [activeView, setActiveView] = useState<PartyViewType>(initialView)
 
-  const value = useMemo(() => ({ activeView, setActiveView }), [activeView])
+  const value = useMemo(() => ({ activeView, setActiveView, partyState }), [activeView, partyState])
 
   return <PartyViewContext.Provider value={value}>{children}</PartyViewContext.Provider>
 }
