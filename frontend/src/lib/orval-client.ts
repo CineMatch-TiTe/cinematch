@@ -11,7 +11,8 @@ export const customInstance = async <T>(
 
   // Construct search params
   const searchParams = new URLSearchParams(params)
-  const finalUrl = `${absoluteUrl}${searchParams.toString() ? `?${searchParams.toString()}` : ''}`
+  const queryString = searchParams.toString()
+  const finalUrl = absoluteUrl + (queryString ? '?' + queryString : '')
 
   const reqHeaders: HeadersInit = {
     'Content-Type': 'application/json',
@@ -19,7 +20,7 @@ export const customInstance = async <T>(
   }
 
   // Server-side cookie forwarding
-  if (typeof window === 'undefined') {
+  if (globalThis.window === undefined) {
     const { cookies } = await import('next/headers')
     const cookieStore = await cookies()
     const allCookies = cookieStore
