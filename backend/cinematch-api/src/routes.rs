@@ -23,6 +23,7 @@ pub fn configure_party() -> impl FnOnce(&mut ServiceConfig) {
             .service(party::picks::get_picks)
             .service(party::picks::pick_movie)
             .service(party::picks::delete_pick)
+            .service(party::picks::get_party_recommendations)
             .service(party::user_ops::join_party)
             .service(party::user_ops::leave_party)
             .service(party::user_ops::get_party_members)

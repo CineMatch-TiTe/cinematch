@@ -92,7 +92,7 @@ pub async fn get_recommendations(db: AppState, user: Option<Identity>) -> HttpRe
 
     // 3 is good
 
-    let ids = match cinematch_recommendation_engine::recommend_movies(&db, user_id, 3).await {
+    let ids = match cinematch_recommendation_engine::recommend_movies(&db, user_id, 3, None).await {
         Ok(movies) => {
             if movies.is_empty() {
                 return HttpResponse::NotFound().finish();

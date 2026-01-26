@@ -247,7 +247,13 @@ pub async fn build_round2_ballots_for_party(
 }
 
 /// Recommend movies for a user using Qdrant vector search, based on their taste profile.
-pub async fn recommend_movies(db: &Database, user_id: Uuid, limit: usize) -> DbResult<Vec<i64>> {
+/// If party_id is provided, excludes movies already picked (liked, disliked, or skipped) in that party.
+pub async fn recommend_movies(
+    db: &Database,
+    user_id: Uuid,
+    limit: usize,
+    party_id: Option<Uuid>,
+) -> DbResult<Vec<i64>> {
     let (positive, negative, skipped) = db.get_taste(user_id).await?;
 
     // get users prefs
@@ -256,6 +262,17 @@ pub async fn recommend_movies(db: &Database, user_id: Uuid, limit: usize) -> DbR
     let prefs = db.get_user_preferences(user_id).await?;
 
     let filter = crate::utils::filter_from_prefs(&prefs, &genre_map);
+
+    // Collect all movies to exclude
+    let mut excluded: std::collections::HashSet<i64> = skipped.into_iter().collect();
+
+    // If party_id provided, exclude movies already picked in that party (liked, disliked, or skipped)
+    if let Some(pid) = party_id {
+        let party_taste = db.get_party_taste(pid).await?;
+        for (_, mid, _) in party_taste {
+            excluded.insert(mid);
+        }
+    }
 
     let mut positive = positive;
     if positive.is_empty() {
@@ -284,10 +301,10 @@ pub async fn recommend_movies(db: &Database, user_id: Uuid, limit: usize) -> DbR
         })
         .collect();
 
-    // Exclude skipped movies from filter
+    // Exclude skipped movies and party picks from filter
     let mut final_filter = filter;
-    if !skipped.is_empty() {
-        let skipped_ids: Vec<PointId> = skipped
+    if !excluded.is_empty() {
+        let excluded_ids: Vec<PointId> = excluded
             .iter()
             .map(|&id| PointId {
                 point_id_options: Some(qdrant_client::qdrant::point_id::PointIdOptions::Num(
@@ -299,7 +316,7 @@ pub async fn recommend_movies(db: &Database, user_id: Uuid, limit: usize) -> DbR
             .as_ref()
             .map(|f| f.must_not.clone())
             .unwrap_or_default();
-        must_not.push(qdrant_client::qdrant::Condition::has_id(skipped_ids));
+        must_not.push(qdrant_client::qdrant::Condition::has_id(excluded_ids));
         final_filter = Some(qdrant_client::qdrant::Filter {
             must: final_filter
                 .as_ref()
