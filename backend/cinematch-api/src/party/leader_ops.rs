@@ -29,14 +29,14 @@ fn map_party_error(e: PartyError) -> HttpResponse {
 
 #[utoipa::path(
     responses(
-        (status = 200, description = "Phase advanced (force skip)"),
+        (status = 200, description = "Phase advanced"),
         (status = 400, description = "Invalid state transition", body = ErrorResponse),
         (status = 401, description = "Unauthorized", body = ErrorResponse),
-        (status = 403, description = "Only party leader can advance", body = ErrorResponse),
+        (status = 403, description = "Leader only", body = ErrorResponse),
         (status = 404, description = "Party not found", body = ErrorResponse),
         (status = 500, description = "Internal server error", body = ErrorResponse)
     ),
-    params(("party_id" = Uuid, Path, description = "The party ID")),
+    params(("party_id" = Uuid, Path, description = "Party ID")),
     tags = ["party"],
     security(("cookie_auth" = [])),
     operation_id = "advance_phase"
@@ -106,11 +106,11 @@ pub async fn advance_phase(
     responses(
         (status = 200, description = "Party disbanded"),
         (status = 401, description = "Unauthorized", body = ErrorResponse),
-        (status = 403, description = "Only party leader can disband", body = ErrorResponse),
-        (status = 404, description = "Party not found", body = ErrorResponse),
+        (status = 403, description = "Leader only", body = ErrorResponse),
+        (status = 404, description = "Party not found"),
         (status = 500, description = "Internal server error", body = ErrorResponse)
     ),
-    params(("party_id" = Uuid, Path, description = "The party ID")),
+    params(("party_id" = Uuid, Path, description = "Party ID")),
     tags = ["party"],
     security(("cookie_auth" = [])),
     operation_id = "disband_party"
@@ -165,13 +165,12 @@ pub async fn disband_party(
     request_body = KickMemberRequest,
     responses(
         (status = 200, description = "Member kicked"),
-        (status = 400, description = "Cannot kick self or invalid request", body = ErrorResponse),
         (status = 401, description = "Unauthorized", body = ErrorResponse),
-        (status = 403, description = "Only party leader can kick", body = ErrorResponse),
+        (status = 403, description = "Leader only or not a member", body = ErrorResponse),
         (status = 404, description = "Party or member not found", body = ErrorResponse),
         (status = 500, description = "Internal server error", body = ErrorResponse)
     ),
-    params(("party_id" = Uuid, Path, description = "The party ID")),
+    params(("party_id" = Uuid, Path, description = "Party ID")),
     tags = ["party"],
     security(("cookie_auth" = [])),
     operation_id = "kick_member"
@@ -239,18 +238,18 @@ pub async fn kick_member(
     }
 }
 
-/// Transfer leadership (leader only).
+/// Transfer leadership (leader only). New leader must be a party member.
 #[utoipa::path(
     request_body = TransferLeadershipRequest,
     responses(
         (status = 200, description = "Leadership transferred"),
         (status = 400, description = "New leader not a member", body = ErrorResponse),
         (status = 401, description = "Unauthorized", body = ErrorResponse),
-        (status = 403, description = "Only leader can transfer", body = ErrorResponse),
+        (status = 403, description = "Leader only", body = ErrorResponse),
         (status = 404, description = "Party not found", body = ErrorResponse),
         (status = 500, description = "Internal server error", body = ErrorResponse)
     ),
-    params(("party_id" = Uuid, Path, description = "The party ID")),
+    params(("party_id" = Uuid, Path, description = "Party ID")),
     tags = ["party"],
     security(("cookie_auth" = [])),
     operation_id = "transfer_leadership"

@@ -6,13 +6,13 @@ use uuid::Uuid;
 
 #[utoipa::path(
     responses(
-        (status = 200, description = "Your picks", body = GetPicksResponse),
+        (status = 200, description = "Your picks (movie IDs)", body = GetPicksResponse),
         (status = 401, description = "Unauthorized", body = ErrorResponse),
         (status = 403, description = "Not a party member", body = ErrorResponse),
         (status = 404, description = "Party not found", body = ErrorResponse),
         (status = 500, description = "Internal server error", body = ErrorResponse)
     ),
-    params(("party_id" = Uuid, Path, description = "The party ID")),
+    params(("party_id" = Uuid, Path, description = "Party ID")),
     tags = ["party"],
     security(("cookie_auth" = [])),
     operation_id = "get_picks"
@@ -59,16 +59,16 @@ pub async fn get_picks(db: AppState, user: Identity, party_id: web::Path<Uuid>) 
     responses(
         (status = 200, description = "Movie picked"),
         (status = 401, description = "Unauthorized", body = ErrorResponse),
-        (status = 403, description = "Not a party member or cannot pick", body = ErrorResponse),
-        (status = 404, description = "Party or movie not found", body = ErrorResponse),
+        (status = 403, description = "Not a member or picking not allowed", body = ErrorResponse),
         (status = 500, description = "Internal server error", body = ErrorResponse)
     ),
     params(
-        ("party_id" = Uuid, Path, description = "The party's unique ID"),
-        ("movie_id" = i64, Path, description = "The movie's unique ID")
+        ("party_id" = Uuid, Path, description = "Party ID"),
+        ("movie_id" = i64, Path, description = "TMDB movie ID")
     ),
     tags = ["party"],
-    security(("cookie_auth" = []))
+    security(("cookie_auth" = [])),
+    operation_id = "pick_movie"
 )]
 #[put("/{party_id}/pick/{movie_id}")]
 pub async fn pick_movie(
@@ -96,7 +96,7 @@ pub async fn pick_movie(
     }
 
     match db.add_party_taste(user_id, party_id, movie_id, true).await {
-        Ok(_) => HttpResponse::Ok().json("Movie picked successfully"),
+        Ok(_) => HttpResponse::Ok().finish(),
         Err(e) => {
             error!(
                 "Failed to register pick for user {} in party {}: {}",
@@ -112,16 +112,16 @@ pub async fn pick_movie(
     responses(
         (status = 200, description = "Pick removed"),
         (status = 401, description = "Unauthorized", body = ErrorResponse),
-        (status = 403, description = "Not a party member or cannot pick", body = ErrorResponse),
-        (status = 404, description = "Party not found", body = ErrorResponse),
+        (status = 403, description = "Not a member or picking not allowed", body = ErrorResponse),
         (status = 500, description = "Internal server error", body = ErrorResponse)
     ),
     params(
-        ("party_id" = Uuid, Path, description = "The party ID"),
-        ("movie_id" = i64, Path, description = "The movie ID to remove from picks")
+        ("party_id" = Uuid, Path, description = "Party ID"),
+        ("movie_id" = i64, Path, description = "TMDB movie ID to remove")
     ),
     tags = ["party"],
-    security(("cookie_auth" = []))
+    security(("cookie_auth" = [])),
+    operation_id = "delete_pick"
 )]
 #[delete("/{party_id}/pick/{movie_id}")]
 pub async fn delete_pick(

@@ -14,15 +14,13 @@ use crate::websocket::models::{MemberJoined, ServerMessage};
 
 #[utoipa::path(
     responses(
-        (status = 200, description = "Successfully joined party", body = CreatePartyResponse),
+        (status = 200, description = "Joined party", body = CreatePartyResponse),
+        (status = 400, description = "Party not joinable or already in party", body = ErrorResponse),
         (status = 401, description = "Unauthorized", body = ErrorResponse),
-        (status = 400, description = "Invalid code or party not joinable", body = ErrorResponse),
         (status = 404, description = "Party not found", body = ErrorResponse),
         (status = 500, description = "Internal server error", body = ErrorResponse)
     ),
-    params(
-        ("code" = String, Path, description = "The 4-character party join code")
-    ),
+    params(("code" = String, Path, description = "4-character join code")),
     tags = ["party"],
     security(("cookie_auth" = [])),
     operation_id = "join_party"
@@ -126,24 +124,16 @@ pub async fn join_party(
     }
 }
 
-/// Leave a party
-///
-/// Removes the requesting user from the party.
-/// If the leader leaves, leadership is transferred to the oldest member.
-/// If no members remain, the party is disbanded.
-///
-/// **Auth**: Requires authenticated user. Users can only leave for themselves.
+/// Leave the party. Leader leaves → transfer to oldest member; no members left → disband.
 #[utoipa::path(
     responses(
-        (status = 200, description = "Successfully left party"),
+        (status = 200, description = "Left"),
+        (status = 400, description = "Not a member", body = ErrorResponse),
         (status = 401, description = "Unauthorized", body = ErrorResponse),
-        (status = 400, description = "Not a member of this party", body = ErrorResponse),
-        (status = 404, description = "Party not found", body = ErrorResponse),
+        (status = 404, description = "Party not found"),
         (status = 500, description = "Internal server error", body = ErrorResponse)
     ),
-    params(
-        ("party_id" = Uuid, Path, description = "The party ID to leave")
-    ),
+    params(("party_id" = Uuid, Path, description = "Party ID")),
     tags = ["party"],
     security(("cookie_auth" = [])),
     operation_id = "leave_party"
@@ -182,17 +172,16 @@ pub async fn leave_party(
 
 #[utoipa::path(
     responses(
-        (status = 200, description = "Party members retrieved", body = PartyMembersResponse),
+        (status = 200, description = "Members", body = PartyMembersResponse),
         (status = 401, description = "Unauthorized", body = ErrorResponse),
         (status = 403, description = "Not a party member", body = ErrorResponse),
         (status = 404, description = "Party not found", body = ErrorResponse),
         (status = 500, description = "Internal server error", body = ErrorResponse)
     ),
-    params(
-        ("party_id" = Uuid, Path, description = "The party ID")
-    ),
+    params(("party_id" = Uuid, Path, description = "Party ID")),
     tags = ["party"],
-    security(("cookie_auth" = []))
+    security(("cookie_auth" = [])),
+    operation_id = "get_party_members"
 )]
 #[get("/{party_id}/members")]
 pub async fn get_party_members(
@@ -292,18 +281,16 @@ pub async fn get_party_members(
 #[utoipa::path(
     request_body = SetReadyRequest,
     responses(
-        (status = 200, description = "Ready set"),
+        (status = 200, description = "Ready state", body = ReadyStateResponse),
+        (status = 400, description = "Not a party member", body = ErrorResponse),
         (status = 401, description = "Unauthorized", body = ErrorResponse),
-        (status = 400, description = "Not a party member"),
-        (status = 404, description = "Party not found"),
+        (status = 404, description = "Party not found", body = ErrorResponse),
         (status = 500, description = "Internal server error", body = ErrorResponse)
     ),
-    params(
-        ("party_id" = Uuid, Path, description = "The party ID")
-    ),
+    params(("party_id" = Uuid, Path, description = "Party ID")),
     tags = ["party"],
     security(("cookie_auth" = [])),
-    operation_id = "toggle_ready"
+    operation_id = "set_ready"
 )]
 #[patch("/{party_id}/ready")]
 pub async fn set_ready(

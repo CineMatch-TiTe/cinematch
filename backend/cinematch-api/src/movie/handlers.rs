@@ -10,15 +10,12 @@ use log::error;
 
 #[utoipa::path(
     responses(
-        (status = 200, description = "Get movie information", body = MovieResponse),
-        (status = 400, description = "Bad request", body = ErrorResponse),
-        (status = 401, description = "Unauthorized"),
-        (status = 404, description = "Movie not found"),
+        (status = 200, description = "Movie details", body = MovieResponse),
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 404, description = "Movie not found", body = ErrorResponse),
         (status = 500, description = "Internal server error", body = ErrorResponse)
     ),
-    params(
-        ("movie_id" = i64, Path, description = "The movie's unique ID")
-    ),
+    params(("movie_id" = i64, Path, description = "TMDB movie ID")),
     tags = ["movie"],
     security(("cookie_auth" = [])),
     operation_id = "movie_get_info"
@@ -47,9 +44,9 @@ pub async fn get_movie(
 
 #[utoipa::path(
     responses(
-        (status = 200, description = "Get list of genres", body = GenreResponse),
-        (status = 401, description = "Unauthorized"),
-        (status = 404, description = "Genres not found"),
+        (status = 200, description = "Genre names", body = GenreResponse),
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 404, description = "No genres available"),
         (status = 500, description = "Internal server error", body = ErrorResponse)
     ),
     tags = ["movie"],
@@ -79,9 +76,9 @@ pub async fn get_genres(db: AppState, user: Option<Identity>) -> HttpResponse {
 
 #[utoipa::path(
     responses(
-        (status = 200, description = "Get list of recommended movies", body = RecommendedMoviesResponse),
-        (status = 401, description = "Unauthorized"),
-        (status = 404, description = "Recommended movies not found"),
+        (status = 200, description = "Recommended movies (Qdrant-based)", body = RecommendedMoviesResponse),
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 404, description = "No recommendations"),
         (status = 500, description = "Internal server error", body = ErrorResponse)
     ),
     tags = ["movie"],
@@ -141,15 +138,15 @@ pub async fn get_recommendations(db: AppState, user: Option<Identity>) -> HttpRe
 
 #[utoipa::path(
     responses(
-        (status = 200, description = "Get list of movies", body = SearchResponse),
-        (status = 400, description = "Bad request", body = ErrorResponse),
-        (status = 401, description = "Unauthorized"),
-        (status = 404, description = "Movies not found"),
+        (status = 200, description = "Matching movies", body = SearchResponse),
+        (status = 400, description = "Empty query", body = ErrorResponse),
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 404, description = "No movies found", body = ErrorResponse),
         (status = 500, description = "Internal server error", body = ErrorResponse)
     ),
     params(
-        ("query" = String, Query, description = "The search query string"),
-        ("page" = Option<i64>, Query, description = "The page number for pagination")
+        ("query" = String, Query, description = "Search string"),
+        ("page" = Option<i64>, Query, description = "Page number (1-based)")
     ),
     tags = ["movie"],
     security(("cookie_auth" = [])),

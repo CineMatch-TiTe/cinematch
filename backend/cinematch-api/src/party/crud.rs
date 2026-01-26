@@ -10,9 +10,9 @@ use uuid::Uuid;
 
 #[utoipa::path(
     responses(
-        (status = 201, description = "Party created successfully", body = CreatePartyResponse),
+        (status = 201, description = "Party created", body = CreatePartyResponse),
         (status = 401, description = "Unauthorized", body = ErrorResponse),
-        (status = 403, description = "Forbidden", body = ErrorResponse),
+        (status = 403, description = "User already in a party", body = ErrorResponse),
         (status = 404, description = "User not found", body = ErrorResponse),
         (status = 500, description = "Internal server error", body = ErrorResponse)
     ),
@@ -85,17 +85,16 @@ pub async fn create_party(db: AppState, user: Option<Identity>) -> HttpResponse 
 
 #[utoipa::path(
     responses(
-        (status = 200, description = "Party details retrieved", body = PartyResponse),
+        (status = 200, description = "Party details", body = PartyResponse),
         (status = 401, description = "Unauthorized", body = ErrorResponse),
         (status = 403, description = "Not a party member", body = ErrorResponse),
         (status = 404, description = "Party not found", body = ErrorResponse),
         (status = 500, description = "Internal server error", body = ErrorResponse)
     ),
-    params(
-        ("party_id" = Uuid, Path, description = "The party's unique ID")
-    ),
+    params(("party_id" = Uuid, Path, description = "Party ID")),
     tags = ["party"],
-    security(("cookie_auth" = []))
+    security(("cookie_auth" = [])),
+    operation_id = "get_party"
 )]
 #[get("/{party_id}")]
 pub async fn get_party(db: AppState, user: Identity, party_id: web::Path<Uuid>) -> HttpResponse {
@@ -163,9 +162,10 @@ pub async fn get_party(db: AppState, user: Identity, party_id: web::Path<Uuid>) 
 
 #[utoipa::path(
     responses(
-        (status = 200, description = "Party details retrieved", body = PartyResponse),
+        (status = 200, description = "Current user's party", body = PartyResponse),
         (status = 401, description = "Unauthorized", body = ErrorResponse),
-        (status = 404, description = "No active party found", body = ErrorResponse),
+        (status = 403, description = "Not a party member", body = ErrorResponse),
+        (status = 404, description = "No active party", body = ErrorResponse),
         (status = 500, description = "Internal server error", body = ErrorResponse)
     ),
     tags = ["party"],

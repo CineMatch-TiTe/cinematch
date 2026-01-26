@@ -15,13 +15,13 @@ use crate::websocket::models::{MovieVotes, ServerMessage, VotingRoundStarted};
 
 #[utoipa::path(
     responses(
-        (status = 200, description = "Ballot and vote info", body = GetVoteResponse),
+        (status = 200, description = "Ballot and vote totals", body = GetVoteResponse),
         (status = 401, description = "Unauthorized", body = ErrorResponse),
         (status = 403, description = "Not a party member", body = ErrorResponse),
-        (status = 404, description = "Party not in Voting or not found", body = ErrorResponse),
+        (status = 404, description = "Party not found or not in Voting", body = ErrorResponse),
         (status = 500, description = "Internal server error", body = ErrorResponse)
     ),
-    params(("party_id" = Uuid, Path, description = "The party ID")),
+    params(("party_id" = Uuid, Path, description = "Party ID")),
     tags = ["party"],
     security(("cookie_auth" = [])),
     operation_id = "get_vote"
@@ -87,19 +87,18 @@ pub async fn get_vote(db: AppState, user: Identity, party_id: web::Path<Uuid>) -
 #[utoipa::path(
     request_body = VoteMovieRequest,
     responses(
-        (status = 200, description = "Vote cast", body = VoteMovieResponse), // likes, dislikes
+        (status = 200, description = "Vote cast", body = VoteMovieResponse),
         (status = 401, description = "Unauthorized", body = ErrorResponse),
-        (status = 403, description = "Not a party member or cannot vote", body = ErrorResponse),
-        (status = 404, description = "Party or movie not found", body = ErrorResponse),
+        (status = 403, description = "Not a member or cannot vote for this movie", body = ErrorResponse),
         (status = 500, description = "Internal server error", body = ErrorResponse)
     ),
     params(
-        ("party_id" = Uuid, Path, description = "The party's unique ID"),
-        ("movie_id" = i64, Path, description = "The movie's unique ID"),
-        ("vote_value" = bool, Query, description = "true for like, false for dislike")
+        ("party_id" = Uuid, Path, description = "Party ID"),
+        ("movie_id" = i64, Path, description = "TMDB movie ID")
     ),
     tags = ["party"],
-    security(("cookie_auth" = []))
+    security(("cookie_auth" = [])),
+    operation_id = "vote_movie"
 )]
 #[post("/{party_id}/vote/{movie_id}")]
 pub async fn vote_movie(

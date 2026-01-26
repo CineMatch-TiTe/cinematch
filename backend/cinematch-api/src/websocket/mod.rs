@@ -141,11 +141,10 @@ pub async fn broadcast_party_timeout(
 
 #[utoipa::path(
     responses(
-        (status = 200, description = "WebSocket connection established"),
-        (status = 401, description = "Unauthorized"),
-        (status = 406, description = "Not Acceptable - user is not in a party"),
-        (status = 400, description = "WebSocket handshake failed: WebSocket upgrade is expected"),
-        (status = 500, description = "Internal server error", body = ErrorResponse)
+        (status = 200, description = "WebSocket upgrade; real-time party updates"),
+        (status = 400, description = "Handshake failed (expect WebSocket upgrade)"),
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 406, description = "User not in a party")
     ),
     tags = ["websocket"],
     security(("cookie_auth" = [])),

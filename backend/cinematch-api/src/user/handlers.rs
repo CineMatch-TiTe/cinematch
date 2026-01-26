@@ -27,21 +27,17 @@ use cinematch_common::{ErrorResponse, extract_user_id};
 // User Management Endpoints
 // ============================================================================
 
-/// Create a guest user (login as guest)
+/// Create a guest user (login as guest).
 ///
-/// Creates a new temporary (oneshot) user with an auto-generated username.
-/// This user can join parties but will be ephemeral to that party's lifetime.
-/// To become persistent, the user must link an external OAuth account.
+/// Creates a temporary (oneshot) user. Optionally provide a username (3–32 chars);
+/// otherwise one is generated. On success, the server sets the `id` cookie (httpOnly,
+/// path=/, samesite=Lax, secure). Send it on subsequent requests; protected endpoints use `cookie_auth`.
 ///
-/// **Session**: On success, the server sets an `id` cookie (httpOnly, path=/, samesite=Lax, secure).
-/// Send this cookie on all subsequent requests; protected endpoints use `cookie_auth`.
-/// Use `GET /api/user/token` to obtain your `user_id` for clients that need it.
-///
-/// **Auth**: None required.
+/// **Auth**: None.
 #[utoipa::path(
     request_body = GuestUserRequest,
     responses(
-        (status = 201, description = "Guest user created; `id` cookie set", body = GuestLoginResponse),
+        (status = 201, description = "Guest created; `id` cookie set", body = GuestLoginResponse),
         (status = 400, description = "Invalid username", body = ErrorResponse),
         (status = 409, description = "Already logged in", body = ErrorResponse),
         (status = 500, description = "Internal server error", body = ErrorResponse)
@@ -104,25 +100,20 @@ pub async fn login_guest(
     }
 }
 
-/// Rename a user
+/// Rename the authenticated user.
 ///
-/// Updates the username for a user. Username can be 3-32 characters.
-///
-/// **Auth Required**: User can only rename their own account (user_id must match JWT token).
-///
+/// Username must be 3–32 characters. Caller must match `user_id` (cookie).
 #[utoipa::path(
     request_body = RenameUserRequest,
     responses(
-        (status = 200, description = "User renamed successfully"),
+        (status = 200, description = "Renamed"),
         (status = 400, description = "Invalid username", body = ErrorResponse),
-        (status = 401, description = "Unauthorized - authentication required"),
-        (status = 403, description = "Forbidden - cannot rename another user"),
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 403, description = "Cannot rename another user"),
         (status = 404, description = "User not found"),
         (status = 500, description = "Internal server error", body = ErrorResponse)
     ),
-    params(
-        ("user_id" = Uuid, Path, description = "The user ID")
-    ),
+    params(("user_id" = Uuid, Path, description = "User ID (must match authenticated user)")),
     tags = ["user"],
     security(("cookie_auth" = [])),
     operation_id = "rename_user"
@@ -164,16 +155,11 @@ pub async fn rename_user(
         }
     }
 }
-/// Get current user info
-///
-/// Returns the currently authenticated user's profile information
-/// along with JWT token validity details.
-///
-/// **Auth Required**: User must be authenticated with a valid JWT token.
+/// Current user profile (cookie-authenticated).
 #[utoipa::path(
     responses(
-        (status = 200, description = "User info retrieved successfully", body = CurrentUserResponse),
-        (status = 401, description = "Unauthorized - authentication required", body = ErrorResponse),
+        (status = 200, description = "User profile", body = CurrentUserResponse),
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
         (status = 404, description = "User not found", body = ErrorResponse),
         (status = 500, description = "Internal server error", body = ErrorResponse)
     ),
@@ -216,17 +202,11 @@ pub async fn get_current_user(user: Identity, db: AppState) -> HttpResponse {
     }
 }
 
-/// Logout user
-///
-/// Clears authentication cookies by setting them to expire.
-/// This effectively logs out the user on the client side.
-///
-/// **Auth**: No authentication required (any user can logout).
+/// Logout: clear `id` cookie. No auth required.
 #[utoipa::path(
     responses(
-        (status = 200, description = "Successfully logged out"),
-        (status = 204, description = "No user was logged in"),
-        (status = 500, description = "Internal server error", body = ErrorResponse)
+        (status = 200, description = "Logged out"),
+        (status = 204, description = "Not logged in")
     ),
     tags = ["user"],
     operation_id = "logout_user"
@@ -241,18 +221,16 @@ pub async fn logout_user(user: Option<Identity>) -> HttpResponse {
     }
 }
 
+/// Like or unlike a movie (global taste). Movie must exist.
 #[utoipa::path(
     request_body = UpdateTasteRequest,
     responses(
-        (status = 201, description = "Updated"),
-        (status = 400, description = "Bad Request - invalid input", body = ErrorResponse),
-        (status = 401, description = "Unauthorized - authentication required"),
-        (status = 404, description = "Movie not found"),
+        (status = 200, description = "Taste updated"),
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 404, description = "Movie not found", body = ErrorResponse),
         (status = 500, description = "Internal server error", body = ErrorResponse)
     ),
-    params(
-        ("movie_id" = i64, Path, description = "The movie ID")
-    ),
+    params(("movie_id" = i64, Path, description = "TMDB movie ID")),
     tags = ["user"],
     security(("cookie_auth" = [])),
     operation_id = "update_taste"

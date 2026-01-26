@@ -6,19 +6,18 @@ use crate::AppState;
 use cinematch_common::{ErrorResponse, FullUserPreferences, extract_user_id};
 use cinematch_db::{DbError, UpdateUserPreferences};
 
-/// Get the current user's preferences
 use super::{UpdateUserPreferencesRequest, UserPreferencesResponse};
 
+/// Current user's preferences (genres, year, etc.).
 #[utoipa::path(
-	responses(
-		(status = 200, description = "Get user preferences", body = UserPreferencesResponse),
-		(status = 401, description = "Unauthorized", body = ErrorResponse),
-		(status = 404, description = "Preferences not found", body = ErrorResponse),
-		(status = 500, description = "Internal server error", body = ErrorResponse)
-	),
-	tags = ["user"],
-	security(("cookie_auth" = [])),
-	operation_id = "get_user_preferences"
+    responses(
+        (status = 200, description = "Preferences", body = UserPreferencesResponse),
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 500, description = "Internal server error", body = ErrorResponse)
+    ),
+    tags = ["user"],
+    security(("cookie_auth" = [])),
+    operation_id = "get_user_preferences"
 )]
 #[get("/pref")]
 pub async fn get_user_pref(db: AppState, user: Option<Identity>) -> HttpResponse {
@@ -67,19 +66,18 @@ pub async fn get_user_pref(db: AppState, user: Option<Identity>) -> HttpResponse
         }
     }
 }
-/// Edit the current user's preferences
+/// Update current user's preferences. Invalid genre names return 400.
 #[utoipa::path(
-	request_body = UpdateUserPreferencesRequest,
-	responses(
-		(status = 200, description = "Preferences updated", body = UserPreferencesResponse),
-		(status = 400, description = "Invalid input", body = ErrorResponse),
-		(status = 401, description = "Unauthorized", body = ErrorResponse),
-		(status = 404, description = "Preferences not found", body = ErrorResponse),
-		(status = 500, description = "Internal server error", body = ErrorResponse)
-	),
-	tags = ["user"],
-	security(("cookie_auth" = [])),
-	operation_id = "edit_user_preferences"
+    request_body = UpdateUserPreferencesRequest,
+    responses(
+        (status = 200, description = "Updated preferences", body = UserPreferencesResponse),
+        (status = 400, description = "Invalid genre name in include/exclude", body = ErrorResponse),
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 500, description = "Internal server error", body = ErrorResponse)
+    ),
+    tags = ["user"],
+    security(("cookie_auth" = [])),
+    operation_id = "edit_user_preferences"
 )]
 #[patch("/pref")]
 pub async fn edit_user_pref(
