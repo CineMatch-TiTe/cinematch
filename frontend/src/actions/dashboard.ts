@@ -15,39 +15,17 @@ function isRedirectError(error: unknown) {
 
 export async function createPartyInstantAction() {
   try {
-    const response = await createParty()
+    const userPrefsRes = await import('@/server/user/user').then((mod) => mod.getUserPreferences())
+    const hasPreferences =
+      userPrefsRes.status === 200 &&
+      userPrefsRes.data?.include_genres &&
+      userPrefsRes.data.include_genres.length > 0
 
-    if (response.status === 201 && response.data?.code) {
-      // We don't necessarily need the code for the redirect if we are leader,
-      // but the party room usually needs partyId.
-      // Wait, createParty response typically returns the party object including ID.
-      // Let's check the type definition in party.ts again if needed,
-      // but usually it returns CreatePartyResponse which has code.
-      // Does it have ID?
-      // Checking `createPartyResponse` in `party.ts`...
-      // It returns `CreatePartyResponse`.
-      // Actually the `createParty` response might just contain the code or id.
-      // The previous `createPartyAction` in `onboarding.ts` used `response.data.code`.
-      // And then redirected to `/preferences`.
-      // But here we want to redirect to `/party-room/[id]`.
-      // Let's check `CreatePartyResponse` model if possible, or assume we might need to fetch the party or it returns ID.
-      // If `CreatePartyResponse` only has code, we might need to join it or fetch my party to get ID?
-      // Wait, `getMyParty` returns `PartyResponse` which has `id`.
-      // Let's look at `createParty` in `onboarding.ts` again.
-      // It redirects to `/preferences?joinCode=...`.
-      // If I create a party, I am the leader.
-      // I probably want to go to the party room.
-      // But I need the party ID.
-      // Let's assume `createParty` response structure.
-      // I will double check `src/server/party/party.ts` output for `CreatePartyResponse` if I can't be sure.
-      // But for now, I'll try to find the ID.
-      // If `CreatePartyResponse` aligns with `PartyResponse`, it has `id`.
-      // For now, let's look at `getMyPartyIdAction` in `party-room.ts`
-      // It calls `getMyParty()`.
-      // So I can call `createParty()` then `getMyParty()` to get the ID if it's not in the response.
+    if (!hasPreferences) {
+      return { requirePreferences: true }
     }
 
-    // Let's re-read party.ts types quickly in the next view if needed, but I'll write the safe version.
+    const response = await createParty()
 
     if (response.status === 201) {
       // Since we just created it, we can get it.
