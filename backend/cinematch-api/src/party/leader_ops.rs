@@ -118,6 +118,7 @@ pub async fn advance_phase(
 #[post("/{party_id}/disband")]
 pub async fn disband_party(
     db: AppState,
+    store: WsStoreData,
     user: Identity,
     party_id: web::Path<Uuid>,
 ) -> HttpResponse {
@@ -147,6 +148,11 @@ pub async fn disband_party(
     match db.disband_party(party_id).await {
         Ok(_) => {
             debug!("Party {} disbanded successfully", party_id);
+            // Notify all party members that the party was disbanded
+            let msg = ServerMessage::PartyDisbanded;
+            let _ = store
+                .send_message_to_party(party_id.to_string(), &msg, None)
+                .await;
             HttpResponse::Ok().finish()
         }
         Err(DbError::PartyNotFound(_)) => HttpResponse::NotFound().finish(),
@@ -178,6 +184,7 @@ pub async fn disband_party(
 #[post("/{party_id}/kick")]
 pub async fn kick_member(
     db: AppState,
+    store: WsStoreData,
     user: Identity,
     party_id: web::Path<Uuid>,
     body: web::Json<KickMemberRequest>,
@@ -225,6 +232,11 @@ pub async fn kick_member(
     match db.remove_party_member(party_id, target_user_id).await {
         Ok(()) => {
             debug!("User {} kicked from party {}", target_user_id, party_id);
+            // Notify remaining members that the user was kicked
+            let msg = ServerMessage::PartyMemberLeft(target_user_id);
+            let _ = store
+                .send_message_to_party(party_id.to_string(), &msg, None)
+                .await;
             HttpResponse::Ok().finish()
         }
         Err(DbError::NotPartyMember) => {
@@ -257,6 +269,7 @@ pub async fn kick_member(
 #[post("/{party_id}/transfer-leadership")]
 pub async fn transfer_leadership(
     db: AppState,
+    store: WsStoreData,
     user: Identity,
     party_id: web::Path<Uuid>,
     body: web::Json<TransferLeadershipRequest>,
@@ -297,7 +310,14 @@ pub async fn transfer_leadership(
     }
 
     match db.transfer_party_leadership(party_id, new_leader_id).await {
-        Ok(_) => HttpResponse::Ok().finish(),
+        Ok(_) => {
+            // Notify all party members of the leadership change
+            let msg = ServerMessage::PartyLeaderChanged(new_leader_id);
+            let _ = store
+                .send_message_to_party(party_id.to_string(), &msg, None)
+                .await;
+            HttpResponse::Ok().finish()
+        }
         Err(DbError::PartyNotFound(_)) => {
             HttpResponse::NotFound().json(ErrorResponse::new("Party not found"))
         }

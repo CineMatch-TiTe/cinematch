@@ -10,7 +10,7 @@ use log::{debug, error, trace};
 use uuid::Uuid;
 
 use crate::websocket::broadcast_party_timeout;
-use crate::websocket::models::{MemberJoined, ServerMessage};
+use crate::websocket::models::{MemberJoined, ReadyStateUpdate, ServerMessage};
 
 #[utoipa::path(
     responses(
@@ -328,6 +328,16 @@ pub async fn set_ready(
     match db.set_member_ready(party_id, user_id, ready.is_ready).await {
         Ok(_) => {
             debug!("Ready state toggled for user {}", user_id);
+
+            // Broadcast ready state update to all party members
+            let ready_msg = ServerMessage::UpdateReadyState(ReadyStateUpdate {
+                user_id,
+                ready: ready.is_ready,
+            });
+            let _ = store
+                .send_message_to_party(party_id.to_string(), &ready_msg, None)
+                .await;
+
             // Auto-advance when all ready (Created→Picking or Picking→Voting or Review→Created).
             // Advancing resets readiness, so we must return all_ready from *before* the reset.
             let advanced =

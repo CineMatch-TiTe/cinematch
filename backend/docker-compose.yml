@@ -13,7 +13,7 @@ services:
     environment:
       - DATABASE_URL=postgres://cinematch_user:password@cinematch-db:5432/cinematch
       - REDIS_URL=redis://cinematch-redis:6379
-      - QDRANT_URL=http://qdrant:6333
+      - QDRANT_URL=http://qdrant:6334
     depends_on:
       - cinematch-db
       - cinematch-redis
@@ -33,7 +33,7 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - cinematch_db_data:/var/lib/postgresql/data
+      - ~/cinematch_db:/var/lib/postgresql/data
     networks:
       - db_network
       - internet
@@ -54,7 +54,7 @@ services:
       - "6333:6333"
       - "6334:6334"
     volumes:
-      - qdrant_storage:/qdrant/storage
+      - ~/qdrant:/qdrant/storage
     environment:
       - QDRANT_API_KEY=
     networks:

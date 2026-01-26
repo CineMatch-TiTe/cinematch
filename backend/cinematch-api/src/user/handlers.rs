@@ -17,10 +17,11 @@ use super::{
     UpdateTasteRequest,
 };
 
-use crate::AppState;
+use crate::{AppState, WsStoreData};
 
 use cinematch_db::DbError;
 
+use crate::websocket::models::{NameChanged, ServerMessage};
 use cinematch_common::{ErrorResponse, extract_user_id};
 
 // ============================================================================
@@ -121,6 +122,7 @@ pub async fn login_guest(
 #[patch("/rename/{user_id}")]
 pub async fn rename_user(
     db: AppState,
+    store: WsStoreData,
     user_id: web::Path<Uuid>,
     body: web::Json<RenameUserRequest>,
     user: Identity,
@@ -146,7 +148,19 @@ pub async fn rename_user(
     };
 
     match db.update_user(user_id, update).await {
-        Ok(_) => HttpResponse::Ok().finish(),
+        Ok(_) => {
+            // If user is in a party, notify party members of the name change
+            if let Ok(party_id) = db.get_user_active_party(user_id).await {
+                let msg = ServerMessage::NameChanged(NameChanged {
+                    user_id,
+                    new_name: new_username.clone(),
+                });
+                let _ = store
+                    .send_message_to_party(party_id.to_string(), &msg, None)
+                    .await;
+            }
+            HttpResponse::Ok().finish()
+        }
         Err(DbError::UserNotFound(_)) => HttpResponse::NotFound().finish(),
         Err(e) => {
             log::error!("Failed to rename user: {}", e);
