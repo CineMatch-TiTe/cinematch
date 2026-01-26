@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
-import { Loader2, X, RefreshCw } from 'lucide-react'
+import { Loader2, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import MovieCard from './MovieCard'
 import { getUserPreferencesAction, pickMovieAction, searchMoviesAction } from '@/actions/party-room'
@@ -185,15 +185,10 @@ export default function PickingFlow({ partyId, onClose }: PickingFlowProps) {
         </p>
         <div className="flex gap-3">
           <Button
-            onClick={handleRefetch}
+            onClick={onClose}
             size="lg"
-            variant="outline"
-            className="border-white/20 text-white hover:bg-white/10"
+            className="bg-red-600 text-white hover:bg-red-700 shadow-lg shadow-red-500/20"
           >
-            <RefreshCw className="w-4 h-4 mr-2" />
-            Try Again
-          </Button>
-          <Button onClick={onClose} size="lg" className="bg-white text-black hover:bg-zinc-200">
             Return to Party
           </Button>
         </div>

@@ -3,6 +3,7 @@
 import { useEffect, useTransition, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
+import Image from 'next/image'
 import { LogOut, Play } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
@@ -116,7 +117,10 @@ export default function PartyViewClient({
 
       <div className="w-full max-w-md p-4 flex-1 flex flex-col z-10 relative">
         <header className="flex flex-col items-center mb-6">
-          <h1 className="text-2xl font-bold tracking-tight mb-2 text-white">Party Room</h1>
+          <div className="flex flex-row items-center mb-2 gap-2">
+            <Image src="/Logo.png" alt="Logo" width={32} height={32} />
+            <h1 className="text-2xl font-bold tracking-tight text-white">Party Room</h1>
+          </div>
           <PartyHeader partyCode={party.code} />
           <div className="mt-2 text-zinc-500 text-sm uppercase tracking-wider font-medium">
             {party.state} Phase
