@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { MovieResponse } from '@/model/movieResponse'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
+import { Skeleton } from '@/components/ui/skeleton'
 import Image from 'next/image'
 import { ThumbsUp } from 'lucide-react'
 
@@ -13,6 +14,13 @@ function VotingCard({
   onVote: (id: number, like: boolean) => void
 }>) {
   const [hasVoted, setHasVoted] = useState(false)
+  const [isImageLoading, setIsImageLoading] = useState(true)
+  const [prevPosterUrl, setPrevPosterUrl] = useState(movie.poster_url)
+
+  if (movie.poster_url !== prevPosterUrl) {
+    setPrevPosterUrl(movie.poster_url)
+    setIsImageLoading(true)
+  }
 
   return (
     <Card
@@ -23,12 +31,20 @@ function VotingCard({
       <div className="flex flex-row h-40 sm:h-48 px-4">
         <div className="relative w-28 sm:w-36 shrink-0 bg-zinc-800">
           {movie.poster_url ? (
-            <Image
-              src={`https://image.tmdb.org/t/p/w200${movie.poster_url}`}
-              alt={movie.title}
-              fill
-              className="object-cover"
-            />
+            <>
+              <Image
+                src={movie.poster_url}
+                alt={movie.title}
+                fill
+                loading="eager"
+                sizes="(max-width: 640px) 112px, 144px"
+                className={`object-cover transition-opacity duration-300 ${
+                  isImageLoading ? 'opacity-0' : 'opacity-100'
+                }`}
+                onLoad={() => setIsImageLoading(false)}
+              />
+              {isImageLoading && <Skeleton className="absolute inset-0 bg-zinc-800" />}
+            </>
           ) : (
             <div className="w-full h-full flex items-center justify-center text-zinc-600">
               No Poster

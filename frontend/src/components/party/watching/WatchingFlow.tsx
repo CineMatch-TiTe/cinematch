@@ -9,6 +9,7 @@ import JSConfetti from 'js-confetti'
 import { MovieResponse } from '@/model/movieResponse'
 import { getMoviesByIdsAction } from '@/actions/party-room'
 import { Card } from '@/components/ui/card'
+import { Skeleton } from '@/components/ui/skeleton'
 
 interface WatchingFlowProps {
   movieId: number
@@ -17,6 +18,7 @@ interface WatchingFlowProps {
 export default function WatchingFlow({ movieId }: Readonly<WatchingFlowProps>) {
   const [movie, setMovie] = useState<MovieResponse | null>(null)
   const [loading, setLoading] = useState(true)
+  const [isImageLoading, setIsImageLoading] = useState(true)
 
   useEffect(() => {
     const fetchMovie = async () => {
@@ -63,21 +65,27 @@ export default function WatchingFlow({ movieId }: Readonly<WatchingFlowProps>) {
             {movie.poster_url ? (
               <>
                 <Image
-                  src={`https://image.tmdb.org/t/p/original${movie.poster_url}`} // Use backdrop if available, but movieResponse only has poster_url usually. Let's check model.
-                  // MovieResponse has poster_url. It doesn't seem to have valid backdrop_path exposed in types clearly seen before, let's Stick to poster but maybe formatted differently or check if we can get backdrop.
-                  // Actually, let's just use poster with a blur background or fit it nicely.
+                  src={movie.poster_url}
                   alt={movie.title}
                   fill
+                  sizes="100vw"
                   className="object-cover opacity-30 blur-sm"
+                  priority
                 />
                 <div className="absolute inset-0 flex items-center justify-center p-8">
                   <div className="relative w-48 h-72 shadow-2xl rounded-lg overflow-hidden border-2 border-white/10">
                     <Image
-                      src={`https://image.tmdb.org/t/p/w500${movie.poster_url}`}
+                      src={movie.poster_url}
                       alt={movie.title}
                       fill
-                      className="object-cover"
+                      sizes="(max-width: 768px) 192px, 192px"
+                      className={`object-cover transition-opacity duration-300 ${
+                        isImageLoading ? 'opacity-0' : 'opacity-100'
+                      }`}
+                      onLoad={() => setIsImageLoading(false)}
+                      priority
                     />
+                    {isImageLoading && <Skeleton className="absolute inset-0 bg-zinc-800" />}
                   </div>
                 </div>
               </>
