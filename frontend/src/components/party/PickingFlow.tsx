@@ -13,6 +13,9 @@ interface PickingFlowProps {
   onClose: () => void
 }
 
+// Number of movies remaining before triggering prefetch
+const PREFETCH_THRESHOLD = 3
+
 export default function PickingFlow({ partyId, onClose }: PickingFlowProps) {
   const [movies, setMovies] = useState<MovieResponse[]>([])
   const [seenMovieIds, setSeenMovieIds] = useState<Set<number>>(new Set())
@@ -23,6 +26,10 @@ export default function PickingFlow({ partyId, onClose }: PickingFlowProps) {
   const [noNewMovies, setNoNewMovies] = useState(false)
   const [searchPage, setSearchPage] = useState(1)
   const searchGenresRef = useRef<string[]>([])
+
+  // Prefetch state for smooth transitions
+  const [prefetchedMovies, setPrefetchedMovies] = useState<MovieResponse[]>([])
+  const [isPrefetching, setIsPrefetching] = useState(false)
 
   const filterNewMovies = useCallback((fetchedMovies: MovieResponse[], seenIds: Set<number>) => {
     return fetchedMovies.filter((movie) => !seenIds.has(movie.movie_id))
@@ -112,28 +119,95 @@ export default function PickingFlow({ partyId, onClose }: PickingFlowProps) {
     }
   }, [movies, currentIndex])
 
-  // Refetch movies when running out
-  const handleRefetch = useCallback(async () => {
-    setRefetching(true)
-    setNoNewMovies(false)
+  // Prefetch next batch of movies in the background
+  const prefetchNextMovies = useCallback(async () => {
+    if (isPrefetching || prefetchedMovies.length > 0 || noNewMovies) return
 
+    setIsPrefetching(true)
     try {
-      const found = await fetchSearchMovies()
-      if (!found) {
-        setNoNewMovies(true)
+      const searchedMovies = await searchMoviesFromPreferences(searchPage)
+      if (!searchedMovies) {
+        setIsPrefetching(false)
+        return
+      }
+
+      const newMovies = filterNewMovies(searchedMovies, seenMovieIds)
+      if (newMovies.length > 0) {
+        setPrefetchedMovies(newMovies)
+        setSearchPage((prev) => prev + 1)
+      } else {
+        // Try next page if current page has no new movies
+        const nextSearchPage = searchPage + 1
+        setSearchPage(nextSearchPage)
+        const nextPageMovies = await searchMoviesFromPreferences(nextSearchPage)
+        if (nextPageMovies) {
+          const nextNewMovies = filterNewMovies(nextPageMovies, seenMovieIds)
+          if (nextNewMovies.length > 0) {
+            setPrefetchedMovies(nextNewMovies)
+            setSearchPage((prev) => prev + 1)
+          }
+        }
       }
     } finally {
-      setRefetching(false)
+      setIsPrefetching(false)
     }
-  }, [fetchSearchMovies])
+  }, [
+    isPrefetching,
+    prefetchedMovies.length,
+    noNewMovies,
+    searchMoviesFromPreferences,
+    searchPage,
+    filterNewMovies,
+    seenMovieIds
+  ])
 
-  // Auto-refetch when movies run out
+  // Trigger prefetch when approaching the end of current movies
+  useEffect(() => {
+    const moviesRemaining = movies.length - currentIndex
+    const shouldPrefetch =
+      movies.length > 0 &&
+      moviesRemaining <= PREFETCH_THRESHOLD &&
+      !isPrefetching &&
+      prefetchedMovies.length === 0 &&
+      !noNewMovies
+
+    if (shouldPrefetch) {
+      prefetchNextMovies()
+    }
+  }, [
+    currentIndex,
+    movies.length,
+    isPrefetching,
+    prefetchedMovies.length,
+    noNewMovies,
+    prefetchNextMovies
+  ])
+
+  // Seamlessly merge prefetched movies when current batch is exhausted
   useEffect(() => {
     const hasFinishedMovies = movies.length > 0 && currentIndex >= movies.length
-    if (hasFinishedMovies && !refetching && !noNewMovies) {
-      handleRefetch()
+
+    if (hasFinishedMovies) {
+      if (prefetchedMovies.length > 0) {
+        // Seamlessly transition to prefetched movies
+        setMovies(prefetchedMovies)
+        setPrefetchedMovies([])
+        setCurrentIndex(0)
+      } else if (!isPrefetching && !noNewMovies) {
+        // Fallback: no prefetched movies ready, show loading and fetch
+        setRefetching(true)
+        fetchSearchMovies().then((found) => {
+          if (!found) {
+            setNoNewMovies(true)
+          }
+          setRefetching(false)
+        })
+      } else if (!isPrefetching) {
+        // No more movies available
+        setNoNewMovies(true)
+      }
     }
-  }, [currentIndex, movies.length, refetching, noNewMovies, handleRefetch])
+  }, [currentIndex, movies.length, prefetchedMovies, isPrefetching, noNewMovies, fetchSearchMovies])
 
   const handleLike = async () => {
     if (processing) return
