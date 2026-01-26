@@ -1,6 +1,6 @@
 'use client'
 
-import React from 'react'
+import { useState } from 'react'
 import {
   Dialog,
   DialogContent,
@@ -9,20 +9,11 @@ import {
   DialogTitle,
   DialogTrigger
 } from '@/components/ui/dialog'
-
-
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Loader2 } from 'lucide-react'
 import useSWR from 'swr'
-import {
-  getCurrentUserAction,
-  getUserPreferencesAction
-} from '@/actions/user'
-
-
+import { getCurrentUserAction, getUserPreferencesAction } from '@/actions/user'
 import AccountForm from '@/components/user/AccountForm'
-import PreferencesTabFlow from '@/components/preferences/PreferencesTabFlow'
-
+import PreferencesFlow from '@/components/preferences/PreferencesFlow'
 
 const fetchUser = async () => {
   const res = await getCurrentUserAction()
@@ -36,13 +27,22 @@ const fetchPrefs = async () => {
   throw new Error(res.error || 'Failed to fetch prefs')
 }
 
-export function PreferencesDialog({ trigger, open, onOpenChangeAction }: Readonly<{
+export function PreferencesDialog({
+  trigger,
+  open,
+  onOpenChangeAction
+}: Readonly<{
   trigger?: React.ReactNode
   open?: boolean
   onOpenChangeAction?: (open: boolean) => void
 }>) {
-  const { data: userData, mutate: mutateUser, isLoading: isUserLoading } = useSWR('/api/user', fetchUser)
-  const { data: prefData, mutate: mutatePref, isLoading: isPrefLoading } = useSWR('/api/user/pref', fetchPrefs)
+  const {
+    data: userData,
+    mutate: mutateUser,
+    isLoading: isUserLoading
+  } = useSWR('/api/user', fetchUser)
+  const { data: prefData, mutate: mutatePref } = useSWR('/api/user/pref', fetchPrefs)
+  const [showPrefsFlow, setShowPrefsFlow] = useState(false)
 
   return (
     <Dialog open={open} onOpenChange={onOpenChangeAction}>
@@ -55,32 +55,42 @@ export function PreferencesDialog({ trigger, open, onOpenChangeAction }: Readonl
           </DialogDescription>
         </DialogHeader>
 
-        <Tabs defaultValue="account" className="w-full">
-          <TabsList className="grid w-full grid-cols-2 bg-zinc-900 border border-red-900/30 mb-4">
-            <TabsTrigger value="account" className="text-white data-[state=active]:bg-red-700 data-[state=active]:text-white">Account</TabsTrigger>
-            <TabsTrigger value="preferences" className="text-white data-[state=active]:bg-red-700 data-[state=active]:text-white">Movie Filters</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="account">
+        {showPrefsFlow ? (
+          <PreferencesFlow
+            initialPrefs={prefData}
+            onComplete={() => {
+              mutatePref()
+              setShowPrefsFlow(false)
+            }}
+          />
+        ) : (
+          <div className="space-y-6">
             {isUserLoading ? (
-              <div className="flex justify-center p-8"><Loader2 className="animate-spin text-red-500" /></div>
+              <div className="flex justify-center p-8">
+                <Loader2 className="animate-spin text-red-500" />
+              </div>
             ) : userData ? (
-              <AccountForm initialUser={userData} onSuccess={() => mutateUser()} />
+              <>
+                <AccountForm initialUser={userData} onSuccess={() => mutateUser()} />
+
+                <div className="mt-8 pt-6 border-t border-zinc-800">
+                  <h3 className="text-lg font-medium text-white mb-2">Taste Profile</h3>
+                  <p className="text-sm text-zinc-400 mb-4">
+                    Update your movie preferences, favorite genres, and decades.
+                  </p>
+                  <button
+                    onClick={() => setShowPrefsFlow(true)}
+                    className="w-full bg-zinc-800 hover:bg-zinc-700 text-white font-medium py-2 px-4 rounded-md transition-colors border border-zinc-700"
+                  >
+                    Redo Taste Profile Setup
+                  </button>
+                </div>
+              </>
             ) : (
               <div className="text-red-500 text-sm">Failed to load user data</div>
             )}
-          </TabsContent>
-
-          <TabsContent value="preferences">
-            {isPrefLoading ? (
-              <div className="flex justify-center p-8"><Loader2 className="animate-spin text-red-500" /></div>
-            ) : prefData ? (
-              <PreferencesTabFlow initialPrefs={prefData} onSuccess={() => mutatePref()} />
-            ) : (
-              <div className="text-red-500 text-sm">Failed to load preferences</div>
-            )}
-          </TabsContent>
-        </Tabs>
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   )

@@ -8,11 +8,12 @@ import {
   leaveParty,
   transferLeadership,
   getMyParty,
+  getPartyRecommendations,
   pickMovie,
   voteMovie,
   getVote
 } from '@/server/party/party'
-import { getRecommendations } from '@/server/movie/movie'
+
 import { SearchFilter } from '@/model/searchFilter'
 
 export async function leavePartyAction(partyId: string) {
@@ -68,9 +69,9 @@ export async function advancePhaseAction(partyId: string) {
   }
 }
 
-export async function getRecommendedMoviesAction() {
+export async function getRecommendedMoviesAction(partyId: string) {
   try {
-    const response = await getRecommendations()
+    const response = await getPartyRecommendations(partyId)
     if (response.status === 200) {
       return { data: response.data.recommended_movies }
     }
@@ -93,7 +94,6 @@ export async function pickMovieAction(partyId: string, movieId: number, liked?: 
     return { error: 'Failed to pick movie' }
   }
 }
-
 
 export async function getMyPartyIdAction() {
   try {

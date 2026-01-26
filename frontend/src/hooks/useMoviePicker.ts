@@ -1,15 +1,9 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { toast } from 'sonner'
-import {
-  getUserPreferencesAction,
-  pickMovieAction,
-  searchMoviesAction
-} from '@/actions/party-room'
+import { getRecommendedMoviesAction, pickMovieAction } from '@/actions/party-room'
 import { MovieResponse } from '@/model/movieResponse'
-import { SearchFilter } from '@/model/searchFilter'
-
 // Number of movies remaining before triggering prefetch
 const PREFETCH_THRESHOLD = 3
 
@@ -37,9 +31,6 @@ export function useMoviePicker({ partyId }: UseMoviePickerOptions): UseMoviePick
   const [processing, setProcessing] = useState(false)
   const [currentIndex, setCurrentIndex] = useState(0)
   const [noNewMovies, setNoNewMovies] = useState(false)
-  const [searchPage, setSearchPage] = useState(1)
-  const searchGenresRef = useRef<string[]>([])
-  const searchYearRef = useRef<{ min?: number; max?: number } | undefined>(undefined)
 
   // Prefetch state for smooth transitions
   const [prefetchedMovies, setPrefetchedMovies] = useState<MovieResponse[]>([])
@@ -50,55 +41,21 @@ export function useMoviePicker({ partyId }: UseMoviePickerOptions): UseMoviePick
   }, [])
 
   // Search movies using user preferences
-  const searchMoviesFromPreferences = useCallback(async (page: number = 1) => {
+  // Fetch party recommendations
+  const fetchRecommendations = useCallback(async () => {
     try {
-      // Get user preferences if we don't have genres yet
-      if (searchGenresRef.current.length === 0) {
-        const prefsResult = await getUserPreferencesAction()
-        if (prefsResult.data?.include_genres) {
-          searchGenresRef.current = prefsResult.data.include_genres
-        }
+      const result = await getRecommendedMoviesAction(partyId)
+
+      if (result.data) {
+        return result.data
       }
-
-      // Use genres for filtering
-      const genres = searchGenresRef.current
-
-      // Calculate year range if not already set
-      if (!searchYearRef.current) {
-        const prefsResult = await getUserPreferencesAction()
-        if (prefsResult.data) {
-          const { target_release_year, release_year_flex } = prefsResult.data
-          if (target_release_year) {
-            searchYearRef.current = {
-              min: target_release_year - release_year_flex,
-              max: target_release_year + release_year_flex
-            }
-          } else {
-            searchYearRef.current = {} // Mark as checked but empty
-          }
-        }
-      }
-
-      const yearFilter = searchYearRef.current
-
-      const filter: SearchFilter = {
-        include_genres: genres,
-        exclude_genres: [],
-        min_year: yearFilter?.min,
-        max_year: yearFilter?.max
-      }
-
-      const searchResult = await searchMoviesAction(filter, page)
-
-      if (searchResult.data) {
-        return searchResult.data
-      }
+      return []
     } catch (error) {
-      console.error('Search failed', error)
-      toast.error('Failed to search movies')
+      console.error('Fetch recommendations failed', error)
+      toast.error('Failed to fetch movies')
+      return []
     }
-    return null
-  }, [])
+  }, [partyId])
 
   // Helper to set new movies
   const setNewMovies = useCallback((newMovies: MovieResponse[]) => {
@@ -106,37 +63,22 @@ export function useMoviePicker({ partyId }: UseMoviePickerOptions): UseMoviePick
     setCurrentIndex(0)
   }, [])
 
-  // Fetch movies from search with pagination
-  const fetchSearchMovies = useCallback(async (): Promise<boolean> => {
-    const searchedMovies = await searchMoviesFromPreferences(searchPage)
-    if (!searchedMovies) return false
-
-    const newMovies = filterNewMovies(searchedMovies, seenMovieIds)
-    if (newMovies.length > 0) {
-      setNewMovies(newMovies)
-      setSearchPage((prev) => prev + 1)
-      return true
-    }
-
-    // Try next page if current page has no new movies
-    setSearchPage((prev) => prev + 1)
-    const nextPageMovies = await searchMoviesFromPreferences(searchPage + 1)
-    if (!nextPageMovies) return false
-
-    const nextNewMovies = filterNewMovies(nextPageMovies, seenMovieIds)
-    if (nextNewMovies.length > 0) {
-      setNewMovies(nextNewMovies)
-      setSearchPage((prev) => prev + 1)
-      return true
-    }
-    return false
-  }, [searchMoviesFromPreferences, searchPage, filterNewMovies, seenMovieIds, setNewMovies])
-
-  // Initial fetch using search
+  // Initial fetch
   useEffect(() => {
     const initialFetch = async () => {
-      const success = await fetchSearchMovies()
-      if (!success) {
+      setLoading(true)
+      const newMovies = await fetchRecommendations()
+
+      // Filter out seen ones just in case backend includes them
+      // (Backend normally excludes picked movies, but client-side checking is good practice)
+      // Actually backend recommendations should be fresh.
+      // But we can filter against seenMovieIds just in case of race conditions during session.
+      const filtered = filterNewMovies(newMovies, seenMovieIds)
+
+      if (filtered.length > 0) {
+        setNewMovies(filtered)
+        setNoNewMovies(false)
+      } else {
         setNoNewMovies(true)
       }
       setLoading(false)
@@ -144,7 +86,7 @@ export function useMoviePicker({ partyId }: UseMoviePickerOptions): UseMoviePick
 
     initialFetch()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, []) // Run once on mount
 
   // Track current movie as seen before moving to next
   const markCurrentAsSeen = useCallback(() => {
@@ -160,28 +102,18 @@ export function useMoviePicker({ partyId }: UseMoviePickerOptions): UseMoviePick
 
     setIsPrefetching(true)
     try {
-      const searchedMovies = await searchMoviesFromPreferences(searchPage)
-      if (!searchedMovies) {
-        setIsPrefetching(false)
-        return
-      }
+      // Fetch more recommendations
+      const movies = await fetchRecommendations()
 
-      const newMovies = filterNewMovies(searchedMovies, seenMovieIds)
+      const newMovies = filterNewMovies(movies, seenMovieIds)
+
       if (newMovies.length > 0) {
         setPrefetchedMovies(newMovies)
-        setSearchPage((prev) => prev + 1)
       } else {
-        // Try next page if current page has no new movies
-        const nextSearchPage = searchPage + 1
-        setSearchPage(nextSearchPage)
-        const nextPageMovies = await searchMoviesFromPreferences(nextSearchPage)
-        if (nextPageMovies) {
-          const nextNewMovies = filterNewMovies(nextPageMovies, seenMovieIds)
-          if (nextNewMovies.length > 0) {
-            setPrefetchedMovies(nextNewMovies)
-            setSearchPage((prev) => prev + 1)
-          }
-        }
+        // If no new movies returned, maybe we are done
+        // Check if we already have some prefetched, if so, we can wait.
+        // But if empty, try again? Or just mark noNewMovies?
+        // Let's assume empty list means no more recommendations.
       }
     } finally {
       setIsPrefetching(false)
@@ -190,8 +122,7 @@ export function useMoviePicker({ partyId }: UseMoviePickerOptions): UseMoviePick
     isPrefetching,
     prefetchedMovies.length,
     noNewMovies,
-    searchMoviesFromPreferences,
-    searchPage,
+    fetchRecommendations,
     filterNewMovies,
     seenMovieIds
   ])
@@ -231,8 +162,13 @@ export function useMoviePicker({ partyId }: UseMoviePickerOptions): UseMoviePick
       } else if (!isPrefetching && !noNewMovies) {
         // Fallback: no prefetched movies ready, show loading and fetch
         setRefetching(true)
-        fetchSearchMovies().then((found) => {
-          if (!found) {
+        fetchRecommendations().then((movies) => {
+          const filtered = filterNewMovies(movies, seenMovieIds)
+          if (filtered.length > 0) {
+            setMovies(filtered)
+            setCurrentIndex(0)
+            setNoNewMovies(false)
+          } else {
             setNoNewMovies(true)
           }
           setRefetching(false)
@@ -242,7 +178,16 @@ export function useMoviePicker({ partyId }: UseMoviePickerOptions): UseMoviePick
         setNoNewMovies(true)
       }
     }
-  }, [currentIndex, movies.length, prefetchedMovies, isPrefetching, noNewMovies, fetchSearchMovies])
+  }, [
+    currentIndex,
+    movies.length,
+    prefetchedMovies,
+    isPrefetching,
+    noNewMovies,
+    fetchRecommendations,
+    filterNewMovies,
+    seenMovieIds
+  ])
 
   const handleLike = async () => {
     if (processing) return

@@ -3,14 +3,14 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 
 interface DecadeSelectionProps {
-  selectedDecades: string[]
+  selectedDecade: string | null
   onToggleDecade: (decade: string) => void
   onNext: () => void
   onBack: () => void
 }
 
 const DecadeSelection: React.FC<DecadeSelectionProps> = ({
-  selectedDecades,
+  selectedDecade,
   onToggleDecade,
   onNext,
   onBack
@@ -28,7 +28,7 @@ const DecadeSelection: React.FC<DecadeSelectionProps> = ({
       <CardContent className="space-y-6">
         <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
           {decades.map((decade) => {
-            const isSelected = selectedDecades.includes(decade)
+            const isSelected = selectedDecade === decade
             return (
               <button
                 key={decade}
@@ -56,7 +56,7 @@ const DecadeSelection: React.FC<DecadeSelectionProps> = ({
           </Button>
           <Button
             onClick={onNext}
-            disabled={selectedDecades.length === 0}
+            disabled={!selectedDecade}
             className="bg-red-600 hover:bg-red-700 text-white"
           >
             Next Step
