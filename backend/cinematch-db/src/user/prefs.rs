@@ -89,6 +89,7 @@ impl Database {
                 user_id: _user_id,
                 genre_id: _genre_id,
             })
+            .on_conflict_do_nothing()
             .execute(&mut conn)
             .await?;
         Ok(())

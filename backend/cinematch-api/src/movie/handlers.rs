@@ -1,11 +1,12 @@
 use crate::movie::SearchResponse;
+use cinematch_common::SearchFilter;
 
 use super::{
     AppState, ErrorResponse, GenreResponse, MovieResponse, RecommendedMoviesResponse, SearchQuery,
     extract_user_id,
 };
 use actix_identity::Identity;
-use actix_web::{HttpResponse, get, web};
+use actix_web::{HttpResponse, get, post, web};
 use log::error;
 
 #[utoipa::path(
@@ -137,6 +138,11 @@ pub async fn get_recommendations(db: AppState, user: Option<Identity>) -> HttpRe
 }
 
 #[utoipa::path(
+    request_body(content = SearchFilter, description = "Search filter"),
+    params(
+        ("title" = String, Query, description = "Movie title"),
+        ("page" = Option<i64>, Query, description = "Page number")
+    ),
     responses(
         (status = 200, description = "Matching movies", body = SearchResponse),
         (status = 400, description = "Empty query", body = ErrorResponse),
@@ -144,32 +150,28 @@ pub async fn get_recommendations(db: AppState, user: Option<Identity>) -> HttpRe
         (status = 404, description = "No movies found", body = ErrorResponse),
         (status = 500, description = "Internal server error", body = ErrorResponse)
     ),
-    params(
-        ("query" = String, Query, description = "Search string"),
-        ("page" = Option<i64>, Query, description = "Page number (1-based)")
-    ),
     tags = ["movie"],
     security(("cookie_auth" = [])),
     operation_id = "search_movies"
 )]
-#[get("/search")]
+#[post("/search")]
 pub async fn search(
     db: AppState,
     user: Option<Identity>,
-    params: web::Query<SearchQuery>,
+    query: web::Query<SearchQuery>,
+    body: Option<web::Json<SearchFilter>>,
 ) -> HttpResponse {
     let _ = extract_user_id!(user);
 
-    let query = params.query.trim();
-    let page = params.page.unwrap_or(1);
-    if query.is_empty() {
-        return HttpResponse::BadRequest().json(ErrorResponse::new("Query cannot be empty"));
-    }
+    let query = query.into_inner();
+    let filter = body.map(|b| b.into_inner());
+    let title = query.title;
+    let page = query.page.unwrap_or(1);
 
-    let movies = match db.search_movies(query, page).await {
+    let movies = match db.search_movies(&title, page, filter).await {
         Ok(movies) => movies,
         Err(e) => {
-            error!("Failed to search movies with query '{}': {}", query, e);
+            error!("Failed to search movies with query '{}': {}", title, e);
             return HttpResponse::InternalServerError()
                 .json(ErrorResponse::new("Failed to search movies"));
         }

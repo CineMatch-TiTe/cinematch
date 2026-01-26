@@ -7,6 +7,7 @@ use crate::models::{NewUser, UpdateUser, User};
 use crate::schema;
 use crate::{Database, DbError, DbResult};
 
+use log;
 use uuid::Uuid;
 
 impl Database {
@@ -51,6 +52,18 @@ impl Database {
             is_tite: false,
         };
         self.create_user_preferences(prefs).await?;
+
+        // Add default exclude for documentaries
+        if let Ok(Some(doc_genre_id)) = self.get_doc_genre_id().await {
+            if let Err(e) = self.add_user_exclude_genre(user.id, doc_genre_id).await {
+                // Log error but don't fail user creation if genre doesn't exist
+                log::warn!("Failed to add default exclude for Documentary genre: {}", e);
+            }
+        } else {
+            // Genre might not exist yet, that's okay
+            log::debug!("Documentary genre not found, skipping default exclude");
+        }
+
         Ok(user)
     }
 

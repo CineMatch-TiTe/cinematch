@@ -5,6 +5,22 @@ use utoipa::ToSchema;
 use uuid::Uuid;
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct SearchFilter {
+    #[schema(example = json!(["Action", "Drama"]))]
+    pub exclude_genres: Vec<String>,
+    #[schema(example = json!(["Horror", "Comedy"]))]
+    pub include_genres: Vec<String>,
+    #[schema(example = json!(2020))]
+    pub min_year: Option<i32>,
+    #[schema(example = json!(2025))]
+    pub max_year: Option<i32>,
+    #[schema(example = json!(30))]
+    pub min_runtime: Option<i32>,
+    #[schema(example = json!(180))]
+    pub max_runtime: Option<i32>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct FullUserPreferences {
     pub user_id: Uuid,
     pub preferred_year: Option<i32>,

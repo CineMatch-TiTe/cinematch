@@ -82,12 +82,12 @@ pub struct RecommendedMoviesResponse {
 }
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
-pub struct SearchQuery {
-    pub query: String,
-    pub page: Option<i64>,
+pub struct SearchResponse {
+    pub movies: Vec<MovieResponse>,
 }
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
-pub struct SearchResponse {
-    pub movies: Vec<MovieResponse>,
+pub struct SearchQuery {
+    pub title: String,
+    pub page: Option<i64>,
 }
