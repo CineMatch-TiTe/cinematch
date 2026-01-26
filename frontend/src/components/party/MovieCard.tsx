@@ -1,4 +1,6 @@
+import { useState } from 'react'
 import { Button } from '@/components/ui/button'
+import { Skeleton } from '@/components/ui/skeleton'
 import { MovieResponse } from '@/model/movieResponse'
 import { ThumbsDown, ThumbsUp, SkipForward } from 'lucide-react'
 import Image from 'next/image'
@@ -18,6 +20,13 @@ export default function MovieCard({
   onSkip,
   disabled
 }: Readonly<MovieCardProps>) {
+  const [isImageLoading, setIsImageLoading] = useState(true)
+  const [prevPosterUrl, setPrevPosterUrl] = useState(movie.poster_url)
+
+  if (movie.poster_url !== prevPosterUrl) {
+    setPrevPosterUrl(movie.poster_url)
+    setIsImageLoading(true)
+  }
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
       <div className="w-full max-w-md h-[80vh] flex flex-col bg-zinc-900 rounded-3xl overflow-hidden shadow-2xl ring-1 ring-white/10 relative">
@@ -27,9 +36,14 @@ export default function MovieCard({
             src={movie.poster_url || '/placeholder-movie.jpg'}
             alt={movie.title}
             fill
-            className="object-cover opacity-60"
+            sizes="(max-width: 768px) 100vw, 500px"
+            className={`object-cover transition-opacity duration-500 ${
+              isImageLoading ? 'opacity-0' : 'opacity-60'
+            }`}
             priority
+            onLoad={() => setIsImageLoading(false)}
           />
+          {isImageLoading && <Skeleton className="absolute inset-0 bg-zinc-800" />}
           <div className="absolute inset-0 bg-linear-to-t from-zinc-950 via-zinc-950/60 to-transparent" />
         </div>
 
