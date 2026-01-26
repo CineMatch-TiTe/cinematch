@@ -13,6 +13,7 @@ import {
 } from '@/server/party/party'
 import { getRecommendations } from '@/server/movie/movie'
 import { logoutUser } from '@/server/user/user'
+import { SearchFilter } from '@/model/searchFilter'
 
 export async function leavePartyAction(partyId: string) {
   try {
@@ -109,10 +110,10 @@ export async function getMyPartyIdAction() {
   }
 }
 
-export async function searchMoviesAction(query: string, page?: number) {
+export async function searchMoviesAction(filter: SearchFilter, page: number = 1) {
   const { searchMovies } = await import('@/server/movie/movie')
   try {
-    const response = await searchMovies({ query, page })
+    const response = await searchMovies(filter, { title: '', page })
     if (response.status === 200) {
       return { data: response.data.movies }
     }

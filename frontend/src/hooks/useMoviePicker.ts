@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { getUserPreferencesAction, pickMovieAction, searchMoviesAction } from '@/actions/party-room'
 import { MovieResponse } from '@/model/movieResponse'
+import { SearchFilter } from '@/model/searchFilter'
 
 // Number of movies remaining before triggering prefetch
 const PREFETCH_THRESHOLD = 3
@@ -33,6 +34,7 @@ export function useMoviePicker({ partyId }: UseMoviePickerOptions): UseMoviePick
   const [noNewMovies, setNoNewMovies] = useState(false)
   const [searchPage, setSearchPage] = useState(1)
   const searchGenresRef = useRef<string[]>([])
+  const searchYearRef = useRef<{ min?: number; max?: number } | undefined>(undefined)
 
   // Prefetch state for smooth transitions
   const [prefetchedMovies, setPrefetchedMovies] = useState<MovieResponse[]>([])
@@ -53,14 +55,35 @@ export function useMoviePicker({ partyId }: UseMoviePickerOptions): UseMoviePick
         }
       }
 
-      // Use genres as search queries, or fallback to generic terms
+      // Use genres for filtering
       const genres = searchGenresRef.current
-      const searchTerms =
-        genres.length > 0 ? genres : ['popular', 'classic', 'new release', 'trending']
 
-      // Search using a random genre/term from user preferences
-      const randomTerm = searchTerms[Math.floor(Math.random() * searchTerms.length)]
-      const searchResult = await searchMoviesAction(randomTerm, page)
+      // Calculate year range if not already set
+      if (!searchYearRef.current) {
+        const prefsResult = await getUserPreferencesAction()
+        if (prefsResult.data) {
+          const { target_release_year, release_year_flex } = prefsResult.data
+          if (target_release_year) {
+            searchYearRef.current = {
+              min: target_release_year - release_year_flex,
+              max: target_release_year + release_year_flex
+            }
+          } else {
+            searchYearRef.current = {} // Mark as checked but empty
+          }
+        }
+      }
+
+      const yearFilter = searchYearRef.current
+
+      const filter: SearchFilter = {
+        include_genres: genres,
+        exclude_genres: [],
+        min_year: yearFilter?.min,
+        max_year: yearFilter?.max
+      }
+
+      const searchResult = await searchMoviesAction(filter, page)
 
       if (searchResult.data) {
         return searchResult.data
