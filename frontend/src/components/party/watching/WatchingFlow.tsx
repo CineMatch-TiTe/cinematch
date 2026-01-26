@@ -58,7 +58,7 @@ export default function WatchingFlow({ movieId }: Readonly<WatchingFlowProps>) {
   }
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-100 pt-8 px-4 flex flex-col items-center">
+    <div className="min-h-screen bg-zinc-950 text-zinc-100 pt-8 pb-32 px-4 flex flex-col items-center">
       <div className="w-full max-w-2xl space-y-6">
         <Card className="bg-zinc-900 border-zinc-800 overflow-hidden shadow-2xl shadow-red-900/20">
           <div className="relative aspect-video w-full bg-zinc-800">
@@ -70,7 +70,6 @@ export default function WatchingFlow({ movieId }: Readonly<WatchingFlowProps>) {
                   fill
                   sizes="100vw"
                   className="object-cover opacity-30 blur-sm"
-                  priority
                 />
                 <div className="absolute inset-0 flex items-center justify-center p-8">
                   <div className="relative w-48 h-72 shadow-2xl rounded-lg overflow-hidden border-2 border-white/10">
