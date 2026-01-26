@@ -99,6 +99,20 @@ export async function pickMovieAction(partyId: string, movieId: number) {
   }
 }
 
+export async function deletePickAction(partyId: string, movieId: number) {
+  try {
+    const { deletePick } = await import('@/server/party/party')
+    const response = await deletePick(partyId, movieId)
+    if (response.status !== 200) {
+      return { error: 'Failed to remove pick' }
+    }
+    return { success: true }
+  } catch (error) {
+    console.error('Delete Pick Error', error)
+    return { error: 'Failed to remove pick' }
+  }
+}
+
 export async function getMyPartyIdAction() {
   try {
     const response = await getMyParty()

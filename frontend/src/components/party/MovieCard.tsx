@@ -1,16 +1,23 @@
 import { Button } from '@/components/ui/button'
 import { MovieResponse } from '@/model/movieResponse'
-import { ThumbsDown, ThumbsUp } from 'lucide-react'
+import { ThumbsDown, ThumbsUp, SkipForward } from 'lucide-react'
 import Image from 'next/image'
 
 interface MovieCardProps {
   movie: MovieResponse
   onLike: () => void
+  onDislike: () => void
   onSkip: () => void
   disabled?: boolean
 }
 
-export default function MovieCard({ movie, onLike, onSkip, disabled }: Readonly<MovieCardProps>) {
+export default function MovieCard({
+  movie,
+  onLike,
+  onDislike,
+  onSkip,
+  disabled
+}: Readonly<MovieCardProps>) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
       <div className="w-full max-w-md h-[80vh] flex flex-col bg-zinc-900 rounded-3xl overflow-hidden shadow-2xl ring-1 ring-white/10 relative">
@@ -55,7 +62,7 @@ export default function MovieCard({ movie, onLike, onSkip, disabled }: Readonly<
             {movie.overview}
           </p>
 
-          <div className="flex flex-wrap gap-2 pt-2">
+          <div className="flex flex-wrap gap-2 pt-2 pb-6">
             {movie.genres.slice(0, 3).map((genre) => (
               <span
                 key={genre}
@@ -68,12 +75,12 @@ export default function MovieCard({ movie, onLike, onSkip, disabled }: Readonly<
         </div>
 
         {/* Action Buttons */}
-        <div className="absolute bottom-6 left-0 right-0 px-8 flex justify-between items-center z-20">
+        <div className="absolute bottom-6 left-0 right-0 px-8 flex justify-between items-center z-20 gap-4">
           <Button
             size="icon"
             variant="ghost"
-            className="w-16 h-16 rounded-full bg-zinc-800/80 hover:bg-red-500/20 hover:text-red-500 text-zinc-400 backdrop-blur-md border border-white/10 transition-all active:scale-95"
-            onClick={onSkip}
+            className="w-16 h-16 rounded-full text-red-400 bg-red-400/10 hover:bg-red-500/20 hover:text-red-500 backdrop-blur-md border border-white/10 transition-all active:scale-95"
+            onClick={onDislike}
             disabled={disabled}
           >
             <ThumbsDown className="w-8 h-8" />
@@ -82,7 +89,17 @@ export default function MovieCard({ movie, onLike, onSkip, disabled }: Readonly<
           <Button
             size="icon"
             variant="ghost"
-            className="w-16 h-16 rounded-full bg-green-500/20 hover:bg-green-500/30 text-green-500 backdrop-blur-md border border-green-500/30 transition-all active:scale-95 shadow-lg shadow-green-500/10"
+            className="w-16 h-16 rounded-full text-zinc-400 bg-zinc-800/50 hover:bg-zinc-700/50 hover:text-white backdrop-blur-md border border-white/10 transition-all active:scale-95"
+            onClick={onSkip}
+            disabled={disabled}
+          >
+            <SkipForward className="w-6 h-6" />
+          </Button>
+
+          <Button
+            size="icon"
+            variant="ghost"
+            className="w-16 h-16 rounded-full bg-green-500/20 hover:bg-green-500/30 text-green-500 backdrop-blur-md border border-green-500/30 transition-all active:scale-95 shadow-lg shadow-green-500/10 hover:text-green-400"
             onClick={onLike}
             disabled={disabled}
           >

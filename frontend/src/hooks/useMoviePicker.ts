@@ -2,7 +2,12 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
-import { getUserPreferencesAction, pickMovieAction, searchMoviesAction } from '@/actions/party-room'
+import {
+  getUserPreferencesAction,
+  pickMovieAction,
+  searchMoviesAction,
+  deletePickAction
+} from '@/actions/party-room'
 import { MovieResponse } from '@/model/movieResponse'
 import { SearchFilter } from '@/model/searchFilter'
 
@@ -20,6 +25,7 @@ interface UseMoviePickerReturn {
   processing: boolean
   noNewMovies: boolean
   handleLike: () => Promise<void>
+  handleDislike: () => Promise<void>
   handleSkip: () => void
   hasFinishedAllMovies: boolean
 }
@@ -261,6 +267,29 @@ export function useMoviePicker({ partyId }: UseMoviePickerOptions): UseMoviePick
     }
   }
 
+  const handleDislike = async () => {
+    if (processing) return
+    const currentMovie = movies[currentIndex]
+    if (!currentMovie) return
+
+    setProcessing(true)
+    try {
+      // Use deletePickAction (which calls DELETE) for veto/dislike
+      const result = await deletePickAction(partyId, currentMovie.movie_id)
+      if (result.error) {
+        toast.error(result.error)
+      } else {
+        markCurrentAsSeen()
+        setCurrentIndex((prev) => prev + 1)
+      }
+    } catch (error) {
+      console.error('Dislike error', error)
+      toast.error('Something went wrong')
+    } finally {
+      setProcessing(false)
+    }
+  }
+
   const handleSkip = () => {
     if (processing) return
     markCurrentAsSeen()
@@ -277,6 +306,7 @@ export function useMoviePicker({ partyId }: UseMoviePickerOptions): UseMoviePick
     processing,
     noNewMovies,
     handleLike,
+    handleDislike,
     handleSkip,
     hasFinishedAllMovies
   }

@@ -11,6 +11,7 @@ export default function PickingFlow({ partyId }: Readonly<{ partyId: string }>) 
     refetching,
     processing,
     handleLike,
+    handleDislike,
     handleSkip,
     hasFinishedAllMovies
   } = useMoviePicker({ partyId })
@@ -41,10 +42,10 @@ export default function PickingFlow({ partyId }: Readonly<{ partyId: string }>) 
 
   return (
     <div className="relative z-50 pt-20 pb-24 h-screen flex flex-col justify-center">
-      {/* Added padding and height to center card in the available space, accounting for footer/header if needed */}
       <MovieCard
         movie={currentMovie}
         onLike={handleLike}
+        onDislike={handleDislike}
         onSkip={handleSkip}
         disabled={processing}
       />
