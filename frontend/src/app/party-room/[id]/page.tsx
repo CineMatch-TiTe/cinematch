@@ -19,7 +19,10 @@ export default async function PartyRoom({ params }: Readonly<{ params: Promise<{
   const members = membersRes.status === 200 ? membersRes.data.members : []
 
   if (!currentUser || !party) {
-    // Should behave like 404 or redirect if critical data missing
+    if (currentUser) {
+      redirect('/api/logout')
+    }
+
     redirect('/')
   }
 

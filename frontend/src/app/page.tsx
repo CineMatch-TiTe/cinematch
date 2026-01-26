@@ -11,8 +11,8 @@ export default async function HomeRoute({
 }: Readonly<{
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>
 }>) {
-  const { partyCode } = await searchParams
-  const initialJoinCode = Array.isArray(partyCode) ? partyCode[0] : partyCode
+  const { joinCode } = await searchParams
+  const initialJoinCode = Array.isArray(joinCode) ? joinCode[0] : joinCode
 
   // Check if user is already logged in and has an active party
   const userRes = await getCurrentUser().catch(() => null)
