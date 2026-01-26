@@ -4,6 +4,7 @@
  * cinematch-api
  * OpenAPI spec version: 0.1.0
  */
+import type { PartyResponseVoteStatus } from './partyResponseVoteStatus';
 import type { PartyStateDto } from './partyStateDto';
 
 /**
@@ -21,6 +22,28 @@ export interface PartyResponse {
   id: string;
   /** The party leader's user ID */
   leader_id: string;
+  /** When the party entered the current phase (Voting, Watching, etc.). Used with timeout secs for client countdown. */
+  phase_entered_at: string;
+  /**
+   * Selected winner movie ID (set when voting ends with a majority; in Watching/Review).
+   * @nullable
+   */
+  selected_movie_id?: number | null;
   /** Current state of the party */
   state: PartyStateDto;
+  /**
+   * Vote totals per movie (only in Voting): movie_id → (likes, dislikes)
+   * @nullable
+   */
+  vote_status?: PartyResponseVoteStatus;
+  /**
+   * Voting phase auto-end timeout (seconds). From VOTING_TIMEOUT_SECS.
+   * @minimum 0
+   */
+  voting_timeout_secs: number;
+  /**
+   * Watching phase auto-advance timeout (seconds). From WATCHING_TIMEOUT_SECS.
+   * @minimum 0
+   */
+  watching_timeout_secs: number;
 }

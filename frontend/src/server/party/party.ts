@@ -7,16 +7,73 @@
 import type {
   CreatePartyResponse,
   ErrorResponse,
+  GetPicksResponse,
+  GetVoteResponse,
   KickMemberRequest,
-  NewRoundResponse,
   PartyMembersResponse,
   PartyResponse,
-  PhaseAdvanceResponse,
+  ReadyStateResponse,
   SetReadyRequest,
-  TransferLeadershipRequest
+  TransferLeadershipRequest,
+  VoteMovieRequest,
+  VoteMovieResponse
 } from '../../model';
 
 import customInstance from '../../lib/orval-client';
+
+export type getMyPartyResponse200 = {
+  data: PartyResponse
+  status: 200
+}
+
+export type getMyPartyResponse401 = {
+  data: ErrorResponse
+  status: 401
+}
+
+export type getMyPartyResponse403 = {
+  data: ErrorResponse
+  status: 403
+}
+
+export type getMyPartyResponse404 = {
+  data: ErrorResponse
+  status: 404
+}
+
+export type getMyPartyResponse500 = {
+  data: ErrorResponse
+  status: 500
+}
+    
+export type getMyPartyResponseSuccess = (getMyPartyResponse200) & {
+  headers: Headers;
+};
+export type getMyPartyResponseError = (getMyPartyResponse401 | getMyPartyResponse403 | getMyPartyResponse404 | getMyPartyResponse500) & {
+  headers: Headers;
+};
+
+export type getMyPartyResponse = (getMyPartyResponseSuccess | getMyPartyResponseError)
+
+export const getGetMyPartyUrl = () => {
+
+
+  
+
+  return `/api/party`
+}
+
+export const getMyParty = async ( options?: RequestInit): Promise<getMyPartyResponse> => {
+  
+  return customInstance<getMyPartyResponse>(getGetMyPartyUrl(),
+  {      
+    ...options,
+    method: 'GET'
+    
+    
+  }
+);}
+
 
 export type createPartyResponse201 = {
   data: CreatePartyResponse
@@ -26,6 +83,11 @@ export type createPartyResponse201 = {
 export type createPartyResponse401 = {
   data: ErrorResponse
   status: 401
+}
+
+export type createPartyResponse403 = {
+  data: ErrorResponse
+  status: 403
 }
 
 export type createPartyResponse404 = {
@@ -41,7 +103,7 @@ export type createPartyResponse500 = {
 export type createPartyResponseSuccess = (createPartyResponse201) & {
   headers: Headers;
 };
-export type createPartyResponseError = (createPartyResponse401 | createPartyResponse404 | createPartyResponse500) & {
+export type createPartyResponseError = (createPartyResponse401 | createPartyResponse403 | createPartyResponse404 | createPartyResponse500) & {
   headers: Headers;
 };
 
@@ -176,7 +238,7 @@ export const getParty = async (partyId: string, options?: RequestInit): Promise<
 
 
 export type advancePhaseResponse200 = {
-  data: PhaseAdvanceResponse
+  data: void
   status: 200
 }
 
@@ -235,11 +297,7 @@ export const advancePhase = async (partyId: string, options?: RequestInit): Prom
 
 
 /**
- * Disbands the party completely. Only the party leader can disband.
-This sets the party state to Disbanded and removes the join code.
-
-**Auth**: Only the party leader can disband the party.
- * @summary Disband party
+ * @summary Disband party (leader only).
  */
 export type disbandPartyResponse200 = {
   data: void
@@ -257,7 +315,7 @@ export type disbandPartyResponse403 = {
 }
 
 export type disbandPartyResponse404 = {
-  data: ErrorResponse
+  data: void
   status: 404
 }
 
@@ -296,20 +354,11 @@ export const disbandParty = async (partyId: string, options?: RequestInit): Prom
 
 
 /**
- * Removes a member from the party. Only the party leader can kick members.
-The leader cannot kick themselves (use leave instead).
-
-**Auth**: Only the party leader can kick members.
- * @summary Kick a member from the party
+ * @summary Kick a member (leader only).
  */
 export type kickMemberResponse200 = {
   data: void
   status: 200
-}
-
-export type kickMemberResponse400 = {
-  data: ErrorResponse
-  status: 400
 }
 
 export type kickMemberResponse401 = {
@@ -335,7 +384,7 @@ export type kickMemberResponse500 = {
 export type kickMemberResponseSuccess = (kickMemberResponse200) & {
   headers: Headers;
 };
-export type kickMemberResponseError = (kickMemberResponse400 | kickMemberResponse401 | kickMemberResponse403 | kickMemberResponse404 | kickMemberResponse500) & {
+export type kickMemberResponseError = (kickMemberResponse401 | kickMemberResponse403 | kickMemberResponse404 | kickMemberResponse500) & {
   headers: Headers;
 };
 
@@ -364,12 +413,7 @@ export const kickMember = async (partyId: string,
 
 
 /**
- * Removes the requesting user from the party.
-If the leader leaves, leadership is transferred to the oldest member.
-If no members remain, the party is disbanded.
-
-**Auth**: Requires authenticated user. Users can only leave for themselves.
- * @summary Leave a party
+ * @summary Leave the party. Leader leaves → transfer to oldest member; no members left → disband.
  */
 export type leavePartyResponse200 = {
   data: void
@@ -387,7 +431,7 @@ export type leavePartyResponse401 = {
 }
 
 export type leavePartyResponse404 = {
-  data: ErrorResponse
+  data: void
   status: 404
 }
 
@@ -479,109 +523,197 @@ export const getPartyMembers = async (partyId: string, options?: RequestInit): P
 );}
 
 
-/**
- * Starts a new movie round from the Review state.
-Only the party leader can start a new round.
-This resets the party to Created state and generates a new join code.
-All members' ready states are reset to false.
-
-**Auth**: Only the party leader can start a new round.
- * @summary Start a new movie round
- */
-export type startNewRoundResponse200 = {
-  data: NewRoundResponse
+export type pickMovieResponse200 = {
+  data: void
   status: 200
 }
 
-export type startNewRoundResponse400 = {
-  data: ErrorResponse
-  status: 400
-}
-
-export type startNewRoundResponse401 = {
+export type pickMovieResponse401 = {
   data: ErrorResponse
   status: 401
 }
 
-export type startNewRoundResponse403 = {
+export type pickMovieResponse403 = {
   data: ErrorResponse
   status: 403
 }
 
-export type startNewRoundResponse404 = {
-  data: ErrorResponse
-  status: 404
-}
-
-export type startNewRoundResponse500 = {
+export type pickMovieResponse500 = {
   data: ErrorResponse
   status: 500
 }
     
-export type startNewRoundResponseSuccess = (startNewRoundResponse200) & {
+export type pickMovieResponseSuccess = (pickMovieResponse200) & {
   headers: Headers;
 };
-export type startNewRoundResponseError = (startNewRoundResponse400 | startNewRoundResponse401 | startNewRoundResponse403 | startNewRoundResponse404 | startNewRoundResponse500) & {
+export type pickMovieResponseError = (pickMovieResponse401 | pickMovieResponse403 | pickMovieResponse500) & {
   headers: Headers;
 };
 
-export type startNewRoundResponse = (startNewRoundResponseSuccess | startNewRoundResponseError)
+export type pickMovieResponse = (pickMovieResponseSuccess | pickMovieResponseError)
 
-export const getStartNewRoundUrl = (partyId: string,) => {
+export const getPickMovieUrl = (partyId: string,
+    movieId: number,) => {
 
 
   
 
-  return `/api/party/${partyId}/new-round`
+  return `/api/party/${partyId}/pick/${movieId}`
 }
 
-export const startNewRound = async (partyId: string, options?: RequestInit): Promise<startNewRoundResponse> => {
+export const pickMovie = async (partyId: string,
+    movieId: number, options?: RequestInit): Promise<pickMovieResponse> => {
   
-  return customInstance<startNewRoundResponse>(getStartNewRoundUrl(partyId),
+  return customInstance<pickMovieResponse>(getPickMovieUrl(partyId,movieId),
   {      
     ...options,
-    method: 'POST'
+    method: 'PUT'
     
     
   }
 );}
 
 
-export type toggleReadyResponse200 = {
+export type deletePickResponse200 = {
   data: void
   status: 200
 }
 
-export type toggleReadyResponse400 = {
-  data: void
-  status: 400
-}
-
-export type toggleReadyResponse401 = {
+export type deletePickResponse401 = {
   data: ErrorResponse
   status: 401
 }
 
-export type toggleReadyResponse404 = {
-  data: void
-  status: 404
+export type deletePickResponse403 = {
+  data: ErrorResponse
+  status: 403
 }
 
-export type toggleReadyResponse500 = {
+export type deletePickResponse500 = {
   data: ErrorResponse
   status: 500
 }
     
-export type toggleReadyResponseSuccess = (toggleReadyResponse200) & {
+export type deletePickResponseSuccess = (deletePickResponse200) & {
   headers: Headers;
 };
-export type toggleReadyResponseError = (toggleReadyResponse400 | toggleReadyResponse401 | toggleReadyResponse404 | toggleReadyResponse500) & {
+export type deletePickResponseError = (deletePickResponse401 | deletePickResponse403 | deletePickResponse500) & {
   headers: Headers;
 };
 
-export type toggleReadyResponse = (toggleReadyResponseSuccess | toggleReadyResponseError)
+export type deletePickResponse = (deletePickResponseSuccess | deletePickResponseError)
 
-export const getToggleReadyUrl = (partyId: string,) => {
+export const getDeletePickUrl = (partyId: string,
+    movieId: number,) => {
+
+
+  
+
+  return `/api/party/${partyId}/pick/${movieId}`
+}
+
+export const deletePick = async (partyId: string,
+    movieId: number, options?: RequestInit): Promise<deletePickResponse> => {
+  
+  return customInstance<deletePickResponse>(getDeletePickUrl(partyId,movieId),
+  {      
+    ...options,
+    method: 'DELETE'
+    
+    
+  }
+);}
+
+
+export type getPicksResponse200 = {
+  data: GetPicksResponse
+  status: 200
+}
+
+export type getPicksResponse401 = {
+  data: ErrorResponse
+  status: 401
+}
+
+export type getPicksResponse403 = {
+  data: ErrorResponse
+  status: 403
+}
+
+export type getPicksResponse404 = {
+  data: ErrorResponse
+  status: 404
+}
+
+export type getPicksResponse500 = {
+  data: ErrorResponse
+  status: 500
+}
+    
+export type getPicksResponseSuccess = (getPicksResponse200) & {
+  headers: Headers;
+};
+export type getPicksResponseError = (getPicksResponse401 | getPicksResponse403 | getPicksResponse404 | getPicksResponse500) & {
+  headers: Headers;
+};
+
+export type getPicksResponse = (getPicksResponseSuccess | getPicksResponseError)
+
+export const getGetPicksUrl = (partyId: string,) => {
+
+
+  
+
+  return `/api/party/${partyId}/picks`
+}
+
+export const getPicks = async (partyId: string, options?: RequestInit): Promise<getPicksResponse> => {
+  
+  return customInstance<getPicksResponse>(getGetPicksUrl(partyId),
+  {      
+    ...options,
+    method: 'GET'
+    
+    
+  }
+);}
+
+
+export type setReadyResponse200 = {
+  data: ReadyStateResponse
+  status: 200
+}
+
+export type setReadyResponse400 = {
+  data: ErrorResponse
+  status: 400
+}
+
+export type setReadyResponse401 = {
+  data: ErrorResponse
+  status: 401
+}
+
+export type setReadyResponse404 = {
+  data: ErrorResponse
+  status: 404
+}
+
+export type setReadyResponse500 = {
+  data: ErrorResponse
+  status: 500
+}
+    
+export type setReadyResponseSuccess = (setReadyResponse200) & {
+  headers: Headers;
+};
+export type setReadyResponseError = (setReadyResponse400 | setReadyResponse401 | setReadyResponse404 | setReadyResponse500) & {
+  headers: Headers;
+};
+
+export type setReadyResponse = (setReadyResponseSuccess | setReadyResponseError)
+
+export const getSetReadyUrl = (partyId: string,) => {
 
 
   
@@ -589,13 +721,13 @@ export const getToggleReadyUrl = (partyId: string,) => {
   return `/api/party/${partyId}/ready`
 }
 
-export const toggleReady = async (partyId: string,
-    setReadyRequest: SetReadyRequest, options?: RequestInit): Promise<toggleReadyResponse> => {
+export const setReady = async (partyId: string,
+    setReadyRequest: SetReadyRequest, options?: RequestInit): Promise<setReadyResponse> => {
   
-  return customInstance<toggleReadyResponse>(getToggleReadyUrl(partyId),
+  return customInstance<setReadyResponse>(getSetReadyUrl(partyId),
   {      
     ...options,
-    method: 'POST',
+    method: 'PATCH',
     headers: { 'Content-Type': 'application/json', ...options?.headers },
     body: JSON.stringify(
       setReadyRequest,)
@@ -604,11 +736,7 @@ export const toggleReady = async (partyId: string,
 
 
 /**
- * Transfers leadership to another party member.
-Only the current leader can transfer leadership.
-
-**Auth**: Only the party leader can transfer leadership.
- * @summary Transfer party leadership
+ * @summary Transfer leadership (leader only). New leader must be a party member.
  */
 export type transferLeadershipResponse200 = {
   data: void
@@ -667,6 +795,113 @@ export const transferLeadership = async (partyId: string,
     headers: { 'Content-Type': 'application/json', ...options?.headers },
     body: JSON.stringify(
       transferLeadershipRequest,)
+  }
+);}
+
+
+export type getVoteResponse200 = {
+  data: GetVoteResponse
+  status: 200
+}
+
+export type getVoteResponse401 = {
+  data: ErrorResponse
+  status: 401
+}
+
+export type getVoteResponse403 = {
+  data: ErrorResponse
+  status: 403
+}
+
+export type getVoteResponse404 = {
+  data: ErrorResponse
+  status: 404
+}
+
+export type getVoteResponse500 = {
+  data: ErrorResponse
+  status: 500
+}
+    
+export type getVoteResponseSuccess = (getVoteResponse200) & {
+  headers: Headers;
+};
+export type getVoteResponseError = (getVoteResponse401 | getVoteResponse403 | getVoteResponse404 | getVoteResponse500) & {
+  headers: Headers;
+};
+
+export type getVoteResponse = (getVoteResponseSuccess | getVoteResponseError)
+
+export const getGetVoteUrl = (partyId: string,) => {
+
+
+  
+
+  return `/api/party/${partyId}/vote`
+}
+
+export const getVote = async (partyId: string, options?: RequestInit): Promise<getVoteResponse> => {
+  
+  return customInstance<getVoteResponse>(getGetVoteUrl(partyId),
+  {      
+    ...options,
+    method: 'GET'
+    
+    
+  }
+);}
+
+
+export type voteMovieResponse200 = {
+  data: VoteMovieResponse
+  status: 200
+}
+
+export type voteMovieResponse401 = {
+  data: ErrorResponse
+  status: 401
+}
+
+export type voteMovieResponse403 = {
+  data: ErrorResponse
+  status: 403
+}
+
+export type voteMovieResponse500 = {
+  data: ErrorResponse
+  status: 500
+}
+    
+export type voteMovieResponseSuccess = (voteMovieResponse200) & {
+  headers: Headers;
+};
+export type voteMovieResponseError = (voteMovieResponse401 | voteMovieResponse403 | voteMovieResponse500) & {
+  headers: Headers;
+};
+
+export type voteMovieResponse = (voteMovieResponseSuccess | voteMovieResponseError)
+
+export const getVoteMovieUrl = (partyId: string,
+    movieId: number,) => {
+
+
+  
+
+  return `/api/party/${partyId}/vote/${movieId}`
+}
+
+export const voteMovie = async (partyId: string,
+    movieId: number,
+    voteMovieRequest: VoteMovieRequest, options?: RequestInit): Promise<voteMovieResponse> => {
+  
+  return customInstance<voteMovieResponse>(getVoteMovieUrl(partyId,movieId),
+  {      
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      voteMovieRequest,)
   }
 );}
 

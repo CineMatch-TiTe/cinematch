@@ -5,18 +5,33 @@
  * OpenAPI spec version: 0.1.0
  */
 
+export * from './castMemberResponse';
 export * from './createPartyResponse';
 export * from './currentUserResponse';
 export * from './errorResponse';
+export * from './genreResponse';
+export * from './getPicksResponse';
+export * from './getVoteResponse';
+export * from './getVoteResponseVoteTotals';
 export * from './guestLoginResponse';
 export * from './guestUserRequest';
 export * from './kickMemberRequest';
 export * from './memberInfo';
-export * from './newRoundResponse';
+export * from './movieResponse';
 export * from './partyMembersResponse';
 export * from './partyResponse';
+export * from './partyResponseVoteStatus';
 export * from './partyStateDto';
-export * from './phaseAdvanceResponse';
+export * from './readyStateResponse';
+export * from './recommendedMoviesResponse';
 export * from './renameUserRequest';
+export * from './searchMoviesParams';
+export * from './searchResponse';
 export * from './setReadyRequest';
 export * from './transferLeadershipRequest';
+export * from './updateTasteRequest';
+export * from './updateUserPreferencesRequest';
+export * from './userPreferencesResponse';
+export * from './voteMovieRequest';
+export * from './voteMovieResponse';
+export * from './voteTotals';

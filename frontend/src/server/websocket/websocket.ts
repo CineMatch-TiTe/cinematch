@@ -21,7 +21,7 @@ export type websocketControllerResponse400 = {
 }
 
 export type websocketControllerResponse401 = {
-  data: void
+  data: ErrorResponse
   status: 401
 }
 
@@ -29,16 +29,11 @@ export type websocketControllerResponse406 = {
   data: void
   status: 406
 }
-
-export type websocketControllerResponse500 = {
-  data: ErrorResponse
-  status: 500
-}
     
 export type websocketControllerResponseSuccess = (websocketControllerResponse200) & {
   headers: Headers;
 };
-export type websocketControllerResponseError = (websocketControllerResponse400 | websocketControllerResponse401 | websocketControllerResponse406 | websocketControllerResponse500) & {
+export type websocketControllerResponseError = (websocketControllerResponse400 | websocketControllerResponse401 | websocketControllerResponse406) & {
   headers: Headers;
 };
 

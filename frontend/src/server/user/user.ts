@@ -9,17 +9,16 @@ import type {
   ErrorResponse,
   GuestLoginResponse,
   GuestUserRequest,
-  RenameUserRequest
+  RenameUserRequest,
+  UpdateTasteRequest,
+  UpdateUserPreferencesRequest,
+  UserPreferencesResponse
 } from '../../model';
 
 import customInstance from '../../lib/orval-client';
 
 /**
- * Returns the currently authenticated user's profile information
-along with JWT token validity details.
-
-**Auth Required**: User must be authenticated with a valid JWT token.
- * @summary Get current user info
+ * @summary Current user profile (cookie-authenticated).
  */
 export type getCurrentUserResponse200 = {
   data: CurrentUserResponse
@@ -71,15 +70,66 @@ export const getCurrentUser = async ( options?: RequestInit): Promise<getCurrent
 
 
 /**
- * Creates a new temporary (oneshot) user with an auto-generated username.
-This user can join parties but will be ephemeral to that party's lifetime.
-To become persistent, the user must link an external OAuth account.
+ * @summary Like or unlike a movie (global taste). Movie must exist.
+ */
+export type updateTasteResponse200 = {
+  data: void
+  status: 200
+}
 
-This is the entry point for users without an account. Use the returned `user_id`
-for subsequent API requests that require authentication.
+export type updateTasteResponse401 = {
+  data: ErrorResponse
+  status: 401
+}
 
-**Auth**: No authentication required.
- * @summary Create a guest user
+export type updateTasteResponse404 = {
+  data: ErrorResponse
+  status: 404
+}
+
+export type updateTasteResponse500 = {
+  data: ErrorResponse
+  status: 500
+}
+    
+export type updateTasteResponseSuccess = (updateTasteResponse200) & {
+  headers: Headers;
+};
+export type updateTasteResponseError = (updateTasteResponse401 | updateTasteResponse404 | updateTasteResponse500) & {
+  headers: Headers;
+};
+
+export type updateTasteResponse = (updateTasteResponseSuccess | updateTasteResponseError)
+
+export const getUpdateTasteUrl = (movieId: number,) => {
+
+
+  
+
+  return `/api/user/like/${movieId}`
+}
+
+export const updateTaste = async (movieId: number,
+    updateTasteRequest: UpdateTasteRequest, options?: RequestInit): Promise<updateTasteResponse> => {
+  
+  return customInstance<updateTasteResponse>(getUpdateTasteUrl(movieId),
+  {      
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      updateTasteRequest,)
+  }
+);}
+
+
+/**
+ * Creates a temporary (oneshot) user. Optionally provide a username (3–32 chars);
+otherwise one is generated. On success, the server sets the `id` cookie (httpOnly,
+path=/, samesite=Lax, secure). Send it on subsequent requests; protected endpoints use `cookie_auth`.
+
+**Auth**: None.
+ * @summary Create a guest user (login as guest).
  */
 export type loginGuestResponse201 = {
   data: GuestLoginResponse
@@ -132,11 +182,7 @@ export const loginGuest = async (guestUserRequest: GuestUserRequest, options?: R
 
 
 /**
- * Clears authentication cookies by setting them to expire.
-This effectively logs out the user on the client side.
-
-**Auth**: No authentication required (any user can logout).
- * @summary Logout user
+ * @summary Logout: clear `id` cookie. No auth required.
  */
 export type logoutUserResponse200 = {
   data: void
@@ -147,20 +193,13 @@ export type logoutUserResponse204 = {
   data: void
   status: 204
 }
-
-export type logoutUserResponse500 = {
-  data: ErrorResponse
-  status: 500
-}
     
 export type logoutUserResponseSuccess = (logoutUserResponse200 | logoutUserResponse204) & {
   headers: Headers;
 };
-export type logoutUserResponseError = (logoutUserResponse500) & {
-  headers: Headers;
-};
+;
 
-export type logoutUserResponse = (logoutUserResponseSuccess | logoutUserResponseError)
+export type logoutUserResponse = (logoutUserResponseSuccess)
 
 export const getLogoutUserUrl = () => {
 
@@ -183,12 +222,108 @@ export const logoutUser = async ( options?: RequestInit): Promise<logoutUserResp
 
 
 /**
- * Updates the username for a user. Username can be 3-32 characters.
+ * @summary Current user's preferences (genres, year, etc.).
+ */
+export type getUserPreferencesResponse200 = {
+  data: UserPreferencesResponse
+  status: 200
+}
 
-**Auth Required**: User can only rename their own account (user_id must match JWT token).
+export type getUserPreferencesResponse401 = {
+  data: ErrorResponse
+  status: 401
+}
+
+export type getUserPreferencesResponse500 = {
+  data: ErrorResponse
+  status: 500
+}
+    
+export type getUserPreferencesResponseSuccess = (getUserPreferencesResponse200) & {
+  headers: Headers;
+};
+export type getUserPreferencesResponseError = (getUserPreferencesResponse401 | getUserPreferencesResponse500) & {
+  headers: Headers;
+};
+
+export type getUserPreferencesResponse = (getUserPreferencesResponseSuccess | getUserPreferencesResponseError)
+
+export const getGetUserPreferencesUrl = () => {
 
 
- * @summary Rename a user
+  
+
+  return `/api/user/pref`
+}
+
+export const getUserPreferences = async ( options?: RequestInit): Promise<getUserPreferencesResponse> => {
+  
+  return customInstance<getUserPreferencesResponse>(getGetUserPreferencesUrl(),
+  {      
+    ...options,
+    method: 'GET'
+    
+    
+  }
+);}
+
+
+/**
+ * @summary Update current user's preferences. Invalid genre names return 400.
+ */
+export type editUserPreferencesResponse200 = {
+  data: UserPreferencesResponse
+  status: 200
+}
+
+export type editUserPreferencesResponse400 = {
+  data: ErrorResponse
+  status: 400
+}
+
+export type editUserPreferencesResponse401 = {
+  data: ErrorResponse
+  status: 401
+}
+
+export type editUserPreferencesResponse500 = {
+  data: ErrorResponse
+  status: 500
+}
+    
+export type editUserPreferencesResponseSuccess = (editUserPreferencesResponse200) & {
+  headers: Headers;
+};
+export type editUserPreferencesResponseError = (editUserPreferencesResponse400 | editUserPreferencesResponse401 | editUserPreferencesResponse500) & {
+  headers: Headers;
+};
+
+export type editUserPreferencesResponse = (editUserPreferencesResponseSuccess | editUserPreferencesResponseError)
+
+export const getEditUserPreferencesUrl = () => {
+
+
+  
+
+  return `/api/user/pref`
+}
+
+export const editUserPreferences = async (updateUserPreferencesRequest: UpdateUserPreferencesRequest, options?: RequestInit): Promise<editUserPreferencesResponse> => {
+  
+  return customInstance<editUserPreferencesResponse>(getEditUserPreferencesUrl(),
+  {      
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      updateUserPreferencesRequest,)
+  }
+);}
+
+
+/**
+ * Username must be 3–32 characters. Caller must match `user_id` (cookie).
+ * @summary Rename the authenticated user.
  */
 export type renameUserResponse200 = {
   data: void
@@ -201,7 +336,7 @@ export type renameUserResponse400 = {
 }
 
 export type renameUserResponse401 = {
-  data: void
+  data: ErrorResponse
   status: 401
 }
 

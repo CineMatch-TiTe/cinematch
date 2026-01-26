@@ -6,9 +6,8 @@
  */
 
 /**
- * Standard error response
+ * Request to set ready state
  */
-export interface ErrorResponse {
-  /** Human-readable error message */
-  error: string;
+export interface VoteMovieRequest {
+  like: boolean;
 }

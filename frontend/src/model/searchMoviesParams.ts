@@ -5,10 +5,13 @@
  * OpenAPI spec version: 0.1.0
  */
 
+export type SearchMoviesParams = {
 /**
- * Standard error response
+ * Search string
  */
-export interface ErrorResponse {
-  /** Human-readable error message */
-  error: string;
-}
+query: string;
+/**
+ * Page number (1-based)
+ */
+page?: number;
+};
