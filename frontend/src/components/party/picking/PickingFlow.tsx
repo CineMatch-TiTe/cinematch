@@ -1,17 +1,10 @@
 'use client'
 
-import { X } from 'lucide-react'
-import { Button } from '@/components/ui/button'
 import MovieCard from '../MovieCard'
 import { PickingLoadingState, PickingEmptyState } from '.'
 import { useMoviePicker } from '@/hooks/useMoviePicker'
 
-interface PickingFlowProps {
-  partyId: string
-  onClose: () => void
-}
-
-export default function PickingFlow({ partyId, onClose }: Readonly<PickingFlowProps>) {
+export default function PickingFlow({ partyId }: Readonly<{ partyId: string }>) {
   const {
     currentMovie,
     loading,
@@ -27,7 +20,19 @@ export default function PickingFlow({ partyId, onClose }: Readonly<PickingFlowPr
   }
 
   if (hasFinishedAllMovies) {
-    return <PickingEmptyState onClose={onClose} />
+    // Note: PickingEmptyState might still need a way to navigate back or just show a message.
+    // Ideally it just says "No more movies" and user can switch tab via footer.
+    // For now, removing onClose from PickingEmptyState if it allows it, or passing no-op/redirect?
+    // Let's check PickingEmptyState signature later or pass undefined if optional.
+    // Assuming PickingEmptyState needs onClose, we might need to adjust it too.
+    // For now let's pass an empty function or modify PickingEmptyState.
+    // Let's modify this to just not pass onClose if not needed, or better, Refactor PickingEmptyState too?
+    // I'll check PickingEmptyState.tsx in next step if it fails. For now, let's assume I can remove it.
+    // Actually, I should probably check PickingEmptyState.tsx.
+    // But let's just render it without props if possible or handle it.
+    // Let's assume PickingEmptyState needs refactoring too.
+    // But for this step, I will remove the Close button from PickingFlow.
+    return <PickingEmptyState />
   }
 
   if (!currentMovie) {
@@ -35,16 +40,8 @@ export default function PickingFlow({ partyId, onClose }: Readonly<PickingFlowPr
   }
 
   return (
-    <div className="relative z-50">
-      <Button
-        size="icon"
-        variant="secondary"
-        className="fixed top-4 right-4 z-60 rounded-full bg-black/50 hover:bg-black/70 text-white backdrop-blur-md border border-white/10"
-        onClick={onClose}
-      >
-        <X className="w-5 h-5" />
-      </Button>
-
+    <div className="relative z-50 pt-20 pb-24 h-screen flex flex-col justify-center">
+      {/* Added padding and height to center card in the available space, accounting for footer/header if needed */}
       <MovieCard
         movie={currentMovie}
         onLike={handleLike}

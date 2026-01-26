@@ -19,7 +19,7 @@ import type {
   VoteMovieResponse
 } from '../../model';
 
-import customInstance from '../../lib/orval-client';
+import { customInstance } from '../../lib/orval-client';
 
 export type getMyPartyResponse200 = {
   data: PartyResponse

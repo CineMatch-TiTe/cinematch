@@ -25,6 +25,7 @@ export * from './partyStateDto';
 export * from './readyStateResponse';
 export * from './recommendedMoviesResponse';
 export * from './renameUserRequest';
+export * from './searchFilter';
 export * from './searchMoviesParams';
 export * from './searchResponse';
 export * from './setReadyRequest';

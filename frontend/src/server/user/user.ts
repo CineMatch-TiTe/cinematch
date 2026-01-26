@@ -15,7 +15,7 @@ import type {
   UserPreferencesResponse
 } from '../../model';
 
-import customInstance from '../../lib/orval-client';
+import { customInstance } from '../../lib/orval-client';
 
 /**
  * @summary Current user profile (cookie-authenticated).

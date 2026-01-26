@@ -8,7 +8,7 @@ import type {
   ErrorResponse
 } from '../../model';
 
-import customInstance from '../../lib/orval-client';
+import { customInstance } from '../../lib/orval-client';
 
 export type websocketControllerResponse200 = {
   data: void

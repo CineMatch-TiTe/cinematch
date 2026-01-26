@@ -13,12 +13,11 @@ export default defineConfig({
         mutator: {
           path: './src/lib/orval-client.ts',
           name: 'customInstance',
-          default: true,
         },
       },
     },
     input: {
-      target: 'http://localhost:8085/api-docs/openapi.json',
+      target: 'https://api.cinematch.space/api-docs/openapi.json',
     },
   },
 });

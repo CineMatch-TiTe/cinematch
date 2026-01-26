@@ -2,11 +2,10 @@
 
 import { Button } from '@/components/ui/button'
 
-interface PickingEmptyStateProps {
-  onClose: () => void
-}
+import { usePartyView } from '@/components/party/PartyViewContext'
 
-export default function PickingEmptyState({ onClose }: Readonly<PickingEmptyStateProps>) {
+export default function PickingEmptyState() {
+  const { setActiveView } = usePartyView()
   return (
     <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-zinc-950/90 backdrop-blur-md p-6 text-center">
       <h2 className="text-2xl font-bold text-white mb-2">That&apos;s all for now!</h2>
@@ -15,7 +14,7 @@ export default function PickingEmptyState({ onClose }: Readonly<PickingEmptyStat
       </p>
       <div className="flex gap-3">
         <Button
-          onClick={onClose}
+          onClick={() => setActiveView('room')}
           size="lg"
           className="bg-red-600 text-white hover:bg-red-700 shadow-lg shadow-red-500/20"
         >

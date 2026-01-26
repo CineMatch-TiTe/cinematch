@@ -83,7 +83,7 @@ export async function getRecommendedMoviesAction() {
   }
 }
 
-export async function pickMovieAction(partyId: string, movieId: number, like: boolean) {
+export async function pickMovieAction(partyId: string, movieId: number) {
   try {
     const response = await pickMovie(partyId, movieId)
     if (response.status !== 200) {

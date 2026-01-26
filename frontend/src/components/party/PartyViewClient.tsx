@@ -20,6 +20,7 @@ import { PartyResponse } from '@/model/partyResponse'
 import { MemberInfo } from '@/model/memberInfo'
 import { CurrentUserResponse } from '@/model/currentUserResponse'
 import PickingFlow from './picking/PickingFlow'
+import { usePartyView } from './PartyViewContext'
 
 interface PartyViewClientProps {
   party: PartyResponse
@@ -47,7 +48,7 @@ export default function PartyViewClient({
 
   const [leaveDialogOpen, setLeaveDialogOpen] = useState(false)
   const [advanceDialogOpen, setAdvanceDialogOpen] = useState(false)
-  const [pickingFlowOpen, setPickingFlowOpen] = useState(false)
+  const { activeView, setActiveView } = usePartyView()
 
   const isLeader = party.leader_id === currentUser.user_id
 
@@ -84,9 +85,9 @@ export default function PartyViewClient({
     })
   }
 
-  if (pickingFlowOpen) {
-    return <PickingFlow partyId={party.id} onClose={() => setPickingFlowOpen(false)} />
-  }
+  // We render PickingFlow always to preserve state, but hide it when not active.
+  // Same for the main party view content.
+  const isPickingView = activeView === 'picking'
 
   const renderAdvanceButton = () => {
     if (!isLeader) return null
@@ -110,60 +111,67 @@ export default function PartyViewClient({
   }
 
   return (
-    <div className="min-h-screen bg-zinc-950 font-sans text-zinc-100 selection:bg-red-500/30 flex flex-col items-center relative">
-      <div className="fixed inset-0 z-0 pointer-events-none">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,var(--tw-gradient-stops))] from-zinc-800/20 via-zinc-950 to-zinc-950" />
+    <>
+      <div style={{ display: isPickingView ? 'block' : 'none' }}>
+        <PickingFlow partyId={party.id} />
       </div>
 
-      <div className="w-full max-w-md p-4 flex-1 flex flex-col z-10 relative">
-        <header className="flex flex-col items-center mb-6">
-          <div className="flex flex-row items-center mb-2 gap-2">
-            <Image src="/Logo.png" alt="Logo" width={32} height={32} />
-            <h1 className="text-2xl font-bold tracking-tight text-white">Party Room</h1>
-          </div>
-          <PartyHeader partyCode={party.code} />
-          <div className="mt-2 text-zinc-500 text-sm uppercase tracking-wider font-medium">
-            {party.state} Phase
-          </div>
-        </header>
+      <div
+        className="min-h-screen bg-zinc-950 font-sans text-zinc-100 selection:bg-red-500/30 flex flex-col items-center relative pb-32"
+        style={{ display: isPickingView ? 'none' : 'flex' }}
+      >
+        <div className="fixed inset-0 z-0 pointer-events-none">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,var(--tw-gradient-stops))] from-zinc-800/20 via-zinc-950 to-zinc-950" />
+        </div>
 
-        <main className="flex-1 w-full relative space-y-6">
-          {party.state === 'picking' && (
-            <Button
-              size="lg"
-              className="w-full py-8 text-xl font-bold bg-linear-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 shadow-xl shadow-indigo-500/20 border border-white/10"
-              onClick={() => setPickingFlowOpen(true)}
-            >
-              <div className="flex flex-col items-center">
-                <span className="flex items-center gap-2">Match your movie taste</span>
-                <span className="text-xs font-normal opacity-80 mt-1 text-white/80">
-                  Swipe movies to help us recommend better
-                </span>
-              </div>
-            </Button>
-          )}
-
-          <div>
-            <h3 className="text-sm font-semibold text-zinc-500 mb-3 px-1 uppercase tracking-wider">
-              Members ({members.length})
-            </h3>
-            <div
-              className={isManualPending ? 'opacity-70 transition-opacity' : 'transition-opacity'}
-            >
-              <PartyMemberList
-                members={members}
-                loading={false}
-                currentUserId={currentUser.user_id}
-                isCurrentUserLeader={isLeader}
-                onKick={handleKick}
-                onPromote={handlePromote}
-              />
+        <div className="w-full max-w-md p-4 flex-1 flex flex-col z-10 relative">
+          <header className="flex flex-col items-center mb-6">
+            <div className="flex flex-row items-center mb-2 gap-2">
+              <Image src="/Logo.png" alt="Logo" width={32} height={32} />
+              <h1 className="text-2xl font-bold tracking-tight text-white">Party Room</h1>
             </div>
-          </div>
-        </main>
+            <PartyHeader partyCode={party.code} />
+            <div className="mt-2 text-zinc-500 text-sm uppercase tracking-wider font-medium">
+              {party.state} Phase
+            </div>
+          </header>
 
-        <footer className="fixed bottom-0 left-0 right-0 p-4 bg-zinc-950/80 backdrop-blur-md border-t border-zinc-900 flex justify-center z-20">
-          <div className="w-full max-w-md flex flex-col gap-3">
+          <main className="flex-1 w-full relative space-y-6">
+            {party.state === 'picking' && (
+              <Button
+                size="lg"
+                className="w-full py-8 text-xl font-bold bg-linear-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 shadow-xl shadow-indigo-500/20 border border-white/10"
+                onClick={() => setActiveView('picking')}
+              >
+                <div className="flex flex-col items-center">
+                  <span className="flex items-center gap-2">Match your movie taste</span>
+                  <span className="text-xs font-normal opacity-80 mt-1 text-white/80">
+                    Swipe movies to help us recommend better
+                  </span>
+                </div>
+              </Button>
+            )}
+
+            <div>
+              <h3 className="text-sm font-semibold text-zinc-500 mb-3 px-1 uppercase tracking-wider">
+                Members ({members.length})
+              </h3>
+              <div
+                className={isManualPending ? 'opacity-70 transition-opacity' : 'transition-opacity'}
+              >
+                <PartyMemberList
+                  members={members}
+                  loading={false}
+                  currentUserId={currentUser.user_id}
+                  isCurrentUserLeader={isLeader}
+                  onKick={handleKick}
+                  onPromote={handlePromote}
+                />
+              </div>
+            </div>
+          </main>
+
+          <div className="w-full max-w-md p-4 mt-8 flex flex-col gap-3 z-20">
             {renderAdvanceButton()}
 
             <Button
@@ -176,28 +184,27 @@ export default function PartyViewClient({
               <LogOut className="mr-2 w-4 h-4" /> Leave Party
             </Button>
           </div>
-        </footer>
-        <div className="h-32" />
 
-        <ActionConfirmationDialog
-          open={leaveDialogOpen}
-          onOpenChange={setLeaveDialogOpen}
-          title="Leave Party?"
-          description="Are you sure you want to leave this party? You will need to rejoin if you want to come back."
-          confirmText="Leave"
-          onConfirm={confirmLeave}
-        />
+          <ActionConfirmationDialog
+            open={leaveDialogOpen}
+            onOpenChange={setLeaveDialogOpen}
+            title="Leave Party?"
+            description="Are you sure you want to leave this party? You will need to rejoin if you want to come back."
+            confirmText="Leave"
+            onConfirm={confirmLeave}
+          />
 
-        <ActionConfirmationDialog
-          open={advanceDialogOpen}
-          onOpenChange={setAdvanceDialogOpen}
-          title="Advance Party Phase?"
-          description={`Are you sure you want to advance the party state? This will move everyone to the next phase.`}
-          confirmText="Advance"
-          onConfirm={confirmAdvance}
-        />
-        <div className="h-32" />
+          <ActionConfirmationDialog
+            open={advanceDialogOpen}
+            onOpenChange={setAdvanceDialogOpen}
+            title="Advance Party Phase?"
+            description={`Are you sure you want to advance the party state? This will move everyone to the next phase.`}
+            confirmText="Advance"
+            onConfirm={confirmAdvance}
+          />
+          <div className="h-32" />
+        </div>
       </div>
-    </div>
+    </>
   )
 }

@@ -9,11 +9,12 @@ import type {
   GenreResponse,
   MovieResponse,
   RecommendedMoviesResponse,
+  SearchFilter,
   SearchMoviesParams,
   SearchResponse
 } from '../../model';
 
-import customInstance from '../../lib/orval-client';
+import { customInstance } from '../../lib/orval-client';
 
 export type getGenresResponse200 = {
   data: GenreResponse
@@ -211,14 +212,16 @@ export const getSearchMoviesUrl = (params: SearchMoviesParams,) => {
   return stringifiedParams.length > 0 ? `/api/movie/search?${stringifiedParams}` : `/api/movie/search`
 }
 
-export const searchMovies = async (params: SearchMoviesParams, options?: RequestInit): Promise<searchMoviesResponse> => {
+export const searchMovies = async (searchFilter: SearchFilter,
+    params: SearchMoviesParams, options?: RequestInit): Promise<searchMoviesResponse> => {
   
   return customInstance<searchMoviesResponse>(getSearchMoviesUrl(params),
   {      
     ...options,
-    method: 'GET'
-    
-    
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      searchFilter,)
   }
 );}
 

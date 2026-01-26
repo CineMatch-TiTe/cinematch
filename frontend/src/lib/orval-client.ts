@@ -21,20 +21,25 @@ export const customInstance = async <T>(
 
   // Server-side cookie forwarding
   if (globalThis.window === undefined) {
-    const { cookies } = await import('next/headers')
-    const cookieStore = await cookies()
-    const allCookies = cookieStore
-      .getAll()
-      .map((c) => `${c.name}=${c.value}`)
-      .join('; ')
+    try {
+      const MODULE_NAME = 'next/headers'
+      const { cookies } = await import(MODULE_NAME)
+      const cookieStore = await cookies()
+      const allCookies = cookieStore
+        .getAll()
+        .map((c: { name: string; value: string }) => `${c.name}=${c.value}`)
+        .join('; ')
 
-    if (allCookies) {
-      const existingCookie = reqHeaders['Cookie'] as string | undefined
-      if (existingCookie) {
-        reqHeaders['Cookie'] = `${existingCookie}; ${allCookies}`
-      } else {
-        reqHeaders['Cookie'] = allCookies
+      if (allCookies) {
+        const existingCookie = reqHeaders['Cookie'] as string | undefined
+        if (existingCookie) {
+          reqHeaders['Cookie'] = `${existingCookie}; ${allCookies}`
+        } else {
+          reqHeaders['Cookie'] = allCookies
+        }
       }
+    } catch {
+      // Ignore errors during module resolution (e.g. during build/orval generation or if module missing)
     }
   }
 

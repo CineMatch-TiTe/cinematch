@@ -7,11 +7,11 @@
 
 export type SearchMoviesParams = {
 /**
- * Search string
+ * Movie title
  */
-query: string;
+title: string;
 /**
- * Page number (1-based)
+ * Page number
  */
 page?: number;
 };
