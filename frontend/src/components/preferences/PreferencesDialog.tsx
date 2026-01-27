@@ -44,6 +44,39 @@ export function PreferencesDialog({
   const { data: prefData, mutate: mutatePref } = useSWR('/api/user/pref', fetchPrefs)
   const [showPrefsFlow, setShowPrefsFlow] = useState(false)
 
+  const renderSettingsContent = () => {
+    if (isUserLoading) {
+      return (
+        <div className="flex justify-center p-8">
+          <Loader2 className="animate-spin text-red-500" />
+        </div>
+      )
+    }
+
+    if (userData) {
+      return (
+        <>
+          <AccountForm initialUser={userData} onSuccess={() => mutateUser()} />
+
+          <div className="mt-8 pt-6 border-t border-zinc-800">
+            <h3 className="text-lg font-medium text-white mb-2">Taste Profile</h3>
+            <p className="text-sm text-zinc-400 mb-4">
+              Update your movie preferences, favorite genres, and decades.
+            </p>
+            <button
+              onClick={() => setShowPrefsFlow(true)}
+              className="w-full bg-zinc-800 hover:bg-zinc-700 text-white font-medium py-2 px-4 rounded-md transition-colors border border-zinc-700"
+            >
+              Redo Taste Profile Setup
+            </button>
+          </div>
+        </>
+      )
+    }
+
+    return <div className="text-red-500 text-sm">Failed to load user data</div>
+  }
+
   return (
     <Dialog open={open} onOpenChange={onOpenChangeAction}>
       {trigger && <DialogTrigger asChild>{trigger}</DialogTrigger>}
@@ -64,32 +97,7 @@ export function PreferencesDialog({
             }}
           />
         ) : (
-          <div className="space-y-6">
-            {isUserLoading ? (
-              <div className="flex justify-center p-8">
-                <Loader2 className="animate-spin text-red-500" />
-              </div>
-            ) : userData ? (
-              <>
-                <AccountForm initialUser={userData} onSuccess={() => mutateUser()} />
-
-                <div className="mt-8 pt-6 border-t border-zinc-800">
-                  <h3 className="text-lg font-medium text-white mb-2">Taste Profile</h3>
-                  <p className="text-sm text-zinc-400 mb-4">
-                    Update your movie preferences, favorite genres, and decades.
-                  </p>
-                  <button
-                    onClick={() => setShowPrefsFlow(true)}
-                    className="w-full bg-zinc-800 hover:bg-zinc-700 text-white font-medium py-2 px-4 rounded-md transition-colors border border-zinc-700"
-                  >
-                    Redo Taste Profile Setup
-                  </button>
-                </div>
-              </>
-            ) : (
-              <div className="text-red-500 text-sm">Failed to load user data</div>
-            )}
-          </div>
+          <div className="space-y-6">{renderSettingsContent()}</div>
         )}
       </DialogContent>
     </Dialog>
