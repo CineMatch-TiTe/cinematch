@@ -34,7 +34,11 @@ impl Database {
     }
 
     /// Get user taste: (positive, negative, skipped)
-    pub async fn get_taste(&self, user_id: Uuid) -> DbResult<(Vec<i64>, Vec<i64>, Vec<i64>)> {
+    pub async fn get_taste(
+        &self,
+        user_id: Uuid,
+        party_id: Option<Uuid>,
+    ) -> DbResult<(Vec<i64>, Vec<i64>, Vec<i64>)> {
         use crate::schema::user_tastes::dsl as ut;
         use diesel::prelude::*;
         use diesel_async::RunQueryDsl;
@@ -42,7 +46,7 @@ impl Database {
         // Select all global tastes for the user (party_id is null)
         let results = ut::user_tastes
             .filter(ut::user_id.eq(user_id))
-            .filter(ut::party_id.is_null())
+            .filter(ut::party_id.eq(party_id))
             .select((ut::movie_id, ut::liked))
             .load::<(i64, Option<bool>)>(&mut conn)
             .await
@@ -119,7 +123,6 @@ impl Database {
         let ids = ut::user_tastes
             .filter(ut::party_id.eq(Some(party_id)))
             .filter(ut::user_id.eq(user_id))
-            .filter(ut::liked.eq(Some(true)))
             .select(ut::movie_id)
             .load::<i64>(&mut conn)
             .await
