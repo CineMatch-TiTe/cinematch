@@ -114,17 +114,6 @@ pub async fn pick_movie(
         }
     }
 
-    // If skip, also store as global taste so it's excluded from all recommendations
-    if liked.is_none()
-        && let Err(e) = db.add_taste(user_id, movie_id, None).await
-    {
-        error!(
-            "Failed to register global skip for user {} movie {}: {}",
-            user_id, movie_id, e
-        );
-        // Don't fail the request, but log the error
-    }
-
     HttpResponse::Ok().finish()
 }
 
@@ -206,23 +195,27 @@ pub async fn get_party_recommendations(
         return HttpResponse::Forbidden().json(ErrorResponse::new("Not a member of this party"));
     }
 
-    let ids: Vec<i64> =
-        match cinematch_recommendation_engine::recommend_movies(&db, user_id, 3, Some(party_id))
-            .await
-        {
-            Ok(movies) => {
-                if movies.is_empty() {
-                    return HttpResponse::NotFound()
-                        .json(ErrorResponse::new("No recommendations available"));
-                }
-                movies
+    let ids: Vec<i64> = match cinematch_recommendation_engine::recommed_movies_from_reviews(
+        &db,
+        user_id,
+        Some(party_id),
+        3,
+    )
+    .await
+    {
+        Ok(movies) => {
+            if movies.is_empty() {
+                return HttpResponse::NotFound()
+                    .json(ErrorResponse::new("No recommendations available"));
             }
-            Err(e) => {
-                error!("Failed to retrieve party recommendations: {}", e);
-                return HttpResponse::InternalServerError()
-                    .json(ErrorResponse::new("Failed to retrieve recommendations"));
-            }
-        };
+            movies
+        }
+        Err(e) => {
+            error!("Failed to retrieve party recommendations: {}", e);
+            return HttpResponse::InternalServerError()
+                .json(ErrorResponse::new("Failed to retrieve recommendations"));
+        }
+    };
 
     let mut responses = Vec::with_capacity(ids.len());
     for movie_id in ids.iter() {

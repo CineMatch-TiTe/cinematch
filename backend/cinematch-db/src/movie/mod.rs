@@ -12,7 +12,7 @@ use crate::DbError;
 use crate::DbResult;
 
 use crate::vector::models::{CastMember, MovieData};
-use cinematch_common::SearchFilter;
+use cinematch_common::{FullUserPreferences, SearchFilter};
 
 impl Database {
     pub async fn get_movie_directors(&self, movie_id: i64) -> DbResult<Vec<String>> {
@@ -239,6 +239,77 @@ impl Database {
         }
 
         Ok(movies_data)
+    }
+
+    /// Check if a single movie_id matches user preferences (genres, year, excluded). Returns true if it passes all filters.
+    /// More efficient than `get_movie_ids_matching_prefs` when checking individual IDs (avoids loading all matches).
+    pub async fn filter_check_movie(
+        &self,
+        movie_id: i64,
+        prefs: &FullUserPreferences,
+        excluded_ids: Option<&[i64]>,
+    ) -> DbResult<bool> {
+        use crate::schema::{movie_genres, movies};
+        use diesel::prelude::*;
+        use diesel_async::RunQueryDsl;
+
+        let mut conn = self.conn().await?;
+
+        // Check if movie_id is in excluded list
+        if let Some(ids) = excluded_ids.filter(|s| !s.is_empty())
+            && ids.contains(&movie_id)
+        {
+            return Ok(false);
+        }
+
+        let mut query = movies::table
+            .filter(movies::movie_id.eq(movie_id))
+            .into_boxed();
+
+        // Excluded genres: movie must NOT have any of these
+        if !prefs.excluded_genres.is_empty() {
+            let has_excluded: i64 = movie_genres::table
+                .filter(movie_genres::movie_id.eq(movie_id))
+                .filter(movie_genres::genre_id.eq_any(prefs.excluded_genres.clone()))
+                .count()
+                .get_result(&mut conn)
+                .await
+                .map_err(DbError::from)?;
+            if has_excluded > 0 {
+                return Ok(false);
+            }
+        }
+
+        // Included genres: movie must have at least one of these
+        if !prefs.included_genres.is_empty() {
+            let has_included: i64 = movie_genres::table
+                .filter(movie_genres::movie_id.eq(movie_id))
+                .filter(movie_genres::genre_id.eq_any(prefs.included_genres.clone()))
+                .count()
+                .get_result(&mut conn)
+                .await
+                .map_err(DbError::from)?;
+            if has_included == 0 {
+                return Ok(false);
+            }
+        }
+
+        // Year range filter
+        if let Some(yr) = prefs.preferred_year {
+            let min_y = yr - prefs.year_flexibility;
+            let max_y = yr + prefs.year_flexibility;
+            query = query
+                .filter(movies::release_year.ge(Some(min_y)))
+                .filter(movies::release_year.le(Some(max_y)));
+        }
+
+        // Check if movie exists and passes remaining filters
+        let exists: i64 = query
+            .count()
+            .get_result(&mut conn)
+            .await
+            .map_err(DbError::from)?;
+        Ok(exists > 0)
     }
 
     pub async fn search_movies(

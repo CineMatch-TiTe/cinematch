@@ -5,6 +5,7 @@ use qdrant_client::qdrant::{
 use uuid::Uuid;
 
 mod utils;
+use log::warn;
 
 use cinematch_db::DbError;
 
@@ -20,7 +21,7 @@ pub async fn recommend_from_pool(
         return Ok(vec![]);
     }
 
-    let (positive, negative, skipped) = db.get_taste(user_id).await?;
+    let (positive, negative, skipped) = db.get_taste(user_id, None).await?;
     let genre_map = db.get_genres().await?;
     let prefs = db.get_user_preferences(user_id).await?;
     let prefs_filter = crate::utils::filter_from_prefs(&prefs, &genre_map);
@@ -251,10 +252,10 @@ pub async fn build_round2_ballots_for_party(
 pub async fn recommend_movies(
     db: &Database,
     user_id: Uuid,
-    limit: usize,
     party_id: Option<Uuid>,
+    limit: usize,
 ) -> DbResult<Vec<i64>> {
-    let (positive, negative, skipped) = db.get_taste(user_id).await?;
+    let (positive, negative, skipped) = db.get_taste(user_id, party_id).await?;
 
     // get users prefs
 
@@ -263,16 +264,8 @@ pub async fn recommend_movies(
 
     let filter = crate::utils::filter_from_prefs(&prefs, &genre_map);
 
-    // Collect all movies to exclude
-    let mut excluded: std::collections::HashSet<i64> = skipped.into_iter().collect();
-
-    // If party_id provided, exclude movies already picked in that party (liked, disliked, or skipped)
-    if let Some(pid) = party_id {
-        let party_taste = db.get_party_taste(pid).await?;
-        for (_, mid, _) in party_taste {
-            excluded.insert(mid);
-        }
-    }
+    // Collect movies which user has skipped and do not recommend them
+    let excluded: std::collections::HashSet<i64> = skipped.into_iter().collect();
 
     let mut positive = positive;
     if positive.is_empty() {
@@ -374,5 +367,103 @@ pub async fn recommend_movies(
         })
         .collect();
 
+    Ok(recommended_ids)
+}
+
+/// Recommend movies from the "ratings" collection (sparse user–movie vectors).
+/// Schema: `{ user_id: int, movie_id: [int] }` — flat array of IDs, not array of objects.
+/// We query Qdrant (sparse + must_not match_any(excluded)), aggregate scores per payload["movie_id"].
+/// Genre/year/excluded (skipped) filtering done PG-side per-id via `filter_check_movie` to avoid loading
+/// all matches into memory. Loop best-scored, check each via Postgres, collect until limit.
+pub async fn recommed_movies_from_reviews(
+    db: &Database,
+    user_id: Uuid,
+    party_id: Option<Uuid>,
+    limit: usize,
+) -> DbResult<Vec<i64>> {
+    use qdrant_client::qdrant::{Condition, Filter, QueryPointsBuilder};
+    use std::collections::HashMap;
+
+    let (positive, negative, skipped) = db.get_taste(user_id, party_id).await?;
+
+    // Build sparse vector: (movie_id as u32, 1.0) for liked, (-1.0) for disliked
+    let mut sparse: Vec<(u32, f32)> = Vec::new();
+    for &mid in &positive {
+        sparse.push((mid as u32, 1.0));
+    }
+    for &mid in &negative {
+        sparse.push((mid as u32, -1.0));
+    }
+
+    if sparse.is_empty() {
+        warn!("No sparse vector, fallback to recommend_movies");
+        return self::recommend_movies(db, user_id, party_id, limit).await;
+    }
+
+    let prefs = db.get_user_preferences(user_id).await?;
+    let excluded: Vec<i64> = skipped.into_iter().collect();
+    let excluded_slice = (!excluded.is_empty()).then_some(excluded.as_slice());
+
+    const MAX_MATCH_ANY: usize = 2000;
+    let filter_ids: Vec<i64> = excluded.iter().copied().take(MAX_MATCH_ANY).collect();
+
+    // movie_id is [int]; must_not match_any(excluded) = exclude users whose movie_id list
+    // contains any excluded id. No NestedCondition (that's for arrays of objects, e.g. diet[]).
+    let builder = if filter_ids.is_empty() {
+        QueryPointsBuilder::new("ratings")
+            .query(sparse)
+            .using("ratings")
+            .limit(100)
+            .with_payload(true)
+    } else {
+        let filter = Filter::must_not([Condition::matches("movie_id", filter_ids)]);
+        QueryPointsBuilder::new("ratings")
+            .query(sparse)
+            .using("ratings")
+            .limit(100)
+            .with_payload(true)
+            .filter(filter)
+    };
+
+    let client = db.vector.client.clone();
+    let response = client
+        .query(builder)
+        .await
+        .map_err(|e| DbError::Other(format!("Qdrant query (ratings) error: {}", e)))?;
+
+    // Aggregate: each result = similar user. Use payload["movie_id"] only.
+    let mut movie_scores: HashMap<i64, f64> = HashMap::new();
+    for point in &response.result {
+        let score = point.score as f64;
+        if let Some(v) = point.payload.get("movie_id")
+            && let Some(qdrant_client::qdrant::value::Kind::ListValue(list)) = &v.kind
+        {
+            for val in &list.values {
+                if let Some(qdrant_client::qdrant::value::Kind::IntegerValue(mid)) = val.kind {
+                    *movie_scores.entry(mid).or_default() += score;
+                }
+            }
+        }
+    }
+
+    let mut sorted: Vec<(i64, f64)> = movie_scores.into_iter().collect();
+    sorted.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+
+    // PG-side filter per-id: loop best-scored, check each via filter_check_movie, collect until limit.
+    // Avoids loading all allowed IDs into memory (could be 1000+).
+    let mut recommended_ids: Vec<i64> = Vec::with_capacity(limit);
+    for (id, _) in &sorted {
+        if db.filter_check_movie(*id, &prefs, excluded_slice).await? {
+            recommended_ids.push(*id);
+            if recommended_ids.len() == limit {
+                break;
+            }
+        }
+    }
+
+    if recommended_ids.is_empty() {
+        warn!("No recommendations from reviews, using recommend_movies fallback");
+        return recommend_movies(db, user_id, party_id, limit).await;
+    }
     Ok(recommended_ids)
 }

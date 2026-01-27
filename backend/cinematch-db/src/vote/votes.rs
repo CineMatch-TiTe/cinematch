@@ -60,7 +60,7 @@ impl Database {
             let mut need_own = OWN_PICKS.saturating_sub(own.len());
             let mut own_pool = own;
             if need_own > 0 {
-                let (global_pos, _, _) = self.get_taste(user_id).await.unwrap_or_default();
+                let (global_pos, _, _) = self.get_taste(user_id, Some(party_id)).await.unwrap_or_default();
                 for &mid in global_pos.iter().take(need_own + own_pool.len()) {
                     if !own_pool.contains(&mid) {
                         own_pool.push(mid);

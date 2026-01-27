@@ -92,19 +92,22 @@ pub async fn get_recommendations(db: AppState, user: Option<Identity>) -> HttpRe
 
     // 3 is good
 
-    let ids = match cinematch_recommendation_engine::recommend_movies(&db, user_id, 3, None).await {
-        Ok(movies) => {
-            if movies.is_empty() {
-                return HttpResponse::NotFound().finish();
+    let ids =
+        match cinematch_recommendation_engine::recommed_movies_from_reviews(&db, user_id, None, 3)
+            .await
+        {
+            Ok(movies) => {
+                if movies.is_empty() {
+                    return HttpResponse::NotFound().finish();
+                }
+                movies
             }
-            movies
-        }
-        Err(e) => {
-            error!("Failed to retrieve recommended movies: {}", e);
-            return HttpResponse::InternalServerError()
-                .json(ErrorResponse::new("Failed to retrieve recommended movies"));
-        }
-    };
+            Err(e) => {
+                error!("Failed to retrieve recommended movies: {}", e);
+                return HttpResponse::InternalServerError()
+                    .json(ErrorResponse::new("Failed to retrieve recommended movies"));
+            }
+        };
 
     // build a list of movie responses
 
