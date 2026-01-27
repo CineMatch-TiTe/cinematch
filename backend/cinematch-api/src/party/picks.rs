@@ -199,7 +199,7 @@ pub async fn get_party_recommendations(
         &db,
         user_id,
         Some(party_id),
-        2,
+        5,
     )
     .await
     {
@@ -218,7 +218,7 @@ pub async fn get_party_recommendations(
     };
 
     let other_ids: Vec<i64> =
-        match cinematch_recommendation_engine::recommend_movies(&db, user_id, Some(party_id), 1)
+        match cinematch_recommendation_engine::recommend_movies(&db, user_id, Some(party_id), 2)
             .await
         {
             Ok(movies) => movies,
@@ -233,10 +233,17 @@ pub async fn get_party_recommendations(
         .into_iter()
         .chain(other_ids.into_iter())
         .collect::<Vec<_>>();
+
+    // de duplicate ids
+    all_ids.dedup();
     use rand::seq::SliceRandom;
     all_ids.shuffle(&mut rand::rng());
-    let mut responses = Vec::with_capacity(all_ids.len());
-    for movie_id in all_ids.iter() {
+
+    // pick 3
+    let selected_ids = all_ids.into_iter().take(3).collect::<Vec<_>>();
+
+    let mut responses = Vec::with_capacity(selected_ids.len());
+    for movie_id in selected_ids.iter() {
         match db.get_movie_by_id(*movie_id).await {
             Ok(Some(movie)) => {
                 responses.push(Into::<crate::movie::MovieResponse>::into(movie));
