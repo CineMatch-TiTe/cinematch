@@ -1,9 +1,8 @@
 'use client'
 
-import { useEffect, useState, useTransition, useRef } from 'react'
+import { useEffect, useState, useTransition, useRef, useCallback } from 'react'
 import { toast } from 'sonner'
 
-import { GetVoteResponseVoteTotals } from '@/model/getVoteResponseVoteTotals'
 import { voteMovieAction, getPartyVotesAction, getMoviesByIdsAction } from '@/actions/party-room'
 import { MovieResponse } from '@/model'
 import VotingCard from './VotingCard'
@@ -14,7 +13,6 @@ interface VotingFlowProps {
 
 export default function VotingFlow({ partyId }: Readonly<VotingFlowProps>) {
   const [movies, setMovies] = useState<MovieResponse[]>([])
-  const [voteTotals, setVoteTotals] = useState<GetVoteResponseVoteTotals>({})
   const [votingRound, setVotingRound] = useState<number | null>(null)
   const [loading, setLoading] = useState(true)
   const [countdown, setCountdown] = useState(5) // 5 seconds countdown
@@ -42,30 +40,33 @@ export default function VotingFlow({ partyId }: Readonly<VotingFlowProps>) {
   const displayedMovieIds = useRef<number[]>([])
 
   // Helper to handle transition
-  const handleBallotChange = async (newMovieIds: number[], nextRound: number) => {
-    // If we're already transitioning or viewed this ballot, ignore (logic check should happen before calling this usually but good safety)
-    if (transitionData) return
-    setTransitionData({ round: nextRound })
-    displayedMovieIds.current = newMovieIds // Update ref immediately to prevent double triggers
+  const handleBallotChange = useCallback(
+    async (newMovieIds: number[], nextRound: number) => {
+      // If we're already transitioning or viewed this ballot, ignore (logic check should happen before calling this usually but good safety)
+      if (transitionData) return
+      setTransitionData({ round: nextRound })
+      displayedMovieIds.current = newMovieIds // Update ref immediately to prevent double triggers
 
-    // Fetch next movies during delay
-    const moviesPromise =
-      newMovieIds.length > 0 ? getMoviesByIdsAction(newMovieIds) : Promise.resolve({ data: [] })
+      // Fetch next movies during delay
+      const moviesPromise =
+        newMovieIds.length > 0 ? getMoviesByIdsAction(newMovieIds) : Promise.resolve({ data: [] })
 
-    // Minimum delay of 3 seconds
-    const [moviesResult] = await Promise.all([
-      moviesPromise,
-      new Promise((resolve) => setTimeout(resolve, 3000))
-    ])
+      // Minimum delay of 3 seconds
+      const [moviesResult] = await Promise.all([
+        moviesPromise,
+        new Promise((resolve) => setTimeout(resolve, 3000))
+      ])
 
-    if (moviesResult.data) {
-      setMovies(moviesResult.data)
-    } else {
-      setMovies([])
-    }
-    setVotingRound(nextRound)
-    setTransitionData(null)
-  }
+      if (moviesResult.data) {
+        setMovies(moviesResult.data)
+      } else {
+        setMovies([])
+      }
+      setVotingRound(nextRound)
+      setTransitionData(null)
+    },
+    [transitionData]
+  )
 
   // Initial fetch of votes and movies
   useEffect(() => {
@@ -78,7 +79,6 @@ export default function VotingFlow({ partyId }: Readonly<VotingFlowProps>) {
       }
 
       const ballotIds = voteResult.data.movie_ids || []
-      setVoteTotals(voteResult.data.vote_totals || {})
       setVotingRound(voteResult.data.voting_round ?? 1)
 
       // Update ref
@@ -95,45 +95,45 @@ export default function VotingFlow({ partyId }: Readonly<VotingFlowProps>) {
     init()
   }, [partyId])
 
+  const fetchVotes = useCallback(async () => {
+    // Skip polling logic if transitioning
+    if (transitionData) return
+
+    const result = await getPartyVotesAction(partyId)
+
+    startTransition(() => {
+      if (result.data) {
+        const newMovieIds = result.data.movie_ids || []
+        const currentIds = displayedMovieIds.current
+
+        const hasChanged =
+          newMovieIds.length !== currentIds.length ||
+          !newMovieIds.every((id) => currentIds.includes(id))
+
+        if (hasChanged) {
+          // We need to pass the newRound explicitly if we want to rely on the fetch result
+          // But handleBallotChange takes the round as argument.
+          // result.data.voting_round might be null, fallback to current or 1.
+          const newRound = result.data.voting_round ?? votingRound ?? 1
+          handleBallotChange(newMovieIds, newRound)
+        } else if (result.data.voting_round && result.data.voting_round !== votingRound) {
+          setVotingRound(result.data.voting_round)
+        }
+      }
+    })
+  }, [partyId, transitionData, votingRound, handleBallotChange])
+
   // Poll for votes and round changes
   useEffect(() => {
-    const fetchVotes = async () => {
-      // Skip polling logic if transitioning
-      if (transitionData) return
+    // Initial fetch handled by other effect, but we can also fetch immediately here if we wanted.
+    // The previous code started interval immediately.
 
-      startTransition(async () => {
-        const result = await getPartyVotesAction(partyId)
-        if (result.data) {
-          // Update vote totals always
-          if (result.data.vote_totals) {
-            setVoteTotals(result.data.vote_totals)
-          }
-
-          // Check if ballot changed
-          const newMovieIds = result.data.movie_ids || []
-          const currentIds = displayedMovieIds.current
-          const newRound = result.data.voting_round ?? votingRound ?? 1
-
-          const hasChanged =
-            newMovieIds.length !== currentIds.length ||
-            !newMovieIds.every((id) => currentIds.includes(id))
-
-          if (hasChanged) {
-            // Trigger transition
-            handleBallotChange(newMovieIds, newRound)
-          } else {
-            // Even if ballot didn't change, round number might (unlikely without ballot change but safely update it)
-            if (result.data.voting_round && result.data.voting_round !== votingRound) {
-              setVotingRound(result.data.voting_round)
-            }
-          }
-        }
-      })
-    }
+    // We can call fetchVotes immediately if we want to ensure latest data,
+    // but the other useEffect (lines 71-96) handles initial load.
 
     const interval = setInterval(fetchVotes, 5000)
     return () => clearInterval(interval)
-  }, [handleBallotChange, partyId, transitionData, votingRound])
+  }, [fetchVotes])
 
   const handleVote = async (movieId: number, like: boolean) => {
     // Optimistic update could go here if needed, but for now we rely on polling/server response
@@ -142,19 +142,9 @@ export default function VotingFlow({ partyId }: Readonly<VotingFlowProps>) {
       toast.error(result.error)
     } else if (result.data) {
       // Update specific movie totals immediately
-      const newTotals = result.data
-      setVoteTotals((prev) => ({
-        ...prev,
-        [movieId.toString()]: newTotals
-      }))
-
       // Also refresh full list just in case needed (e.g. if round ended)
       const votesResult = await getPartyVotesAction(partyId)
       if (votesResult.data) {
-        if (votesResult.data.vote_totals) {
-          setVoteTotals(votesResult.data.vote_totals)
-        }
-
         // Check for round/ballot change immediately
         const newMovieIds = votesResult.data.movie_ids || []
         const currentIds = displayedMovieIds.current
