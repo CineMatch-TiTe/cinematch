@@ -1,8 +1,5 @@
 'use client'
 
-import { useEffect, useTransition, useState, useRef } from 'react'
-import { useRouter } from 'next/navigation'
-import { toast } from 'sonner'
 import Image from 'next/image'
 import { LogOut, Play, Settings } from 'lucide-react'
 
@@ -11,12 +8,6 @@ import { ActionConfirmationDialog } from '@/components/common/ActionConfirmation
 import { PartyHeader } from '@/components/party/PartyHeader'
 import { PartyMemberList } from '@/components/party/PartyMemberList'
 import { PreferencesDialog } from '@/components/preferences/PreferencesDialog'
-import {
-  kickMemberAction,
-  leavePartyAction,
-  promoteMemberAction,
-  advancePhaseAction
-} from '@/actions/party-room'
 import { PartyResponse } from '@/model/partyResponse'
 import { MemberInfo } from '@/model/memberInfo'
 import { CurrentUserResponse } from '@/model/currentUserResponse'
@@ -24,6 +15,7 @@ import VotingFlow from './voting/VotingFlow'
 import PickingFlow from './picking/PickingFlow'
 import WatchingFlow from './watching/WatchingFlow'
 import { usePartyView } from './PartyViewContext'
+import { usePartyViewLogic } from '@/hooks/usePartyViewLogic'
 
 interface PartyViewClientProps {
   party: PartyResponse
@@ -36,82 +28,31 @@ export default function PartyViewClient({
   members,
   currentUser
 }: Readonly<PartyViewClientProps>) {
-  const router = useRouter()
-  const [isManualPending, startManualTransition] = useTransition()
-  const [, startPollingTransition] = useTransition()
-  useEffect(() => {
-    const interval = setInterval(() => {
-      startPollingTransition(() => {
-        router.refresh()
-      })
-    }, 5000)
-
-    return () => clearInterval(interval)
-  }, [router])
-
-  const [leaveDialogOpen, setLeaveDialogOpen] = useState(false)
-  const [advanceDialogOpen, setAdvanceDialogOpen] = useState(false)
   const { activeView, setActiveView } = usePartyView()
-  const prevPartyState = useRef(party.state)
 
-  // Effect to handle view switching based on party state
-  useEffect(() => {
-    if (prevPartyState.current !== party.state) {
-      if (party.state === 'voting') {
-        setActiveView('voting')
-      } else if (party.state === 'watching') {
-        setActiveView('watching')
-      }
-      prevPartyState.current = party.state
-    }
-  }, [party.state, setActiveView])
+  const {
+    isManualPending,
+    leaveDialogOpen,
+    setLeaveDialogOpen,
+    advanceDialogOpen,
+    setAdvanceDialogOpen,
+    isLeader,
+    handleLeaveClick,
+    handleAdvanceClick,
+    confirmLeave,
+    confirmAdvance,
+    handleKick,
+    handlePromote,
+    getAdvanceButtonText
+  } = usePartyViewLogic({ party, currentUser, setActiveView })
 
-  const isLeader = party.leader_id === currentUser.user_id
-
-  const handleLeaveClick = () => setLeaveDialogOpen(true)
-  const handleAdvanceClick = () => setAdvanceDialogOpen(true)
-
-  const confirmLeave = async () => {
-    await leavePartyAction(party.id)
-    setLeaveDialogOpen(false)
-  }
-
-  const confirmAdvance = async () => {
-    startManualTransition(async () => {
-      const result = await advancePhaseAction(party.id)
-      if (result.error) toast.error(result.error)
-      setAdvanceDialogOpen(false)
-    })
-  }
-
-  const handleKick = async (memberId: string) => {
-    startManualTransition(async () => {
-      const result = await kickMemberAction(party.id, memberId)
-      if (result.error) toast.error(result.error)
-      else toast.success('Member kicked')
-    })
-  }
-
-  const handlePromote = async (memberId: string) => {
-    startManualTransition(async () => {
-      const result = await promoteMemberAction(party.id, memberId)
-      if (result.error) toast.error(result.error)
-      else toast.success('Leadership transferred')
-    })
-  }
-
-  // View state helpers
   const isPickingView = activeView === 'picking'
   const isVotingView = activeView === 'voting'
   const isWatchingView = activeView === 'watching'
   const isPartyView = activeView === 'room'
 
   const renderAdvanceButton = () => {
-    if (!isLeader) return null
-
-    let text = ''
-    if (party.state === 'created') text = 'Start Picking'
-    if (party.state === 'picking') text = 'Start Voting'
+    const text = getAdvanceButtonText()
 
     if (!text) return null
 
