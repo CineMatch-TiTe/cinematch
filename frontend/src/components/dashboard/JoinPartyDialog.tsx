@@ -20,7 +20,7 @@ interface JoinPartyDialogProps {
   trigger: React.ReactNode
 }
 
-export function JoinPartyDialog({ trigger }: JoinPartyDialogProps) {
+export function JoinPartyDialog({ trigger }: Readonly<JoinPartyDialogProps>) {
   const [code, setCode] = useState('')
   const [isOpen, setIsOpen] = useState(false)
   const [isPending, startTransition] = useTransition()

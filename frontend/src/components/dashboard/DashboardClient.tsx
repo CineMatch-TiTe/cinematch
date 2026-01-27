@@ -5,16 +5,13 @@ import { PartyActions } from './PartyActions'
 import PersonalPickingFlow from '@/components/party/picking/PersonalPickingFlow'
 import { Button } from '@/components/ui/button'
 import { CurrentUserResponse } from '@/model/currentUserResponse'
-
-// Define CurrentUser type locally or import if available,
-// strictly we only need display name or user object.
 interface DashboardClientProps {
   user: CurrentUserResponse
 }
 
 type DashboardView = 'actions' | 'picking'
 
-export function DashboardClient({ user }: DashboardClientProps) {
+export function DashboardClient({ user }: Readonly<DashboardClientProps>) {
   const [view, setView] = useState<DashboardView>('actions')
 
   return (
