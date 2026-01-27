@@ -2,6 +2,8 @@ use super::{AppState, DbError, ErrorResponse, GetPicksResponse, PartyState, extr
 
 use crate::user::UpdateTasteRequest;
 
+use std::collections::HashSet;
+
 use actix_identity::Identity;
 use actix_web::{HttpResponse, delete, get, put, web};
 use log::{error, trace};
@@ -229,13 +231,13 @@ pub async fn get_party_recommendations(
             }
         };
 
-    let mut all_ids = ids
+    let all_ids = ids
         .into_iter()
         .chain(other_ids.into_iter())
-        .collect::<Vec<_>>();
+        .collect::<HashSet<_>>();
 
-    // de duplicate ids
-    all_ids.dedup();
+    let mut all_ids = all_ids.into_iter().collect::<Vec<_>>();
+
     use rand::seq::SliceRandom;
     all_ids.shuffle(&mut rand::rng());
 
