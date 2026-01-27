@@ -199,7 +199,7 @@ pub async fn get_party_recommendations(
         &db,
         user_id,
         Some(party_id),
-        3,
+        2,
     )
     .await
     {
@@ -217,8 +217,26 @@ pub async fn get_party_recommendations(
         }
     };
 
-    let mut responses = Vec::with_capacity(ids.len());
-    for movie_id in ids.iter() {
+    let other_ids: Vec<i64> =
+        match cinematch_recommendation_engine::recommend_movies(&db, user_id, Some(party_id), 1)
+            .await
+        {
+            Ok(movies) => movies,
+            Err(e) => {
+                error!("Failed to retrieve other recommendations: {}", e);
+                return HttpResponse::InternalServerError()
+                    .json(ErrorResponse::new("Failed to retrieve recommendations"));
+            }
+        };
+
+    let mut all_ids = ids
+        .into_iter()
+        .chain(other_ids.into_iter())
+        .collect::<Vec<_>>();
+    use rand::seq::SliceRandom;
+    all_ids.shuffle(&mut rand::rng());
+    let mut responses = Vec::with_capacity(all_ids.len());
+    for movie_id in all_ids.iter() {
         match db.get_movie_by_id(*movie_id).await {
             Ok(Some(movie)) => {
                 responses.push(Into::<crate::movie::MovieResponse>::into(movie));
