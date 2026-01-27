@@ -264,9 +264,6 @@ pub async fn recommend_movies(
 
     let filter = crate::utils::filter_from_prefs(&prefs, &genre_map);
 
-    // Collect movies which user has skipped and do not recommend them
-    let excluded: std::collections::HashSet<i64> = skipped.into_iter().collect();
-
     let mut positive = positive;
     if positive.is_empty() {
         let popular_movies = db.get_popular_movies(5).await?;
@@ -295,6 +292,11 @@ pub async fn recommend_movies(
         .collect();
 
     // Exclude skipped movies and party picks from filter
+    let excluded: Vec<i64> = positive
+        .into_iter()
+        .chain(negative.into_iter())
+        .chain(skipped.into_iter())
+        .collect();
     let mut final_filter = filter;
     if !excluded.is_empty() {
         let excluded_ids: Vec<PointId> = excluded
@@ -401,7 +403,12 @@ pub async fn recommed_movies_from_reviews(
     }
 
     let prefs = db.get_user_preferences(user_id).await?;
-    let excluded: Vec<i64> = skipped.into_iter().collect();
+    // add all eg positive negative and skipped too into the excluded list
+    let excluded: Vec<i64> = positive
+        .into_iter()
+        .chain(negative.into_iter())
+        .chain(skipped.into_iter())
+        .collect();
     let excluded_slice = (!excluded.is_empty()).then_some(excluded.as_slice());
 
     const MAX_MATCH_ANY: usize = 2000;
@@ -413,14 +420,14 @@ pub async fn recommed_movies_from_reviews(
         QueryPointsBuilder::new("ratings")
             .query(sparse)
             .using("ratings")
-            .limit(100)
+            .limit(200)
             .with_payload(true)
     } else {
         let filter = Filter::must_not([Condition::matches("movie_id", filter_ids)]);
         QueryPointsBuilder::new("ratings")
             .query(sparse)
             .using("ratings")
-            .limit(100)
+            .limit(200)
             .with_payload(true)
             .filter(filter)
     };
