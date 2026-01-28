@@ -3,10 +3,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { MovieResponse } from '@/model/movieResponse'
-
-const PREFETCH_THRESHOLD = 3
+import { useMoviePickerContext } from '@/context/MoviePickerContext'
 
 export interface UseMoviePickerOptions {
+  key: string
   fetchNext: () => Promise<MovieResponse[]>
   submitAction: (movieId: number, action: boolean | null) => Promise<{ error?: string }>
 }
@@ -14,7 +14,6 @@ export interface UseMoviePickerOptions {
 export interface UseMoviePickerReturn {
   currentMovie: MovieResponse | undefined
   loading: boolean
-  refetching: boolean
   processing: boolean
   noNewMovies: boolean
   handleLike: () => Promise<void>
@@ -24,34 +23,49 @@ export interface UseMoviePickerReturn {
 }
 
 export function useMoviePicker({
+  key,
   fetchNext,
   submitAction
 }: UseMoviePickerOptions): UseMoviePickerReturn {
-  const [movies, setMovies] = useState<MovieResponse[]>([])
-  const [seenMovieIds, setSeenMovieIds] = useState<Set<number>>(new Set())
-  const [loading, setLoading] = useState(true)
-  const [processing, setProcessing] = useState(false)
-  const [currentIndex, setCurrentIndex] = useState(0)
-  const [noNewMovies, setNoNewMovies] = useState(false)
-  const [isPrefetching, setIsPrefetching] = useState(false)
+  const { getState, setState } = useMoviePickerContext()
 
+  const savedState = getState(key)
   const initialized = useRef(false)
 
-  const filterNewMovies = useCallback((fetchedMovies: MovieResponse[], seenIds: Set<number>) => {
-    return fetchedMovies.filter((movie) => !seenIds.has(movie.movie_id))
-  }, [])
+  // Initialize state from context if available, otherwise defaults
+  const [movies, setMovies] = useState<MovieResponse[]>(savedState?.movies || [])
+  const [seenMovieIds, setSeenMovieIds] = useState<Set<number>>(savedState?.seenMovieIds || new Set())
+  const [currentIndex, setCurrentIndex] = useState(savedState?.currentIndex || 0)
+  const [noNewMovies, setNoNewMovies] = useState(savedState?.noNewMovies || false)
 
-  const loadMoreMovies = useCallback(async () => {
-    if (isPrefetching || noNewMovies) return
+  // If we restored state, we are not loading. If we need to fetch, we are loading.
+  const [loading, setLoading] = useState(!savedState)
+  const [processing, setProcessing] = useState(false)
 
-    setIsPrefetching(true)
+  // Sync back to context on every change
+  useEffect(() => {
+    setState(key, {
+      movies,
+      seenMovieIds,
+      currentIndex,
+      noNewMovies
+    })
+  }, [key, movies, seenMovieIds, currentIndex, noNewMovies, setState])
+
+  const fetchMore = useCallback(async () => {
+    setLoading(true)
     try {
       const newMovies = await fetchNext()
-      setMovies((prevMovies) => {
-        return prevMovies
-      })
 
-      const filtered = filterNewMovies(newMovies, seenMovieIds)
+      // Filter out movies we've already seen
+      // We use the functional update of setMovies to ensure access to latest 'movies' if needed,
+      // but here we primarily need 'seenMovieIds'.
+      // However, 'seenMovieIds' in the closure might be stale if we don't include it in deps.
+      // But we are in useCallback with dependency... wait.
+      // seenMovieIds could change if user swipes while fetching?
+      // "loading" blocks interaction so user can't swipe. Safe.
+
+      const filtered = newMovies.filter((m) => !seenMovieIds.has(m.movie_id))
 
       if (filtered.length > 0) {
         setMovies((prev) => [...prev, ...filtered])
@@ -63,24 +77,34 @@ export function useMoviePicker({
       console.error('Failed to load movies', error)
       toast.error('Failed to load movies')
     } finally {
-      setIsPrefetching(false)
       setLoading(false)
     }
-  }, [fetchNext, filterNewMovies, isPrefetching, noNewMovies, seenMovieIds])
+  }, [fetchNext, seenMovieIds])
 
+  // Initial load
   useEffect(() => {
     if (!initialized.current) {
       initialized.current = true
-      loadMoreMovies()
+      // If we have no state, fetch.
+      // If we have state but somehow empty and not marked as noNewMovies, maybe fetch?
+      // Respect savedState first.
+      if (!savedState) {
+        fetchMore()
+      } else {
+        // We have saved state.
+        // If we were effectively "done" but not marked as noNewMovies?
+        // E.g. user refreshed while loading?
+        // Let's assume savedState captures the last consistent state.
+        // If savedState says not loading, we remain not loading.
+      }
     }
-  }, [loadMoreMovies])
+  }, [savedState, fetchMore])
 
   useEffect(() => {
-    const remaining = movies.length - currentIndex
-    if (!loading && !noNewMovies && remaining <= PREFETCH_THRESHOLD) {
-      loadMoreMovies()
+    if (initialized.current && !loading && !noNewMovies && currentIndex >= movies.length) {
+      fetchMore()
     }
-  }, [currentIndex, movies.length, loading, noNewMovies, loadMoreMovies])
+  }, [currentIndex, movies.length, loading, noNewMovies, fetchMore])
 
   const handleAction = async (action: boolean | null) => {
     if (processing) return
@@ -110,13 +134,12 @@ export function useMoviePicker({
     }
   }
 
-  const hasFinishedAllMovies = movies.length > 0 && currentIndex >= movies.length && noNewMovies
+  const hasFinishedAllMovies = noNewMovies && currentIndex >= movies.length
 
   return {
     currentMovie: movies[currentIndex],
     loading,
-    processing, // separate loading and processing
-    refetching: isPrefetching, // map isPrefetching to refetching for compatibility
+    processing,
     noNewMovies,
     handleLike: () => handleAction(true),
     handleDislike: () => handleAction(false),
