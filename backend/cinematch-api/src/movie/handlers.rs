@@ -9,6 +9,8 @@ use actix_identity::Identity;
 use actix_web::{HttpResponse, get, post, web};
 use log::error;
 
+use std::collections::HashSet;
+
 #[utoipa::path(
     responses(
         (status = 200, description = "Movie details", body = MovieResponse),
@@ -90,39 +92,56 @@ pub async fn get_genres(db: AppState, user: Option<Identity>) -> HttpResponse {
 pub async fn get_recommendations(db: AppState, user: Option<Identity>) -> HttpResponse {
     let user_id = extract_user_id!(user);
 
-    // 3 is good
-
-    let ids =
-        match cinematch_recommendation_engine::recommed_movies_from_reviews(&db, user_id, None, 3)
+    let ids: Vec<i64> =
+        match cinematch_recommendation_engine::recommed_movies_from_reviews(&db, user_id, None, 5)
             .await
         {
             Ok(movies) => {
                 if movies.is_empty() {
-                    return HttpResponse::NotFound().finish();
+                    return HttpResponse::NotFound()
+                        .json(ErrorResponse::new("No recommendations available"));
                 }
                 movies
             }
             Err(e) => {
-                error!("Failed to retrieve recommended movies: {}", e);
+                error!("Failed to retrieve party recommendations: {}", e);
                 return HttpResponse::InternalServerError()
-                    .json(ErrorResponse::new("Failed to retrieve recommended movies"));
+                    .json(ErrorResponse::new("Failed to retrieve recommendations"));
             }
         };
 
-    // build a list of movie responses
+    let other_ids: Vec<i64> =
+        match cinematch_recommendation_engine::recommend_movies(&db, user_id, None, 2).await {
+            Ok(movies) => movies,
+            Err(e) => {
+                error!("Failed to retrieve other recommendations: {}", e);
+                return HttpResponse::InternalServerError()
+                    .json(ErrorResponse::new("Failed to retrieve recommendations"));
+            }
+        };
 
-    let mut responses = Vec::with_capacity(ids.len());
+    let all_ids = ids
+        .into_iter()
+        .chain(other_ids.into_iter())
+        .collect::<HashSet<_>>();
 
-    for movie_id in ids.iter() {
+    let mut all_ids = all_ids.into_iter().collect::<Vec<_>>();
+
+    use rand::seq::SliceRandom;
+    all_ids.shuffle(&mut rand::rng());
+
+    // pick 3
+    let selected_ids = all_ids.into_iter().take(3).collect::<Vec<_>>();
+
+    let mut responses = Vec::with_capacity(selected_ids.len());
+    for movie_id in selected_ids.iter() {
         match db.get_movie_by_id(*movie_id).await {
-            Ok(movie) => match movie {
-                Some(movie) => {
-                    responses.push(Into::<MovieResponse>::into(movie));
-                }
-                None => {
-                    error!("Recommended movie with ID {} not found", movie_id);
-                }
-            },
+            Ok(Some(movie)) => {
+                responses.push(Into::<crate::movie::MovieResponse>::into(movie));
+            }
+            Ok(None) => {
+                error!("Recommended movie with ID {} not found", movie_id);
+            }
             Err(e) => {
                 error!("Failed to retrieve movie with ID {}: {}", movie_id, e);
                 return HttpResponse::InternalServerError()
@@ -132,10 +151,10 @@ pub async fn get_recommendations(db: AppState, user: Option<Identity>) -> HttpRe
     }
 
     if responses.is_empty() {
-        return HttpResponse::NotFound().finish();
+        return HttpResponse::NotFound().json(ErrorResponse::new("No recommendations available"));
     }
 
-    HttpResponse::Ok().json(RecommendedMoviesResponse {
+    HttpResponse::Ok().json(crate::movie::RecommendedMoviesResponse {
         recommended_movies: responses,
     })
 }
