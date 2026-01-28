@@ -23,7 +23,7 @@ CineMatch is a real-time collaborative movie selection platform. Users create or
 | Language | TypeScript |
 | UI | React 19.2.3 |
 | Styling | Tailwind CSS 4, tw-animate-css |
-| Components | Shadcn UI |
+| Components | Shadcn UI, Radix UI |
 | Icons | Lucide React |
 | Forms | Zod validation |
 | Data Fetching | SWR |
@@ -133,26 +133,6 @@ graph TD
     K -->|Leader advances| L[Voting Phase]
     L --> M[Results]
 ```
-
-### Party States
-
-1. **Created** – Members join and set preferences
-2. **Picking** – Members swipe through movie recommendations  
-3. **Voting** – Group votes on top picks
-
-## Key Components
-
-### `PartyViewClient`
-Main party room component with real-time polling, member list, and phase controls.
-
-### `PickingFlow`
-Full-screen movie picker using `useMoviePicker` hook. Features like/skip gestures and prefetching.
-
-### `PreferencesFlow`
-Multi-step onboarding wizard for genre, decade, and viewing preference selection.
-
-### `useMoviePicker`
-Custom hook managing movie queue, prefetching, and API interactions with smart caching.
 
 ## API Integration
 

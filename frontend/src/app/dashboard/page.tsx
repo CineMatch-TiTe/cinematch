@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import { LogOut, Settings } from 'lucide-react'
 import Image from 'next/image'
 import { PreferencesDialog } from '@/components/preferences/PreferencesDialog'
-import { DashboardClient } from './DashboardClient'
+import { DashboardClient } from '@/components/dashboard/DashboardClient'
 
 export default async function DashboardPage() {
   const userRes = await getCurrentUser().catch(() => null)

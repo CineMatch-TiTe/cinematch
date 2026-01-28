@@ -1,11 +1,27 @@
 'use client'
 
+import { useCallback } from 'react'
 import MovieCard from '../MovieCard'
 import { PickingLoadingState } from '.'
 import PersonalPickingEmptyState from './PersonalPickingEmptyState'
-import { usePersonalMoviePicker } from '@/hooks/usePersonalMoviePicker'
+import { useMoviePicker } from '@/hooks/useMoviePicker'
+import { getPersonalRecommendationsAction, updatePersonalTasteAction } from '@/actions/dashboard'
 
 export default function PersonalPickingFlow() {
+  const fetchNext = useCallback(async () => {
+    try {
+      const result = await getPersonalRecommendationsAction()
+      return result.data ?? []
+    } catch (error) {
+      console.error('Failed to fetch personal recommendations', error)
+      return []
+    }
+  }, [])
+
+  const submitAction = useCallback(async (movieId: number, action: boolean | null) => {
+    return await updatePersonalTasteAction(movieId, action)
+  }, [])
+
   const {
     currentMovie,
     loading,
@@ -15,14 +31,13 @@ export default function PersonalPickingFlow() {
     handleDislike,
     handleSkip,
     hasFinishedAllMovies
-  } = usePersonalMoviePicker()
+  } = useMoviePicker({ fetchNext, submitAction })
 
   if (loading || refetching) {
     return <PickingLoadingState isRefetching={refetching} />
   }
 
   if (hasFinishedAllMovies) {
-    // Reuse existing empty state for now
     return <PersonalPickingEmptyState />
   }
 
