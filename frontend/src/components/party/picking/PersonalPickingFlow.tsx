@@ -25,16 +25,15 @@ export default function PersonalPickingFlow() {
   const {
     currentMovie,
     loading,
-    refetching,
     processing,
     handleLike,
     handleDislike,
     handleSkip,
     hasFinishedAllMovies
-  } = useMoviePicker({ fetchNext, submitAction })
+  } = useMoviePicker({ key: 'personal', fetchNext, submitAction })
 
-  if (loading || refetching) {
-    return <PickingLoadingState isRefetching={refetching} />
+  if (loading) {
+    return <PickingLoadingState />
   }
 
   if (hasFinishedAllMovies) {

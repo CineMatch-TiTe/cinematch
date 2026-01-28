@@ -27,16 +27,15 @@ export default function PickingFlow({ partyId }: Readonly<{ partyId: string }>) 
   const {
     currentMovie,
     loading,
-    refetching,
     processing,
     handleLike,
     handleDislike,
     handleSkip,
     hasFinishedAllMovies
-  } = useMoviePicker({ fetchNext, submitAction })
+  } = useMoviePicker({ key: `party-${partyId}`, fetchNext, submitAction })
 
-  if (loading || refetching) {
-    return <PickingLoadingState isRefetching={refetching} />
+  if (loading) {
+    return <PickingLoadingState />
   }
 
   if (hasFinishedAllMovies) {
