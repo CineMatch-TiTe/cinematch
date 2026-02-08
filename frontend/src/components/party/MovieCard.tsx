@@ -1,8 +1,10 @@
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Badge } from '@/components/ui/badge'
+import { Card, CardContent } from '@/components/ui/card'
 import { MovieResponse } from '@/model/movieResponse'
-import { ThumbsDown, ThumbsUp, SkipForward } from 'lucide-react'
+import { ThumbsDown, ThumbsUp, SkipForward, Star, Calendar, Clock } from 'lucide-react'
 import Image from 'next/image'
 
 interface MovieCardProps {
@@ -27,9 +29,10 @@ export default function MovieCard({
     setPrevPosterUrl(movie.poster_url)
     setIsImageLoading(true)
   }
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="w-full max-w-md h-[80vh] flex flex-col bg-zinc-900 rounded-3xl overflow-hidden shadow-2xl ring-1 ring-white/10 relative">
+      <Card className="w-full max-w-md h-[80vh] flex flex-col bg-zinc-900 border-zinc-800 overflow-hidden shadow-2xl relative">
         {/* Movie Poster Background */}
         <div className="absolute inset-0 z-0">
           <Image
@@ -44,30 +47,33 @@ export default function MovieCard({
             onLoad={() => setIsImageLoading(false)}
           />
           {isImageLoading && <Skeleton className="absolute inset-0 bg-zinc-800" />}
-          <div className="absolute inset-0 bg-linear-to-t from-zinc-950 via-zinc-950/60 to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-zinc-950/60 to-transparent" />
         </div>
 
         {/* Content */}
-        <div className="relative z-10 flex-1 flex flex-col justify-end p-6 pb-24 space-y-4">
+        <CardContent className="relative z-10 flex-1 flex flex-col justify-end p-6 pb-24 space-y-4">
           <div>
             <h2 className="text-3xl font-bold text-white shadow-black drop-shadow-md leading-tight">
               {movie.title}
             </h2>
             <div className="flex flex-wrap gap-2 mt-2">
               {movie.release_date && (
-                <span className="text-sm font-medium text-zinc-300 bg-black/40 px-2 py-1 rounded backdrop-blur-md">
+                <Badge variant="secondary" className="bg-black/40 text-zinc-300 hover:bg-black/60 backdrop-blur-md border-0">
+                  <Calendar className="w-3 h-3 mr-1" />
                   {new Date(movie.release_date).getFullYear()}
-                </span>
+                </Badge>
               )}
               {movie.rating && (
-                <span className="text-sm font-medium text-yellow-400 bg-black/40 px-2 py-1 rounded backdrop-blur-md">
-                  ★ {movie.rating}
-                </span>
+                <Badge variant="secondary" className="bg-black/40 text-yellow-400 hover:bg-black/60 backdrop-blur-md border-0">
+                  <Star className="w-3 h-3 mr-1 fill-yellow-400" />
+                  {movie.rating}
+                </Badge>
               )}
               {movie.runtime && (
-                <span className="text-sm font-medium text-zinc-300 bg-black/40 px-2 py-1 rounded backdrop-blur-md">
+                <Badge variant="secondary" className="bg-black/40 text-zinc-300 hover:bg-black/60 backdrop-blur-md border-0">
+                  <Clock className="w-3 h-3 mr-1" />
                   {movie.runtime} min
-                </span>
+                </Badge>
               )}
             </div>
           </div>
@@ -78,15 +84,16 @@ export default function MovieCard({
 
           <div className="flex flex-wrap gap-2 pt-2 pb-6">
             {movie.genres.slice(0, 3).map((genre) => (
-              <span
+              <Badge
                 key={genre}
-                className="text-xs font-medium text-zinc-400 border border-zinc-700/50 px-2 py-1 rounded-full bg-black/40 backdrop-blur-md"
+                variant="outline"
+                className="text-xs font-medium text-zinc-400 border-zinc-700/50 bg-black/40 backdrop-blur-md"
               >
                 {genre}
-              </span>
+              </Badge>
             ))}
           </div>
-        </div>
+        </CardContent>
 
         {/* Action Buttons */}
         <div className="absolute bottom-6 left-0 right-0 px-8 flex justify-between items-center z-20 gap-4">
@@ -120,7 +127,7 @@ export default function MovieCard({
             <ThumbsUp className="w-8 h-8 fill-current" />
           </Button>
         </div>
-      </div>
+      </Card>
     </div>
   )
 }

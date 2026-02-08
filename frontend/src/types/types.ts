@@ -6,6 +6,3 @@ export interface UserPreferences {
   isStudying: boolean | null // true for "Studying software engineering", false for "Studying some nonsense", null for unselected
 }
 
-export interface PreferencesFlowProps {
-  joinCode: string
-}

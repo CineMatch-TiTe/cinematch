@@ -13,7 +13,7 @@ import { Loader2 } from 'lucide-react'
 import useSWR from 'swr'
 import { getCurrentUserAction, getUserPreferencesAction } from '@/actions/user'
 import AccountForm from '@/components/user/AccountForm'
-import PreferencesFlow from '@/components/preferences/PreferencesFlow'
+import Preferences from '@/components/preferences/Preferences'
 
 const fetchUser = async () => {
   const res = await getCurrentUserAction()
@@ -89,7 +89,8 @@ export function PreferencesDialog({
         </DialogHeader>
 
         {showPrefsFlow ? (
-          <PreferencesFlow
+          <Preferences
+            mode="wizard"
             initialPrefs={prefData}
             onComplete={() => {
               mutatePref()

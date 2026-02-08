@@ -246,5 +246,5 @@ export async function loginAction(prevState: unknown, formData: FormData) {
     }
   }
 
-  redirect('/dashboard')
+  redirect('/preferences')
 }
