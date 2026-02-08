@@ -1,7 +1,7 @@
 'use client'
 
-import { MovieResponse } from '@/model/movieResponse'
 import React, { createContext, useContext, useRef } from 'react'
+import { MovieResponse } from '@/model/movieResponse'
 
 interface PickerState {
     movies: MovieResponse[]
@@ -18,7 +18,7 @@ interface MoviePickerContextType {
 
 const MoviePickerContext = createContext<MoviePickerContextType | undefined>(undefined)
 
-export function MoviePickerProvider({ children }: { children: React.ReactNode }) {
+export function MoviePickerProvider({ children }: Readonly<{ children: React.ReactNode }>) {
     const states = useRef<Map<string, PickerState>>(new Map())
 
     const getState = (key: string) => {
@@ -33,8 +33,10 @@ export function MoviePickerProvider({ children }: { children: React.ReactNode })
         states.current.delete(key)
     }
 
+    const contextValue = React.useMemo(() => ({ getState, setState, clearState }), [])
+
     return (
-        <MoviePickerContext.Provider value={{ getState, setState, clearState }}>
+        <MoviePickerContext.Provider value={contextValue}>
             {children}
         </MoviePickerContext.Provider>
     )

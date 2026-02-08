@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { MovieResponse } from '@/model/movieResponse'
-import { useMoviePickerContext } from '@/context/MoviePickerContext'
+import { useMoviePickerContext } from '@/components/providers/MoviePickerProvider'
 
 export interface UseMoviePickerOptions {
   key: string
