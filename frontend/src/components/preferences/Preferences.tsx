@@ -1,3 +1,5 @@
+'use client'
+
 import { Button } from '@/components/ui/button'
 import { Film, Loader2 } from 'lucide-react'
 import { UserPreferencesResponse } from '@/model/userPreferencesResponse'
