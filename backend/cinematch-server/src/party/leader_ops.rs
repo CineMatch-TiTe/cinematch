@@ -30,7 +30,7 @@ use cinematch_db::domain::{Party, User};
 )]
 #[post("/advance")]
 pub async fn advance_phase(
-    db: AppState,
+    ctx: AppState,
     user: Identity,
     party_query: web::Query<OptionalIdParam>,
 ) -> Result<HttpResponse, ApiError> {
@@ -38,35 +38,35 @@ pub async fn advance_phase(
     let party_id = match party_query.id {
         Some(id) => id,
         None => {
-            let user_obj = User::from_id(&db, leader_id).await?;
+            let user_obj = User::from_id(&ctx, leader_id).await?;
             user_obj
-                .current_party(&db)
+                .current_party(&ctx)
                 .await?
                 .ok_or_else(|| ApiError::NotFound("No active party found".to_string()))?
                 .id
         }
     };
 
-    let party = Party::from_id(&db, party_id).await?;
+    let party = Party::from_id(&ctx, party_id).await?;
 
-    let outcome = party.advance_phase(&db, leader_id).await?;
+    let outcome = party.advance_phase(&ctx, leader_id).await?;
     match &outcome {
         PartyAdvanceOutcome::PhaseChanged(s) => {
             debug!("Party {} phase advanced to {:?}", party_id, s);
-            db.scheduler
-                .enforce_phase_timeout_and_broadcast(party_id, std::sync::Arc::new(db.clone()))
+            ctx.scheduler
+                .enforce_phase_timeout_and_broadcast(party_id, ctx.clone())
                 .await;
         }
         PartyAdvanceOutcome::VotingEnded(EndVotingTransition::Round2Started) => {
             debug!("Party {} voting round 2 started", party_id);
-            db.scheduler
-                .enforce_phase_timeout_and_broadcast(party_id, std::sync::Arc::new(db.clone()))
+            ctx.scheduler
+                .enforce_phase_timeout_and_broadcast(party_id, ctx.clone())
                 .await;
         }
         PartyAdvanceOutcome::VotingEnded(EndVotingTransition::PhaseChanged(s)) => {
             debug!("Party {} voting ended -> {:?}", party_id, s);
-            db.scheduler
-                .enforce_phase_timeout_and_broadcast(party_id, std::sync::Arc::new(db.clone()))
+            ctx.scheduler
+                .enforce_phase_timeout_and_broadcast(party_id, ctx.clone())
                 .await;
         }
     }
@@ -86,7 +86,7 @@ pub async fn advance_phase(
 )]
 #[post("/disband")]
 pub async fn disband_party(
-    db: AppState,
+    ctx: AppState,
     user: Identity,
     party_query: web::Query<OptionalIdParam>,
 ) -> Result<HttpResponse, ApiError> {
@@ -94,17 +94,17 @@ pub async fn disband_party(
     let party_id = match party_query.id {
         Some(id) => id,
         None => {
-            let user_obj = User::from_id(&db, user_id).await?;
+            let user_obj = User::from_id(&ctx, user_id).await?;
             user_obj
-                .current_party(&db)
+                .current_party(&ctx)
                 .await?
                 .ok_or_else(|| ApiError::NotFound("No active party found".to_string()))?
                 .id
         }
     };
 
-    let party_obj = Party::from_id(&db, party_id).await?;
-    party_obj.disband_checked(&db, user_id).await?;
+    let party_obj = Party::from_id(&ctx, party_id).await?;
+    party_obj.disband_checked(&ctx, user_id).await?;
 
     debug!("Party {} disbanded successfully", party_id);
     Ok(HttpResponse::Ok().finish())
@@ -126,7 +126,7 @@ pub async fn disband_party(
 )]
 #[post("/kick")]
 pub async fn kick_member(
-    db: AppState,
+    ctx: AppState,
     user: Identity,
     kick_query: web::Query<KickQuery>,
     party_query: web::Query<OptionalIdParam>,
@@ -136,17 +136,17 @@ pub async fn kick_member(
     let party_id = match party_query.id {
         Some(id) => id,
         None => {
-            let user_obj = User::from_id(&db, requester_id).await?;
+            let user_obj = User::from_id(&ctx, requester_id).await?;
             user_obj
-                .current_party(&db)
+                .current_party(&ctx)
                 .await?
                 .ok_or_else(|| ApiError::NotFound("No active party found".to_string()))?
                 .id
         }
     };
 
-    let party_obj = Party::from_id(&db, party_id).await?;
-    party_obj.kick(&db, requester_id, target_user_id).await?;
+    let party_obj = Party::from_id(&ctx, party_id).await?;
+    party_obj.kick(&ctx, requester_id, target_user_id).await?;
 
     debug!("User {} kicked from party {}", target_user_id, party_id);
     Ok(HttpResponse::Ok().finish())
@@ -169,7 +169,7 @@ pub async fn kick_member(
 )]
 #[post("/transfer-leadership")]
 pub async fn transfer_leadership(
-    db: AppState,
+    ctx: AppState,
     user: Identity,
     transfer_query: web::Query<TransferQuery>,
     party_query: web::Query<OptionalIdParam>,
@@ -179,18 +179,18 @@ pub async fn transfer_leadership(
     let party_id = match party_query.id {
         Some(id) => id,
         None => {
-            let user_obj = User::from_id(&db, requester_id).await?;
+            let user_obj = User::from_id(&ctx, requester_id).await?;
             user_obj
-                .current_party(&db)
+                .current_party(&ctx)
                 .await?
                 .ok_or_else(|| ApiError::NotFound("No active party found".to_string()))?
                 .id
         }
     };
 
-    let party_obj = Party::from_id(&db, party_id).await?;
+    let party_obj = Party::from_id(&ctx, party_id).await?;
     party_obj
-        .transfer_leadership_checked(&db, requester_id, new_leader_id)
+        .transfer_leadership_checked(&ctx, requester_id, new_leader_id)
         .await?;
     Ok(HttpResponse::Ok().finish())
 }

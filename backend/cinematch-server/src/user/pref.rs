@@ -25,15 +25,15 @@ use super::{UpdateUserPreferencesRequest, UserPreferencesResponse};
 )]
 #[get("/preferences")]
 pub async fn get_user_pref(
-    db: AppState,
+    ctx: AppState,
     user: Option<Identity>,
 ) -> Result<web::Json<UserPreferencesResponse>, ApiError> {
     let user_id = extract_user_id(user)?;
-    let user_obj = User::from_id(&db, user_id).await?;
-    let prefs_handle = user_obj.preferences(&db).await?;
-    let prefs_record = prefs_handle.record(&db).await?;
+    let user_obj = User::from_id(&ctx, user_id).await?;
+    let prefs_handle = user_obj.preferences(&ctx).await?;
+    let prefs_record = prefs_handle.record(&ctx).await?;
 
-    let genre_map = match Movie::all_genres(&db).await {
+    let genre_map = match Movie::all_genres(&ctx).await {
         Ok(map) => map,
         Err(e) => {
             error!("Failed to fetch genres: {}", e);
@@ -87,15 +87,15 @@ pub async fn get_user_pref(
 )]
 #[patch("/preferences")]
 pub async fn edit_user_pref(
-    db: AppState,
+    ctx: AppState,
     user: Option<Identity>,
     update: web::Json<UpdateUserPreferencesRequest>,
 ) -> Result<web::Json<UserPreferencesResponse>, ApiError> {
     let user_id = extract_user_id(user)?;
-    let user_obj = User::from_id(&db, user_id).await?;
-    let prefs_handle = user_obj.preferences(&db).await?;
+    let user_obj = User::from_id(&ctx, user_id).await?;
+    let prefs_handle = user_obj.preferences(&ctx).await?;
 
-    let genre_map = match Movie::all_genres(&db).await {
+    let genre_map = match Movie::all_genres(&ctx).await {
         Ok(map) => map,
         Err(e) => {
             error!("Failed to fetch genres: {}", e);
@@ -110,7 +110,7 @@ pub async fn edit_user_pref(
         release_year_flex: update.release_year_flex,
         is_tite: update.is_tite,
     };
-    if let Err(e) = user_obj.update_preferences(&db, update_internal).await {
+    if let Err(e) = user_obj.update_preferences(&ctx, update_internal).await {
         error!("Failed to update user preferences: {}", e);
         return Err(ApiError::InternalServerError(
             "Failed to update preferences".to_string(),
@@ -119,15 +119,15 @@ pub async fn edit_user_pref(
     // Update included genres
     if let Some(ref names) = update.include_genres {
         // Remove all current includes
-        if let Ok(current) = user_obj.included_genres(&db).await {
+        if let Ok(current) = user_obj.included_genres(&ctx).await {
             for gid in current {
-                let _ = user_obj.remove_included_genre(&db, gid).await;
+                let _ = user_obj.remove_included_genre(&ctx, gid).await;
             }
         }
         // Add new includes
         for name in names {
             if let Some(&gid) = genre_map.get(name) {
-                let _ = user_obj.add_included_genre(&db, gid).await;
+                let _ = user_obj.add_included_genre(&ctx, gid).await;
             } else {
                 return Err(ApiError::BadRequest(
                     "Invalid genre name in include_genres".to_string(),
@@ -138,15 +138,15 @@ pub async fn edit_user_pref(
     // Update excluded genres
     if let Some(ref names) = update.exclude_genres {
         // Remove all current excludes
-        if let Ok(current) = user_obj.excluded_genres(&db).await {
+        if let Ok(current) = user_obj.excluded_genres(&ctx).await {
             for gid in current {
-                let _ = user_obj.remove_excluded_genre(&db, gid).await;
+                let _ = user_obj.remove_excluded_genre(&ctx, gid).await;
             }
         }
         // Add new excludes
         for name in names {
             if let Some(&gid) = genre_map.get(name) {
-                let _ = user_obj.add_excluded_genre(&db, gid).await;
+                let _ = user_obj.add_excluded_genre(&ctx, gid).await;
             } else {
                 return Err(ApiError::BadRequest(
                     "Invalid genre name in exclude_genres".to_string(),
@@ -155,7 +155,7 @@ pub async fn edit_user_pref(
         }
     }
 
-    let prefs = prefs_handle.record(&db).await?;
+    let prefs = prefs_handle.record(&ctx).await?;
 
     Ok(web::Json(UserPreferencesResponse {
         target_release_year: prefs.preferred_year,

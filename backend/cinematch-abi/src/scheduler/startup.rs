@@ -18,7 +18,10 @@ use cinematch_db::AppContext;
 
 /// Reschedule all timeouts on server startup.
 /// Call after creating the registry and before starting the HTTP server.
-pub async fn reschedule_timeouts_on_startup(registry: &Arc<Scheduler>, ctx: Arc<dyn AppContext>) {
+pub async fn reschedule_timeouts_on_startup<C: AppContext + Clone + 'static>(
+    registry: &Arc<Scheduler>,
+    ctx: C,
+) {
     let (voting_secs, watching_secs) = get_timeout_secs();
     let now = Utc::now();
 
@@ -55,11 +58,10 @@ pub async fn reschedule_timeouts_on_startup(registry: &Arc<Scheduler>, ctx: Arc<
                         "Startup: party {} {:?} timeout already past, executing immediately",
                         party_id, state
                     );
-                    executor::execute_phase_timeout(registry, party_id, state, Arc::clone(&ctx))
-                        .await;
+                    executor::execute_phase_timeout(registry, party_id, state, ctx.clone()).await;
                 } else {
                     registry
-                        .schedule_phase_timeout(party_id, state, deadline, Arc::clone(&ctx))
+                        .schedule_phase_timeout(party_id, state, deadline, ctx.clone())
                         .await;
                 }
             }
@@ -83,7 +85,7 @@ pub async fn reschedule_timeouts_on_startup(registry: &Arc<Scheduler>, ctx: Arc<
                     party_id
                 );
                 registry
-                    .schedule_ready_countdown(party_id, Arc::clone(&ctx))
+                    .schedule_ready_countdown(party_id, ctx.clone())
                     .await;
             }
         }

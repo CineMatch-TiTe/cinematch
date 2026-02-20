@@ -94,11 +94,6 @@ async fn main() -> Result<()> {
             println!("  - movies.csv");
             println!("  - links.csv\n");
         }
-        Command::UpdateOnboarding => {
-            println!("🚀 Starting Onboarding Update...");
-            let ratings_path = std::path::PathBuf::from(RATINGS_CSV);
-            commands::update_onboarding::run(database.clone().into(), ratings_path, None).await?;
-        }
     }
 
     let elapsed = start.elapsed();

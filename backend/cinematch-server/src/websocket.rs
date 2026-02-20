@@ -29,26 +29,26 @@ pub use cinematch_common::models::websocket::ServerMessage;
 pub async fn websocket_controller(
     req: HttpRequest,
     stream: Payload,
-    db: AppState,
+    ctx: AppState,
     user: Identity,
 ) -> Result<HttpResponse, ApiError> {
     let user_id = extract_user_id(user)?;
 
     trace!("WebSocket upgrade for user {}", user_id);
 
-    let session = WsSession::new(user_id, db.ws_registry.clone());
+    let session = WsSession::new(user_id, ctx.ws_registry.clone());
     ws::start(session, &req, stream).map_err(ApiError::from)
 }
 
 /// Broadcast a message to all members of a party.
 /// Fetches member IDs from the database and sends via WsRegistry.
 pub async fn broadcast_to_party<T: serde::Serialize>(
-    db: &AppState,
+    ctx: &AppState,
     party_id: Uuid,
     msg: &T,
     exclude_user: Option<Uuid>,
 ) {
-    let party = match Party::from_id(db, party_id).await {
+    let party = match Party::from_id(ctx, party_id).await {
         Ok(p) => p,
         Err(e) => {
             error!("broadcast_to_party: party {} not found: {:?}", party_id, e);
@@ -56,7 +56,7 @@ pub async fn broadcast_to_party<T: serde::Serialize>(
         }
     };
 
-    let member_ids = match party.member_ids(db).await {
+    let member_ids = match party.member_ids(ctx).await {
         Ok(ids) => ids,
         Err(e) => {
             error!(
@@ -73,5 +73,5 @@ pub async fn broadcast_to_party<T: serde::Serialize>(
         member_ids
     };
 
-    db.ws_registry.send_to_users(&recipients, msg);
+    ctx.ws_registry.send_to_users(&recipients, msg);
 }

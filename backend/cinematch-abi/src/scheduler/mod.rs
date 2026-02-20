@@ -59,12 +59,12 @@ impl Scheduler {
 
     /// Schedule a phase timeout (Voting/Watching).
     /// Cancels any existing timeout for this party first.
-    pub async fn schedule_phase_timeout(
+    pub async fn schedule_phase_timeout<C: AppContext + Clone + 'static>(
         self: &Arc<Self>,
         party_id: Uuid,
         phase: PartyState,
         deadline_at: DateTime<Utc>,
-        ctx: Arc<dyn AppContext>,
+        ctx: C,
     ) {
         self.cancel(party_id).await;
 
@@ -86,7 +86,7 @@ impl Scheduler {
         );
 
         let timeout_registry = Arc::clone(self);
-        let ctx_clone = Arc::clone(&ctx);
+        let ctx_clone = ctx.clone();
         let handle = rt::spawn(async move {
             debug!(
                 "[Scheduler] Sleeping {:.1}s for {:?} timeout (party {})",
@@ -110,10 +110,10 @@ impl Scheduler {
 
     /// Schedule ready countdown.
     /// Cancels any existing timeout for this party first.
-    pub async fn schedule_ready_countdown(
+    pub async fn schedule_ready_countdown<C: AppContext + Clone + 'static>(
         self: &Arc<Self>,
         party_id: Uuid,
-        ctx: Arc<dyn AppContext>,
+        ctx: C,
     ) {
         self.cancel(party_id).await;
 
@@ -134,8 +134,8 @@ impl Scheduler {
         );
 
         let timeout_registry = Arc::clone(self);
-        let ctx_clone = Arc::clone(&ctx);
-        let ctx_for_broadcast = Arc::clone(&ctx);
+        let ctx_clone = ctx.clone();
+        let ctx_for_broadcast = ctx.clone();
 
         let handle = rt::spawn(async move {
             debug!(
@@ -177,8 +177,7 @@ impl Scheduler {
     }
 
     /// Cancel timeout and broadcast that deadline is cleared.
-    /// Cancel timeout and broadcast that deadline is cleared.
-    pub async fn cancel_and_broadcast(&self, party_id: Uuid, ctx: &Arc<dyn AppContext>) {
+    pub async fn cancel_and_broadcast<C: AppContext>(&self, party_id: Uuid, ctx: &C) {
         self.cancel(party_id).await;
         let msg = ServerMessage::PartyTimeoutUpdate(PartyTimeoutUpdate {
             phase_entered_at: None,
@@ -201,10 +200,10 @@ impl Scheduler {
 
     /// Enforce phase-specific timeout and broadcast to clients.
     /// Used when entering Voting or Watching phase to ensure backend schedule matches client deadline.
-    pub async fn enforce_phase_timeout_and_broadcast(
+    pub async fn enforce_phase_timeout_and_broadcast<C: AppContext + Clone + 'static>(
         self: &Arc<Self>,
         party_id: Uuid,
-        ctx: Arc<dyn AppContext>,
+        ctx: C,
     ) {
         use crate::domain::get_timeout_secs;
 

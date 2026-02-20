@@ -14,27 +14,24 @@ use uuid::Uuid;
 
 #[derive(Debug, Deserialize, ToSchema, IntoParams)]
 pub struct RecommendationQuery {
-    /// Optional party ID to get recommendations for a party context.
+    /// (Optional) Party ID to get recommendations for a group.
     pub party_id: Option<Uuid>,
-    /// Recommendation method:
+    /// (Optional) Recommendation method to use.
     /// - `reviews`: Based on user reviews.
-    /// - `semantic`: based on semantic similarity of plots/reviews.
-    /// - `default`: Hybrid approach.
+    /// - `semantic`: based on plot/meta similarity.
+    /// - `default`: Hybrid mix.
     #[param(default = "default")]
     pub method: Option<RecommendationMethod>,
-    /// Vector type for semantic search:
-    /// - `plot`: Movie plot embeddings.
-    /// - `cast_crew`: Cast and crew embeddings.
-    /// - `reviews`: Review embeddings.
-    /// - `combined`: Combined embeddings.
+    /// (Optional) Vector type for semantic search.
+    /// - `plot`: Movie plots.
+    /// - `cast_crew`: Actors/Directors.
+    /// - `reviews`: User reviews.
+    /// - `combined`: All metrics.
     #[param(default = "combined")]
     pub vector: Option<VectorType>,
-    /// Number of recommendations to return (default: 3).
+    /// (Optional) Number of movies to return (default: 3).
     #[param(default = 3)]
     pub limit: Option<usize>,
-    /// Whether to force onboarding recommendations.
-    #[param(default = false)]
-    pub onboard: Option<bool>,
 }
 
 use crate::movie::RecommendedMoviesResponse;
@@ -56,7 +53,7 @@ use crate::movie::RecommendedMoviesResponse;
 )]
 #[get("")]
 pub async fn get_recommendations(
-    db: AppState,
+    ctx: AppState,
     user: Identity,
     query: web::Query<RecommendationQuery>,
 ) -> Result<web::Json<RecommendedMoviesResponse>, ApiError> {
@@ -65,8 +62,8 @@ pub async fn get_recommendations(
 
     let party_id = if let Some(pid) = query.party_id {
         // Verify user is in this party if party_id is provided
-        let party = Party::from_id(&db, pid).await?;
-        party.require_member(&db, user_id).await?;
+        let party = Party::from_id(&ctx, pid).await?;
+        party.require_member(&ctx, user_id).await?;
         Some(pid)
     } else {
         None
@@ -77,32 +74,21 @@ pub async fn get_recommendations(
     let limit = query.limit.unwrap_or(3);
 
     let rec_handle = if let Some(pid) = party_id {
-        Recommendation::for_party(std::sync::Arc::new(db.clone()), user_id, pid)
+        Recommendation::for_party(ctx.clone(), user_id, pid)
     } else {
-        Recommendation::for_user(std::sync::Arc::new(db.clone()), user_id)
+        Recommendation::for_user(ctx.clone(), user_id)
     };
 
     let movie_ids = match method {
-        RecommendationMethod::Reviews => {
-            rec_handle
-                .get_from_reviews(vector, limit, query.onboard)
-                .await?
-        }
-        RecommendationMethod::Semantic => {
-            rec_handle
-                .get_standard(vector, limit, query.onboard)
-                .await?
-        }
+        RecommendationMethod::Reviews => rec_handle.get_from_reviews(vector, limit).await?,
+        RecommendationMethod::Semantic => rec_handle.get_standard(vector, limit).await?,
         RecommendationMethod::Default => {
             // Default logic: mix reviews and standard
             let reviews_ids = rec_handle
-                .get_from_reviews(vector, 5, query.onboard)
+                .get_from_reviews(vector, 5)
                 .await
                 .unwrap_or_default();
-            let standard_ids = rec_handle
-                .get_standard(vector, 2, query.onboard)
-                .await
-                .unwrap_or_default();
+            let standard_ids = rec_handle.get_standard(vector, 2).await.unwrap_or_default();
 
             let mut combined = reviews_ids;
             for id in standard_ids {
@@ -124,7 +110,7 @@ pub async fn get_recommendations(
 
     let mut responses = Vec::with_capacity(movie_ids.len());
     for movie_id in movie_ids {
-        if let Some(movie) = Movie::new(movie_id).data(&db).await? {
+        if let Some(movie) = Movie::new(movie_id).data(&ctx).await? {
             responses.push(MovieResponse::from(movie));
         }
     }

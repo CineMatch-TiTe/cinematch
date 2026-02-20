@@ -23,7 +23,7 @@ use cinematch_db::domain::{Party, User};
 )]
 #[get("/pick")]
 pub async fn get_picks(
-    db: AppState,
+    ctx: AppState,
     user: Identity,
     party_query: web::Query<OptionalIdParam>,
 ) -> Result<web::Json<super::GetPicksResponse>, ApiError> {
@@ -31,17 +31,17 @@ pub async fn get_picks(
     let party_id = match party_query.id {
         Some(id) => id,
         None => {
-            let user_obj = User::from_id(&db, user_id).await?;
+            let user_obj = User::from_id(&ctx, user_id).await?;
             user_obj
-                .current_party(&db)
+                .current_party(&ctx)
                 .await?
                 .ok_or_else(|| ApiError::NotFound("No active party found".to_string()))?
                 .id
         }
     };
 
-    let party_obj = Party::from_id(&db, party_id).await?;
-    let movie_ids = party_obj.get_user_picks(&db, user_id).await?;
+    let party_obj = Party::from_id(&ctx, party_id).await?;
+    let movie_ids = party_obj.get_user_picks(&ctx, user_id).await?;
 
     Ok(web::Json(super::GetPicksResponse { movie_ids }))
 }
@@ -64,7 +64,7 @@ pub async fn get_picks(
 )]
 #[put("/pick")]
 pub async fn pick_movie(
-    db: AppState,
+    ctx: AppState,
     user: Identity,
     query: web::Query<crate::user::UpdateTasteQuery>,
     party_query: web::Query<OptionalIdParam>,
@@ -77,18 +77,18 @@ pub async fn pick_movie(
     let party_id = match party_query.id {
         Some(id) => id,
         None => {
-            let user_obj = User::from_id(&db, user_id).await?;
+            let user_obj = User::from_id(&ctx, user_id).await?;
             user_obj
-                .current_party(&db)
+                .current_party(&ctx)
                 .await?
                 .ok_or_else(|| ApiError::NotFound("No active party found".to_string()))?
                 .id
         }
     };
 
-    let party_obj = Party::from_id(&db, party_id).await?;
+    let party_obj = Party::from_id(&ctx, party_id).await?;
     party_obj
-        .set_user_pick(&db, user_id, movie_id, liked)
+        .set_user_pick(&ctx, user_id, movie_id, liked)
         .await?;
 
     Ok(HttpResponse::Ok().finish())
@@ -111,7 +111,7 @@ pub async fn pick_movie(
 )]
 #[delete("/pick")]
 pub async fn delete_pick(
-    db: AppState,
+    ctx: AppState,
     user: Identity,
     query: web::Query<super::MovieIdQuery>,
     party_query: web::Query<OptionalIdParam>,
@@ -121,17 +121,17 @@ pub async fn delete_pick(
     let party_id = match party_query.id {
         Some(id) => id,
         None => {
-            let user_obj = User::from_id(&db, user_id).await?;
+            let user_obj = User::from_id(&ctx, user_id).await?;
             user_obj
-                .current_party(&db)
+                .current_party(&ctx)
                 .await?
                 .ok_or_else(|| ApiError::NotFound("No active party found".to_string()))?
                 .id
         }
     };
 
-    let party_obj = Party::from_id(&db, party_id).await?;
-    party_obj.remove_user_pick(&db, user_id, movie_id).await?;
+    let party_obj = Party::from_id(&ctx, party_id).await?;
+    party_obj.remove_user_pick(&ctx, user_id, movie_id).await?;
 
     Ok(HttpResponse::Ok().finish())
 }

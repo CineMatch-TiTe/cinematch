@@ -7,7 +7,6 @@ use qdrant_client::qdrant::{
 use std::collections::{HashMap, HashSet};
 use uuid::Uuid;
 
-pub mod onboarding;
 mod utils;
 use log::warn;
 

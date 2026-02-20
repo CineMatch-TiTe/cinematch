@@ -14,11 +14,11 @@ use cinematch_db::repo::party::models::PartyState;
 use super::Scheduler;
 
 /// Execute phase timeout (Voting/Watching).
-pub async fn execute_phase_timeout(
+pub async fn execute_phase_timeout<C: AppContext + Clone + 'static>(
     registry: &Arc<Scheduler>,
     party_id: Uuid,
     expected_phase: PartyState,
-    ctx: Arc<dyn AppContext>,
+    ctx: C,
 ) {
     // Remove from tasks first (we're executing)
     registry.remove_task(party_id).await;
@@ -74,7 +74,7 @@ pub async fn execute_phase_timeout(
     }
 }
 
-async fn execute_voting_timeout(party: &Party, party_id: Uuid, ctx: Arc<dyn AppContext>) {
+async fn execute_voting_timeout<C: AppContext>(party: &Party, party_id: Uuid, ctx: C) {
     info!(
         "[Scheduler] Executing voting timeout for party {}",
         party_id
@@ -134,7 +134,7 @@ async fn execute_voting_timeout(party: &Party, party_id: Uuid, ctx: Arc<dyn AppC
     }
 }
 
-async fn execute_watching_timeout(party: &Party, party_id: Uuid, ctx: Arc<dyn AppContext>) {
+async fn execute_watching_timeout<C: AppContext>(party: &Party, party_id: Uuid, ctx: C) {
     info!(
         "[Scheduler] Executing watching timeout for party {}",
         party_id
@@ -164,10 +164,10 @@ async fn execute_watching_timeout(party: &Party, party_id: Uuid, ctx: Arc<dyn Ap
 }
 
 /// Execute ready countdown (all members ready → advance phase).
-pub async fn execute_ready_countdown(
+pub async fn execute_ready_countdown<C: AppContext + Clone + 'static>(
     registry: &Arc<Scheduler>,
     party_id: Uuid,
-    ctx: Arc<dyn AppContext>,
+    ctx: C,
 ) {
     // Verify all still ready
     let Ok(party) = Party::from_id(&ctx, party_id).await else {

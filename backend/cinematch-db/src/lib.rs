@@ -142,30 +142,6 @@ impl AppContext for SimpleContext {
     fn send_users(&self, _user_ids: &[Uuid], _msg: &ServerMessage) {}
 }
 
-impl AppContext for Arc<dyn AppContext> {
-    fn db(&self) -> &Arc<Database> {
-        (**self).db()
-    }
-    fn broadcast_party(&self, party_id: Uuid, msg: &ServerMessage, exclude: Option<Uuid>) {
-        (**self).broadcast_party(party_id, msg, exclude)
-    }
-    fn send_users(&self, user_ids: &[Uuid], msg: &ServerMessage) {
-        (**self).send_users(user_ids, msg)
-    }
-}
-
-impl AppContext for Box<dyn AppContext> {
-    fn db(&self) -> &Arc<Database> {
-        (**self).db()
-    }
-    fn broadcast_party(&self, party_id: Uuid, msg: &ServerMessage, exclude: Option<Uuid>) {
-        (**self).broadcast_party(party_id, msg, exclude)
-    }
-    fn send_users(&self, user_ids: &[Uuid], msg: &ServerMessage) {
-        (**self).send_users(user_ids, msg)
-    }
-}
-
 // ============================================================================
 // Database Connection Pool
 // ============================================================================

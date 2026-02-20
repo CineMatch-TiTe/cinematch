@@ -29,7 +29,7 @@ use cinematch_common::models::ErrorResponse;
 )]
 #[post("/login/guest")]
 pub async fn login_guest(
-    db: AppState,
+    ctx: AppState,
     request: HttpRequest,
     body: web::Json<GuestUserRequest>,
     user: Option<Identity>,
@@ -45,7 +45,7 @@ pub async fn login_guest(
     });
     debug!("Creating guest user with username choice: {:?}", username);
 
-    match cinematch_db::domain::User::create_guest(&db, &username).await {
+    match cinematch_db::domain::User::create_guest(&ctx, &username).await {
         Ok(user) => {
             if let Err(e) = Identity::login(&request.extensions(), user.id.to_string()) {
                 error!("Failed to set user identity in session: {e}");
@@ -55,7 +55,7 @@ pub async fn login_guest(
             }
             trace!("User identity set in session for user_id={}", user.id);
 
-            let username = user.username(&db).await.unwrap_or_default();
+            let username = user.username(&ctx).await.unwrap_or_default();
             Ok(web::Json(GuestLoginResponse {
                 user_id: user.id,
                 username,

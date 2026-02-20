@@ -78,7 +78,7 @@ async fn main() -> std::io::Result<()> {
     };
 
     // Reschedule any active timeouts from before restart
-    reschedule_timeouts_on_startup(&scheduler, Arc::new(app_state.clone())).await;
+    reschedule_timeouts_on_startup(&scheduler, app_state.clone()).await;
     let data = web::Data::new(app_state);
 
     let server_host = std::env::var("SERVER_HOST").unwrap_or_else(|_| "0.0.0.0".to_string());

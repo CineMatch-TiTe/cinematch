@@ -25,7 +25,7 @@ use std::collections::HashMap;
 )]
 #[get("/vote")]
 pub async fn get_vote(
-    db: AppState,
+    ctx: AppState,
     user: Identity,
     party_query: web::Query<OptionalIdParam>,
 ) -> Result<web::Json<GetVoteResponse>, ApiError> {
@@ -33,32 +33,32 @@ pub async fn get_vote(
     let party_id = match party_query.id {
         Some(id) => id,
         None => {
-            let user_obj = User::from_id(&db, user_id).await?;
+            let user_obj = User::from_id(&ctx, user_id).await?;
             user_obj
-                .current_party(&db)
+                .current_party(&ctx)
                 .await?
                 .ok_or_else(|| ApiError::NotFound("No active party found".to_string()))?
                 .id
         }
     };
 
-    let party_obj = Party::from_id(&db, party_id).await?;
-    party_obj.require_member(&db, user_id).await?;
+    let party_obj = Party::from_id(&ctx, party_id).await?;
+    party_obj.require_member(&ctx, user_id).await?;
 
-    let state = party_obj.state(&db).await?;
+    let state = party_obj.state(&ctx).await?;
     if state != PartyState::Voting {
         return Err(ApiError::NotFound("Party is not in Voting".to_string()));
     }
 
     let movie_ids = party_obj
-        .get_user_votes(&db, user_id)
+        .get_user_votes(&ctx, user_id)
         .await?
         .into_iter()
         .map(|v| v.movie_id)
         .collect();
 
     let vote_totals: HashMap<i64, VoteTotals> = party_obj
-        .get_votes(&db, Some(user_id))
+        .get_votes(&ctx, Some(user_id))
         .await?
         .into_iter()
         .map(|(mid, (l, d))| {
@@ -74,8 +74,8 @@ pub async fn get_vote(
 
     let response = GetVoteResponse {
         movie_ids,
-        voting_round: party_obj.voting_round(&db).await?,
-        can_vote: party_obj.can_vote(&db).await?,
+        voting_round: party_obj.voting_round(&ctx).await?,
+        can_vote: party_obj.can_vote(&ctx).await?,
         vote_totals,
     };
     Ok(web::Json(response))
@@ -99,7 +99,7 @@ pub async fn get_vote(
 )]
 #[post("/vote")]
 pub async fn vote_movie(
-    db: AppState,
+    ctx: AppState,
     user: Identity,
     vote_query: web::Query<VoteQuery>,
     party_query: web::Query<OptionalIdParam>,
@@ -110,28 +110,28 @@ pub async fn vote_movie(
     let party_id = match party_query.id {
         Some(id) => id,
         None => {
-            let user_obj = User::from_id(&db, user_id).await?;
+            let user_obj = User::from_id(&ctx, user_id).await?;
             user_obj
-                .current_party(&db)
+                .current_party(&ctx)
                 .await?
                 .ok_or_else(|| ApiError::NotFound("No active party found".to_string()))?
                 .id
         }
     };
 
-    let party_obj = Party::from_id(&db, party_id).await?;
-    party_obj.require_member(&db, user_id).await?;
+    let party_obj = Party::from_id(&ctx, party_id).await?;
+    party_obj.require_member(&ctx, user_id).await?;
 
     // Cast vote with broadcast
     let (likes, dislikes) = party_obj
-        .cast_vote_with_broadcast(&db, user_id, movie_id, vote_value)
+        .cast_vote_with_broadcast(&ctx, user_id, movie_id, vote_value)
         .await?;
 
     // Try auto-end voting if all members have voted
-    if let Ok(Some(_)) = party_obj.try_auto_end_voting(&db).await {
+    if let Ok(Some(_)) = party_obj.try_auto_end_voting(&ctx).await {
         // Broadcast handled by ABI
-        db.scheduler
-            .enforce_phase_timeout_and_broadcast(party_id, std::sync::Arc::new(db.clone()))
+        ctx.scheduler
+            .enforce_phase_timeout_and_broadcast(party_id, ctx.clone())
             .await;
     }
 

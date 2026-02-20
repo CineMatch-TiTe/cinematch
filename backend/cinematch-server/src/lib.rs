@@ -37,7 +37,6 @@ pub fn validate_username(input: &str) -> Result<String, ApiError> {
 
 mod auth;
 mod movie;
-pub mod onboarding;
 mod party;
 mod recommendation;
 mod user;
@@ -74,7 +73,15 @@ impl Modify for SecurityAddon {
 #[derive(OpenApi)]
 #[openapi(
     modifiers(&SecurityAddon),
-    components(schemas(crate::api_error::ApiError)),
+    components(schemas(
+        crate::api_error::ApiError,
+        cinematch_common::models::RecommendationMethod,
+        cinematch_common::models::VectorType,
+        cinematch_common::models::ErrorResponse,
+        crate::movie::MovieResponse,
+        crate::movie::CastMemberResponse,
+        crate::movie::RecommendedMoviesResponse,
+    )),
     tags(
         (name = "Auth", description = "Authentication and session management."),
         (name = "User", description = "User profile and global preferences."),
@@ -85,7 +92,6 @@ impl Modify for SecurityAddon {
         (name = "Leader Tools", description = "Administrative tools for party leaders."),
         (name = "Recommendation", description = "AI-powered movie suggestions."),
         (name = "Movie", description = "Global movie retrieval and search."),
-        (name = "Onboarding", description = "New user interest discovery."),
         (name = "websocket", description = "Real-time communication.")
     )
 )]

@@ -21,7 +21,7 @@ use cinematch_db::domain::Movie;
 )]
 #[get("")]
 pub async fn get_movie(
-    db: AppState,
+    ctx: AppState,
     user: Option<Identity>,
     query: web::Query<crate::party::MovieIdQuery>,
 ) -> Result<web::Json<super::MovieResponse>, ApiError> {
@@ -29,7 +29,7 @@ pub async fn get_movie(
     let movie_id = query.movie_id;
 
     let movie = Movie::new(movie_id)
-        .data(&db)
+        .data(&ctx)
         .await?
         .ok_or_else(|| ApiError::NotFound("Movie not found".to_string()))?;
 
@@ -49,12 +49,12 @@ pub async fn get_movie(
 )]
 #[get("/genres")]
 pub async fn get_genres(
-    db: AppState,
+    ctx: AppState,
     user: Option<Identity>,
 ) -> Result<web::Json<super::GenreResponse>, ApiError> {
     let _ = extract_user_id(user)?;
 
-    let genre_map = Movie::all_genres(&db).await?;
+    let genre_map = Movie::all_genres(&ctx).await?;
     let mut names: Vec<String> = genre_map.keys().cloned().collect();
     names.sort();
 
@@ -80,7 +80,7 @@ pub async fn get_genres(
 )]
 #[post("/search")]
 pub async fn search(
-    db: AppState,
+    ctx: AppState,
     user: Option<Identity>,
     query: web::Query<SearchQuery>,
     body: Option<web::Json<cinematch_common::SearchFilter>>,
@@ -92,7 +92,7 @@ pub async fn search(
     let title = query_inner.title;
     let page = query_inner.page.unwrap_or(1);
 
-    let movies = Movie::search(&db, &title, page, filter).await?;
+    let movies = Movie::search(&ctx, &title, page, filter).await?;
 
     if movies.is_empty() {
         return Err(ApiError::NotFound("No movies found".to_string()));

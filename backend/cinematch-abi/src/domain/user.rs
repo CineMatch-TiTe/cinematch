@@ -139,7 +139,7 @@ fn validate_username(name: &str) -> Result<String, DomainError> {
 pub trait UserCreation {
     /// Create a guest user with a checked/generated name.
     async fn create_guest_checked(
-        ctx: std::sync::Arc<dyn cinematch_db::AppContext>,
+        ctx: &impl cinematch_db::AppContext,
         username: Option<String>,
     ) -> Result<User, DomainError>;
 
@@ -150,7 +150,7 @@ pub trait UserCreation {
 #[async_trait]
 impl UserCreation for User {
     async fn create_guest_checked(
-        ctx: std::sync::Arc<dyn cinematch_db::AppContext>,
+        ctx: &impl cinematch_db::AppContext,
         username: Option<String>,
     ) -> Result<User, DomainError> {
         let name = match username {
@@ -158,7 +158,7 @@ impl UserCreation for User {
             None => Self::generate_guest_name(),
         };
 
-        User::create_guest(&ctx, &name)
+        User::create_guest(ctx, &name)
             .await
             .map_err(DomainError::from)
     }

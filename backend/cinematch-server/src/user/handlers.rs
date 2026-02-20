@@ -39,7 +39,7 @@ use cinematch_db::domain::User;
 )]
 #[post("/rename")]
 pub async fn rename_user(
-    db: AppState,
+    ctx: AppState,
     #[allow(unused_variables)] _user_id: web::Query<crate::party::OptionalIdParam>, // Kept for future path-based admin overrides
     query: web::Query<crate::user::RenameQuery>,
     user: Identity,
@@ -47,9 +47,9 @@ pub async fn rename_user(
     let new_username = &query.name;
     let claims = extract_user_id(user)?;
 
-    let user_obj = User::from_id(&db, claims).await?;
+    let user_obj = User::from_id(&ctx, claims).await?;
 
-    user_obj.rename(&db, new_username).await?;
+    user_obj.rename(&ctx, new_username).await?;
 
     Ok(HttpResponse::Ok().finish())
 }
@@ -68,15 +68,15 @@ pub async fn rename_user(
 #[get("")]
 pub async fn get_current_user(
     user: Identity,
-    db: AppState,
+    ctx: AppState,
 ) -> Result<web::Json<CurrentUserResponse>, ApiError> {
     let user_id = extract_user_id(user)?;
-    let user_obj = User::from_id(&db, user_id).await?;
+    let user_obj = User::from_id(&ctx, user_id).await?;
 
     // Fetch details
-    let username = user_obj.username(&db).await?;
-    let is_guest = user_obj.is_oneshot(&db).await?;
-    let record = user_obj.record(&db).await?;
+    let username = user_obj.username(&ctx).await?;
+    let is_guest = user_obj.is_oneshot(&ctx).await?;
+    let record = user_obj.record(&ctx).await?;
 
     // Token expiry: 24 hours from now
     let now = chrono::Utc::now().timestamp();
@@ -110,7 +110,7 @@ pub async fn get_current_user(
 )]
 #[put("/taste")]
 pub async fn update_taste(
-    db: AppState,
+    ctx: AppState,
     user: Identity,
     query: web::Query<UpdateTasteQuery>,
 ) -> Result<HttpResponse, ApiError> {
@@ -119,8 +119,10 @@ pub async fn update_taste(
     let liked = query.liked;
     let rating = query.rating;
 
-    let user_obj = User::from_id(&db, _user_id).await?;
-    user_obj.update_rating(&db, movie_id, liked, rating).await?;
+    let user_obj = User::from_id(&ctx, _user_id).await?;
+    user_obj
+        .update_rating(&ctx, movie_id, liked, rating)
+        .await?;
 
     Ok(HttpResponse::Ok().finish())
 }
@@ -140,15 +142,15 @@ pub async fn update_taste(
 )]
 #[get("/taste")]
 pub async fn get_taste(
-    db: AppState,
+    ctx: AppState,
     user: Identity,
     query: web::Query<GetTasteQuery>,
 ) -> Result<web::Json<UserTasteResponse>, ApiError> {
     let user_id = extract_user_id(user)?;
     let movie_id = query.movie_id;
 
-    let user_obj = User::from_id(&db, user_id).await?;
-    let taste = user_obj.get_rating(&db, movie_id).await?;
+    let user_obj = User::from_id(&ctx, user_id).await?;
+    let taste = user_obj.get_rating(&ctx, movie_id).await?;
 
     match taste {
         Some((liked, rating, updated_at)) => Ok(web::Json(UserTasteResponse {
