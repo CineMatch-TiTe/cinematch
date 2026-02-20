@@ -7,32 +7,32 @@ Base URL
 --------
 
 ```
-http://localhost:8085/api
+http://localhost:8080/api
 ```
 
 Authentication
 --------------
 
-All endpoints (except `POST /user/login/guest`) require cookie-based authentication. The `id` cookie is set upon successful login and MUST be included in subsequent requests.
+All endpoints (except `POST /auth/login/guest`) require cookie-based authentication. The `id` cookie is set upon successful login and MUST be included in subsequent requests.
 
 Workflow
 --------
 
 ### 1. User Creation (Guest)
 
-**POST** `/user/login/guest`
+**POST** `/auth/login/guest`
 
 Create a temporary guest user account. Optionally provide a username (3-32 characters).
 
 ```bash
 # With custom username
-curl -X POST http://localhost:8080/api/user/login/guest \
+curl -X POST http://localhost:8080/api/auth/login/guest \
   -H "Content-Type: application/json" \
   -d '{"username": "Alice"}' \
   -c cookies.txt
 
 # Auto-generated username
-curl -X POST http://localhost:8080/api/user/login/guest \
+curl -X POST http://localhost:8080/api/auth/login/guest \
   -H "Content-Type: application/json" \
   -d '{}' \
   -c cookies.txt
@@ -54,12 +54,12 @@ The `id` cookie is automatically set and stored in `cookies.txt`. Use `-b cookie
 
 #### Option A: Create a Party
 
-**POST** `/party`
+**POST** `/party/create`
 
 Create a new party. You become the party leader.
 
 ```bash
-curl -X POST http://localhost:8080/api/party \
+curl -X POST http://localhost:8080/api/party/create \
   -b cookies.txt \
   -H "Content-Type: application/json"
 ```
@@ -164,30 +164,28 @@ ws.onmessage = (event) => {
 
 ### 5. Set User Preferences (Optional)
 
-**PUT** `/user/like/{movie_id}`
+**GET** `/user/pref` / **PUT** `/user/pref`
 
-Like or unlike a movie to improve recommendations.
+Get or update user preferences (year filters, genres, etc.).
 
 ```bash
-# Like a movie
-curl -X PUT http://localhost:8080/api/user/like/12345 \
-  -b cookies.txt \
-  -H "Content-Type: application/json" \
-  -d '{"liked": true}'
+# Get preferences
+curl -X GET http://localhost:8080/api/user/pref \
+  -b cookies.txt
 
-# Unlike a movie
-curl -X PUT http://localhost:8080/api/user/like/12345 \
+# Update preferences
+curl -X PUT http://localhost:8080/api/user/pref \
   -b cookies.txt \
   -H "Content-Type: application/json" \
-  -d '{"liked": false}'
+  -d '{"preferred_year": 2020, "year_flexibility": 5, "include_genres": [], "exclude_genres": []}'
 ```
 
-**GET** `/movie/recommendations`
+**GET** `/recommend`
 
 Get personalized movie recommendations based on taste.
 
 ```bash
-curl -X GET http://localhost:8080/api/movie/recommendations \
+curl -X GET http://localhost:8080/api/recommend \
   -b cookies.txt
 ```
 
@@ -199,13 +197,15 @@ Once all members are ready, the party automatically advances to `Picking` phase.
 
 #### Search for Movies
 
-**GET** `/movie/search?query={query}`
+**POST** `/movie/search`
 
-Search for movies by title.
+Search for movies by title and criteria.
 
 ```bash
-curl -X GET "http://localhost:8080/api/movie/search?query=inception" \
-  -b cookies.txt
+curl -X POST "http://localhost:8080/api/movie/search" \
+  -b cookies.txt \
+  -H "Content-Type: application/json" \
+  -d '{"query": "inception"}'
 ```
 
 #### Pick a Movie
@@ -216,8 +216,7 @@ Add a movie to the party's selection. Each member can pick multiple movies.
 
 ```bash
 curl -X POST http://localhost:8080/api/party/660e8400-e29b-41d4-a716-446655440001/pick/12345 \
-  -b cookies.txt \
-  -H "Content-Type: application/json"
+  -b cookies.txt
 ```
 
 #### Get All Picks
@@ -244,22 +243,15 @@ curl -X DELETE http://localhost:8080/api/party/660e8400-e29b-41d4-a716-446655440
 
 #### Set Ready
 
-**POST** `/party/{party_id}/ready`
+**PATCH** `/party/{party_id}/ready`
 
 Mark yourself as ready. When all members are ready, party advances to `Voting` phase.
 
 ```bash
-curl -X POST http://localhost:8080/api/party/660e8400-e29b-41d4-a716-446655440001/ready \
+curl -X PATCH http://localhost:8080/api/party/660e8400-e29b-41d4-a716-446655440001/ready \
   -b cookies.txt \
   -H "Content-Type: application/json" \
   -d '{"is_ready": true}'
-```
-
-**Response:**
-```json
-{
-  "all_ready": true  // true when all members are ready
-}
 ```
 
 ---
@@ -305,27 +297,7 @@ curl -X POST http://localhost:8080/api/party/660e8400-e29b-41d4-a716-44665544000
   -b cookies.txt \
   -H "Content-Type: application/json" \
   -d '{"vote": true}'
-
-# Dislike a movie
-curl -X POST http://localhost:8080/api/party/660e8400-e29b-41d4-a716-446655440001/vote/12345 \
-  -b cookies.txt \
-  -H "Content-Type: application/json" \
-  -d '{"vote": false}'
 ```
-
-**Response:**
-```json
-{
-  "likes": 3,
-  "dislikes": 1
-}
-```
-
-#### Voting Rounds
-
-- **Round 1:** Vote on all picked movies
-- **Round 2:** Automatically starts when voting ends. Top 3 movies by net score (likes - dislikes) advance to round 2.
-- After round 2, party advances to `Watching` phase with the winning movie.
 
 ---
 
@@ -339,8 +311,7 @@ Force advance to next phase (skip waiting for all ready/votes).
 
 ```bash
 curl -X POST http://localhost:8080/api/party/660e8400-e29b-41d4-a716-446655440001/advance \
-  -b cookies.txt \
-  -H "Content-Type: application/json"
+  -b cookies.txt
 ```
 
 #### Kick Member (Leader Only)
@@ -356,19 +327,6 @@ curl -X POST http://localhost:8080/api/party/660e8400-e29b-41d4-a716-44665544000
   -d '{"target_user_id": "770e8400-e29b-41d4-a716-446655440002"}'
 ```
 
-#### Transfer Leadership (Leader Only)
-
-**POST** `/party/{party_id}/transfer-leadership`
-
-Transfer party leadership to another member.
-
-```bash
-curl -X POST http://localhost:8080/api/party/660e8400-e29b-41d4-a716-446655440001/transfer-leadership \
-  -b cookies.txt \
-  -H "Content-Type: application/json" \
-  -d '{"new_leader_id": "770e8400-e29b-41d4-a716-446655440002"}'
-```
-
 #### Disband Party (Leader Only)
 
 **POST** `/party/{party_id}/disband`
@@ -377,8 +335,7 @@ End the party permanently.
 
 ```bash
 curl -X POST http://localhost:8080/api/party/660e8400-e29b-41d4-a716-446655440001/disband \
-  -b cookies.txt \
-  -H "Content-Type: application/json"
+  -b cookies.txt
 ```
 
 ---
@@ -387,128 +344,13 @@ curl -X POST http://localhost:8080/api/party/660e8400-e29b-41d4-a716-44665544000
 
 #### Get Current User
 
-**GET** `/user`
+**GET** `/api/user/me`
 
 Get your user profile.
 
 ```bash
-curl -X GET http://localhost:8080/api/user \
+curl -X GET http://localhost:8080/api/user/me \
   -b cookies.txt
-```
-
-#### Rename User
-
-**PATCH** `/user/rename/{user_id}`
-
-Change your username (3-32 characters).
-
-```bash
-curl -X PATCH http://localhost:8080/api/user/rename/550e8400-e29b-41d4-a716-446655440000 \
-  -b cookies.txt \
-  -H "Content-Type: application/json" \
-  -d '{"new_username": "AliceUpdated"}'
-```
-
-#### Leave Party
-
-**POST** `/party/{party_id}/leave`
-
-Leave the current party.
-
-```bash
-curl -X POST http://localhost:8080/api/party/660e8400-e29b-41d4-a716-446655440001/leave \
-  -b cookies.txt \
-  -H "Content-Type: application/json"
-```
-
-#### Logout
-
-**POST** `/user/logout`
-
-Clear authentication cookie.
-
-```bash
-curl -X POST http://localhost:8080/api/user/logout \
-  -b cookies.txt
-```
-
----
-
-## Complete Example Flow
-
-```bash
-# 1. Create guest user
-curl -X POST http://localhost:8080/api/user/login/guest \
-  -H "Content-Type: application/json" \
-  -d '{"username": "Alice"}' \
-  -c cookies.txt
-
-# 2. Create party
-curl -X POST http://localhost:8080/api/party \
-  -b cookies.txt \
-  -H "Content-Type: application/json"
-
-# 3. Get party details
-curl -X GET http://localhost:8080/api/party/{party_id} \
-  -b cookies.txt
-
-# 4. Set ready (advances to Picking)
-curl -X POST http://localhost:8080/api/party/{party_id}/ready \
-  -b cookies.txt \
-  -H "Content-Type: application/json" \
-  -d '{"is_ready": true}'
-
-# 5. Search and pick movies
-curl -X GET "http://localhost:8080/api/movie/search?query=matrix" \
-  -b cookies.txt
-
-curl -X POST http://localhost:8080/api/party/{party_id}/pick/603 \
-  -b cookies.txt
-
-# 6. Set ready again (advances to Voting)
-curl -X POST http://localhost:8080/api/party/{party_id}/ready \
-  -b cookies.txt \
-  -H "Content-Type: application/json" \
-  -d '{"is_ready": true}'
-
-# 7. Get voting ballot
-curl -X GET http://localhost:8080/api/party/{party_id}/vote \
-  -b cookies.txt
-
-# 8. Vote on movies available in the ballot
-curl -X POST http://localhost:8080/api/party/{party_id}/vote/603 \
-  -b cookies.txt \
-  -H "Content-Type: application/json" \
-  -d '{"vote": true}'
-
-# 8. After voting completes, party advances to Watching phase
-```
-
----
-
-## WebSocket Real-time Updates
-
-Connect to `/api/ws` to receive real-time updates:
-
-```javascript
-const ws = new WebSocket('ws://localhost:8080/api/ws');
-
-ws.onmessage = (event) => {
-  const msg = JSON.parse(event.data);
-  
-  switch (msg[0]) {  // ServerMessage is an enum
-    case 'PartyMemberJoined':
-      console.log('New member:', msg[1]);
-      break;
-    case 'PartyStateChanged':
-      console.log('New state:', msg[1]);
-      break;
-    case 'MovieVoteUpdate':
-      console.log('Votes updated:', msg[1]);
-      break;
-    // ... handle other message types
-  }
-};
 ```
 
 ---
@@ -523,23 +365,12 @@ All errors follow this format:
 }
 ```
 
-**Common Status Codes:**
-- `200` - Success
-- `201` - Created
-- `400` - Bad Request (invalid input)
-- `401` - Unauthorized (not logged in)
-- `403` - Forbidden (not authorized for action)
-- `404` - Not Found
-- `406` - Not Acceptable (e.g., not in a party for WebSocket)
-- `409` - Conflict (e.g., already logged in)
-- `500` - Internal Server Error
-
 ---
 
 ## API Documentation
 
 Interactive API documentation available at:
-- Swagger UI: `http://localhost:8085/swagger-ui/`
-- ReDoc: `http://localhost:8085/redoc`
-- Scalar: `http://localhost:8085/scalar`
-- RapiDoc: `http://localhost:8085/rapidoc`
+- Swagger UI: `http://localhost:8080/swagger-ui/`
+- ReDoc: `http://localhost:8080/redoc`
+- Scalar: `http://localhost:8080/scalar`
+- RapiDoc: `http://localhost:8080/rapidoc`

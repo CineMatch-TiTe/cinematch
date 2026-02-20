@@ -496,7 +496,7 @@ impl Database {
     }
     /// Get all movie-genre associations and all genre IDs.
     /// Returns (Map<MovieID, Vec<GenreUUID>>, Vec<GenreUUID>)
-    /// Intended for bulk operations like onboarding.
+    /// Intended for bulk operations or initialization.
     pub async fn get_all_movie_genres_data(
         &self,
     ) -> DbResult<(std::collections::HashMap<i64, Vec<Uuid>>, Vec<Uuid>)> {

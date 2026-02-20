@@ -17,13 +17,21 @@ graph TB
         WS[WebSocket]
     end
 
-    subgraph "Domain Layer"
-        ABI[cinematch-abi]
-        REC[cinematch-recommendation-engine]
+    subgraph "cinematch-abi (Domain Layer)"
+        ABI[ABI Core]
+        SCH[Scheduler]
+        REG[WsRegistry]
     end
 
-    subgraph "Data Layer"
-        DB[cinematch-db]
+    subgraph "cinematch-recommendation-engine"
+        RE_STD[Standard Engine]
+        RE_REV[Reviews Engine]
+        RE_POOL[Pool Engine]
+        BALLOT[Ballot Builders]
+    end
+
+    subgraph "cinematch-db (Data Layer)"
+        DB[Database Interface]
     end
 
     subgraph "Storage"
@@ -41,9 +49,16 @@ graph TB
     FE -->|WebSocket| WS
     API --> ABI
     WS --> ABI
-    ABI --> REC
+    ABI --> SCH
+    ABI --> REG
+    ABI --> RE_STD
+    ABI --> RE_REV
+    ABI --> RE_POOL
     ABI --> DB
-    REC --> DB
+    RE_STD --> DB
+    RE_REV --> DB
+    RE_POOL --> DB
+    BALLOT --> RE_POOL
     DB --> PG
     DB --> RD
     DB --> QD
@@ -69,7 +84,7 @@ Databases
 | Database | Port | Description |
 |----------|------|-------------|
 | **PostgreSQL 15** | 5432 | Primary relational data (users, parties, movies, votes, ratings). |
-| **Redis 7** | 6379 | Session store, onboarding state, candidate caching. |
+| **Redis 7** | 6379 | Session store, candidate caching. |
 | **Qdrant** | 6333/6334 | Vector similarity search (4 named embedding vectors per movie). |
 
 For schema details, see [docs/databases.md](docs/databases.md).
@@ -77,7 +92,7 @@ For schema details, see [docs/databases.md](docs/databases.md).
 Recommendation Algorithm
 ------------------------
 
-The engine implements multiple strategies contingent on user context. For details, see [docs/algorithm.md](docs/algorithm.md).
+The engine implements multiple strategies (Semantic, Collaborative, Pool-based) contingent on user context. For details, see [docs/algorithm.md](docs/algorithm.md).
 
 Quick Start
 -----------
@@ -93,4 +108,4 @@ cargo run -p cinematch-importer -- update-all
 cargo run -p cinematch-server
 ```
 
-The API server starts on `http://localhost:8085`. Swagger UI is available at `/swagger-ui/`.
+The API server starts on `http://localhost:8080`. Swagger UI is available at `/swagger-ui/`.

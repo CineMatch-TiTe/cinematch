@@ -10,28 +10,26 @@ Structure
 
 ```
 src/
-├── lib.rs          # AppState (Arc<Database> + Arc<WsRegistry> + Arc<Scheduler>)
-├── prelude.rs      # Re-exports
+├── lib.rs           # AppState (AppContext implementation)
+├── prelude.rs       # Re-exports
 ├── domain/
-│   ├── onboarding.rs    # OnboardingService + OnboardingCache (L1 RAM + L2 Redis)
-│   ├── recommendation.rs # Recommendation domain model
+│   ├── recommendation.rs # Recommendation domain model (facade)
 │   ├── user.rs          # User domain extensions
-│   ├── party/           # Party domain logic
+│   ├── party/           # Party domain logic & State Machine
 │   └── error.rs         # Domain error types
-├── scheduler/       # Async timeout scheduler for phase transitions
-└── websocket/       # WsRegistry for managing WebSocket connections
+├── scheduler/        # Async timeout scheduler for phase transitions
+└── websocket/        # WsRegistry for managing WebSocket connections
 ```
 
 Responsibilities
 ----------------
 
-- **`AppState`**: Shared application state injected into Actix handlers (`Arc<Database>`, `Arc<WsRegistry>`, `Arc<Scheduler>`).
-- **`OnboardingService`**: Manages onboarding sessions. Implements a 3-tier cache (RAM → Redis → Postgres) for candidate data.
-- **`Recommendation`**: Recommendation strategy selection logic.
-- **`Scheduler`**: Manages timeout-based phase transitions.
+- **`AppState`**: Shared application state injected into Actix handlers. Implements `AppContext` to provide unified access to `Database`, `WsRegistry`, and `Scheduler`.
+- **`Recommendation`**: Facade for the `cinematch-recommendation-engine`. Handles strategy selection logic.
+- **`Scheduler`**: Manages timeout-based phase transitions (e.g., auto-advancing from Picking to Voting).
 - **`WsRegistry`**: Registry of active WebSocket connections for party state broadcasting.
 
 Architecture Constraints
 ------------------------
 
-Handlers in `cinematch-server` MUST NOT access `cinematch-db` directly. All database interactions MUST traverse `cinematch-abi` domain types.
+Handlers in `cinematch-server` MUST NOT access `cinematch-db` directly. All database interactions MUST traverse `cinematch-abi` domain types or extension traits.

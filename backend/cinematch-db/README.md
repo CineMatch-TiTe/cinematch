@@ -25,12 +25,11 @@ src/
 │   ├── user/       # User CRUD
 │   ├── vote/       # Vote operations
 │   ├── taste/      # User taste profile
-│   ├── onboarding/ # Onboarding queries
 │   └── schedules/  # Timeout schedules
-├── domain/         # Domain types
-│   ├── party.rs    # Party entity
-│   ├── user.rs     # User entity
-│   └── movie.rs    # Movie entity
+├── domain/         # Domain types (Extension traits)
+│   ├── party.rs    # Party entity logic
+│   ├── user.rs     # User entity logic
+│   └── movie.rs    # Movie entity logic
 └── prelude.rs      # Imports
 ```
 

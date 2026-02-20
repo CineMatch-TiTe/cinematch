@@ -17,7 +17,6 @@ Endpoints
 | `/api/movie` | `GET /:id`, `GET /genres`, `POST /search` | Movie catalog queries. |
 | `/api/recommend` | `GET /` | Personalized recommendations. |
 | `/api/ws` | WebSocket upgrade | Real-time party updates. |
-| `/api/onboarding` | `POST /start`, `POST /rate` | Onboarding session flow. |
 
 Features
 --------

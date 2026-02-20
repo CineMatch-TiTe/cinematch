@@ -136,7 +136,7 @@ impl ErrorResponse {
     }
 }
 
-/// User action on a movie during onboarding
+/// User action on a movie (e.g. during discovery or rating flow)
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum SwipeAction {
