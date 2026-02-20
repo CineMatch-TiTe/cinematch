@@ -47,36 +47,10 @@ impl OllamaService {
         Ok(())
     }
 
-    /// Embed text using the specified embedding model
-    #[allow(dead_code)]
-    pub async fn embed(&self, text: &str) -> Result<Vec<f32>> {
-        let request = GenerateEmbeddingsRequest::new(
-            EMBED_MODEL.to_string(),
-            EmbeddingsInput::Single(text.to_string()),
-        );
-
-        let mut response = self
-            .client
-            .generate_embeddings(request)
-            .await
-            .map_err(|e| anyhow::anyhow!("Failed to generate embeddings: {}", e))?;
-
-        // Sanitize embeddings: replace NaN with 0.0 and clamp infinities
-        for embedding in &mut response.embeddings {
-            for value in embedding.iter_mut() {
-                if !value.is_finite() {
-                    if value.is_nan() {
-                        *value = 0.0;
-                    } else if value.is_infinite() {
-                        *value = if *value > 0.0 { 1.0 } else { -1.0 };
-                    }
-                }
-            }
-        }
-
-        Ok(response.embeddings.into_iter().next().unwrap_or_default())
-    }
-
+    /// Generate embeddings for a batch of texts.
+    ///
+    /// Non-finite values (NaN, ±Inf) are sanitised to prevent JSON
+    /// serialisation errors when uploading to Qdrant.
     pub async fn embed_batch(&self, texts: &[String]) -> Result<Vec<Vec<f32>>> {
         if texts.is_empty() {
             return Ok(Vec::new());
@@ -93,16 +67,17 @@ impl OllamaService {
             .await
             .map_err(|e| anyhow::anyhow!("Failed to generate batch embeddings: {}", e))?;
 
-        // Sanitize embeddings: replace NaN with 0.0 and clamp infinities
-        // This prevents JSON serialization errors when sending to Qdrant
+        // Sanitize: replace NaN → 0.0, ±Inf → ±1.0
         for embedding in &mut response.embeddings {
             for value in embedding.iter_mut() {
                 if !value.is_finite() {
-                    if value.is_nan() {
-                        *value = 0.0;
-                    } else if value.is_infinite() {
-                        *value = if *value > 0.0 { 1.0 } else { -1.0 };
-                    }
+                    *value = if value.is_nan() {
+                        0.0
+                    } else if *value > 0.0 {
+                        1.0
+                    } else {
+                        -1.0
+                    };
                 }
             }
         }

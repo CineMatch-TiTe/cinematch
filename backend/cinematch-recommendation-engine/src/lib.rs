@@ -1,9 +1,13 @@
-use cinematch_db::{Database, DbResult};
+use cinematch_common::models::VectorType;
+use cinematch_db::domain::Movie;
+use cinematch_db::{AppContext, DbResult};
 use qdrant_client::qdrant::{
     PointId, RecommendPoints, RecommendStrategy, WithPayloadSelector, WithVectorsSelector,
 };
+use std::collections::{HashMap, HashSet};
 use uuid::Uuid;
 
+pub mod onboarding;
 mod utils;
 use log::warn;
 
@@ -12,23 +16,26 @@ use cinematch_db::DbError;
 /// Recommend up to `limit` movies from `pool` (HasId filter) for a user, using taste + prefs.
 /// Uses Qdrant recommend. Returns IDs from the pool only. If pool is empty, returns [].
 pub async fn recommend_from_pool(
-    db: &Database,
+    ctx: &impl AppContext,
     user_id: Uuid,
     pool: &[i64],
+    vector_type: VectorType,
     limit: usize,
 ) -> DbResult<Vec<i64>> {
     if pool.is_empty() || limit == 0 {
         return Ok(vec![]);
     }
 
-    let (positive, negative, skipped) = db.get_taste(user_id, None).await?;
-    let genre_map = db.get_genres().await?;
-    let prefs = db.get_user_preferences(user_id).await?;
-    let prefs_filter = crate::utils::filter_from_prefs(&prefs, &genre_map);
+    let user = cinematch_db::domain::user::User::new(user_id);
+    let (positive, negative, skipped) = user.get_ratings(ctx).await?;
+    let genre_map = Movie::all_genres(ctx).await?;
+    let prefs = user.preferences(ctx).await?;
+    let prefs_record = prefs.record(ctx).await?;
+    let prefs_filter = crate::utils::filter_from_prefs(&prefs_record, &genre_map);
 
     let mut positive = positive;
     if positive.is_empty() {
-        let popular_movies = db.get_popular_movies(5).await?;
+        let popular_movies = Movie::popular(ctx, 5).await?;
         positive = popular_movies.into_iter().map(|m| m.movie_id).collect();
     }
 
@@ -42,7 +49,7 @@ pub async fn recommend_from_pool(
 
     let filter = crate::utils::filter_pool_and_prefs(&filtered_pool, prefs_filter.as_ref());
 
-    let client = db.vector.client.clone();
+    let client = ctx.db().vector.client.clone();
     let positive_ids: Vec<PointId> = positive
         .iter()
         .filter(|&id| filtered_pool.contains(id))
@@ -94,7 +101,7 @@ pub async fn recommend_from_pool(
         }),
         score_threshold: None,
         offset: None,
-        using: Some("combined_vector".to_string()),
+        using: Some(vector_type.as_str().to_string()),
         strategy: Some(RecommendStrategy::AverageVector.into()),
         ..Default::default()
     };
@@ -135,18 +142,21 @@ const POPULAR_FALLBACK_LIMIT: i64 = 30;
 
 /// Build voting ballots using Qdrant-backed recommendations. Party pool = all picks (shared);
 /// per user: 3 from party pool + 2 from own pool, shuffle, take 5. Pad from popular if needed.
-pub async fn build_voting_ballots_for_party(db: &Database, party_id: Uuid) -> DbResult<()> {
+pub async fn build_voting_ballots_for_party(
+    ctx: &impl AppContext,
+    party: &cinematch_db::domain::Party,
+) -> DbResult<()> {
     use rand::seq::SliceRandom;
-    use std::collections::{HashMap, HashSet};
+    // party is passed in, no need to create it
 
-    db.clear_shown_movies_for_party(party_id).await?;
+    party.clear_ballots(ctx).await?;
 
-    let members = db.get_party_members(party_id).await?;
+    let members = party.member_records(ctx).await?;
     if members.is_empty() {
         return Ok(());
     }
 
-    let party_taste = db.get_party_taste(party_id).await?;
+    let party_taste = party.get_picks(ctx).await?;
     let mut picks_by_user: HashMap<Uuid, Vec<i64>> = HashMap::new();
     let mut party_pool_set: HashSet<i64> = HashSet::new();
     for (uid, mid, liked) in party_taste {
@@ -158,11 +168,15 @@ pub async fn build_voting_ballots_for_party(db: &Database, party_id: Uuid) -> Db
     }
     let party_pool: Vec<i64> = party_pool_set.into_iter().collect();
 
-    let popular = db
-        .get_popular_movie_ids(POPULAR_FALLBACK_LIMIT)
+    let popular = Movie::popular_ids(ctx, POPULAR_FALLBACK_LIMIT)
         .await
         .unwrap_or_default();
-    let mut rng = rand::rng();
+    use rand::SeedableRng;
+    let seed = std::time::SystemTime::now()
+        .duration_since(std::time::SystemTime::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos() as u64;
+    let mut rng = rand::rngs::StdRng::seed_from_u64(seed);
 
     for member in &members {
         let user_id = member.user_id;
@@ -171,8 +185,22 @@ pub async fn build_voting_ballots_for_party(db: &Database, party_id: Uuid) -> Db
             .map(|v| v.to_vec())
             .unwrap_or_default();
 
-        let recs_party = recommend_from_pool(db, user_id, &party_pool, PARTY_POOL_LIMIT).await?;
-        let recs_own = recommend_from_pool(db, user_id, &own_pool, OWN_POOL_LIMIT).await?;
+        let recs_party = recommend_from_pool(
+            ctx,
+            user_id,
+            &party_pool,
+            VectorType::Combined,
+            PARTY_POOL_LIMIT,
+        )
+        .await?;
+        let recs_own = recommend_from_pool(
+            ctx,
+            user_id,
+            &own_pool,
+            VectorType::Combined,
+            OWN_POOL_LIMIT,
+        )
+        .await?;
 
         let mut ballot: Vec<i64> = recs_party;
         for mid in recs_own {
@@ -199,29 +227,30 @@ pub async fn build_voting_ballots_for_party(db: &Database, party_id: Uuid) -> Db
         let mut ballot: Vec<i64> = ballot.into_iter().take(BALLOT_SIZE).collect();
         ballot.shuffle(&mut rng);
         if !ballot.is_empty() {
-            db.add_shown_movies(party_id, user_id, &ballot).await?;
+            party.add_shown_movies(ctx, user_id, &ballot).await?;
         }
     }
 
-    db.enable_voting(party_id).await?;
-    db.set_voting_round(party_id, Some(1)).await?;
+    // Side effects (enable voting, set round) removed. Caller must handle them.
     Ok(())
 }
 
 /// Build round-2 ballots using Qdrant: same top-3 pool for everyone, recommend_from_pool per user.
-/// Clears shown_movies, adds per-user ballots, enables voting, sets round 2 and phase_entered_at.
+/// Clears shown_movies, adds per-user ballots.
 pub async fn build_round2_ballots_for_party(
-    db: &Database,
-    party_id: Uuid,
+    ctx: &impl AppContext,
+    party: &cinematch_db::domain::Party,
     top3: &[i64],
 ) -> DbResult<()> {
     if top3.is_empty() {
         return Ok(());
     }
-    db.clear_shown_movies_for_party(party_id).await?;
-    let members = db.get_party_members(party_id).await?;
+    // party passed in
+    party.clear_ballots(ctx).await?;
+    let members = party.member_records(ctx).await?;
+
     for member in &members {
-        let recs = recommend_from_pool(db, member.user_id, top3, 3).await?;
+        let recs = recommend_from_pool(ctx, member.user_id, top3, VectorType::Combined, 3).await?;
         let ballot: Vec<i64> = if recs.len() >= 3 {
             recs
         } else {
@@ -237,41 +266,57 @@ pub async fn build_round2_ballots_for_party(
             b
         };
         if !ballot.is_empty() {
-            db.add_shown_movies(party_id, member.user_id, &ballot)
-                .await?;
+            party.add_shown_movies(ctx, member.user_id, &ballot).await?;
         }
     }
-    db.enable_voting(party_id).await?;
-    db.set_voting_round(party_id, Some(2)).await?;
-    db.set_phase_entered_at_now(party_id).await?;
+
+    // Side effects removed. Caller handles state transition.
     Ok(())
 }
 
 /// Recommend movies for a user using Qdrant vector search, based on their taste profile.
 /// If party_id is provided, excludes movies already picked (liked, disliked, or skipped) in that party.
 pub async fn recommend_movies(
-    db: &Database,
+    ctx: &impl AppContext,
     user_id: Uuid,
     party_id: Option<Uuid>,
+    vector_type: VectorType,
     limit: usize,
 ) -> DbResult<Vec<i64>> {
-    let (positive, negative, skipped) = db.get_taste(user_id, party_id).await?;
+    let user = cinematch_db::domain::user::User::new(user_id);
+    let (positive, negative, skipped) = if let Some(pid) = party_id {
+        // If in party context, we might want to exclude party-specific picks too?
+        // For now, let's use global ratings + party picks combined or just ratings.
+        // Usually, we want to exclude anything they've already seen/acted upon.
+        let (pos, neg, skp) = user.get_ratings(ctx).await?;
+        let picks = user.get_party_picks(ctx, pid).await?;
+        let mut all_pos = pos;
+        for p in picks {
+            if !all_pos.contains(&p) {
+                all_pos.push(p);
+            }
+        }
+        (all_pos, neg, skp)
+    } else {
+        user.get_ratings(ctx).await?
+    };
 
     // get users prefs
 
-    let genre_map = db.get_genres().await?;
-    let prefs = db.get_user_preferences(user_id).await?;
+    let genre_map = Movie::all_genres(ctx).await?;
+    let prefs = user.preferences(ctx).await?;
+    let prefs_record = prefs.record(ctx).await?;
 
-    let filter = crate::utils::filter_from_prefs(&prefs, &genre_map);
+    let filter = crate::utils::filter_from_prefs(&prefs_record, &genre_map);
 
     let mut positive = positive;
     if positive.is_empty() {
-        let popular_movies = db.get_popular_movies(5).await?;
+        let popular_movies = Movie::popular(ctx, 5).await?;
         positive = popular_movies.into_iter().map(|m| m.movie_id).collect();
     }
 
     // Get QdrantService from db.vector (assume db.vector is QdrantService)
-    let client = db.vector.client.clone();
+    let client = ctx.db().vector.client.clone();
 
     // Convert i64 IDs to Qdrant PointId
     let positive_ids: Vec<PointId> = positive
@@ -341,7 +386,7 @@ pub async fn recommend_movies(
         }),
         score_threshold: None,
         offset: None,
-        using: Some("combined_vector".to_string()),
+        using: Some(vector_type.as_str().to_string()),
         strategy: Some(RecommendStrategy::AverageVector.into()),
         ..Default::default()
     };
@@ -373,22 +418,18 @@ pub async fn recommend_movies(
 }
 
 /// Recommend movies from the "ratings" collection (sparse user–movie vectors).
-/// Schema: `{ user_id: int, movie_id: [int] }` — flat array of IDs, not array of objects.
-/// We query Qdrant (sparse + must_not match_any(excluded)), aggregate scores per payload["movie_id"].
-/// Genre/year/excluded (skipped) filtering done PG-side per-id via `filter_check_movie` to avoid loading
-/// all matches into memory. Loop best-scored, check each via Postgres, collect until limit.
 pub async fn recommed_movies_from_reviews(
-    db: &Database,
+    ctx: &impl AppContext,
     user_id: Uuid,
     party_id: Option<Uuid>,
+    vector_type: VectorType,
     limit: usize,
 ) -> DbResult<Vec<i64>> {
     use qdrant_client::qdrant::{Condition, Filter, QueryPointsBuilder};
-    use std::collections::HashMap;
-
-    let (positive, negative, skipped) = db.get_taste(user_id, party_id).await?;
-
-    // Build sparse vector: (movie_id as u32, 1.0) for liked, (-1.0) for disliked
+    let user = cinematch_db::domain::user::User::new(user_id);
+    let (positive, negative, skipped) = user.get_ratings(ctx).await?;
+    let prefs = user.preferences(ctx).await?;
+    let prefs_record = prefs.record(ctx).await?;
     let mut sparse: Vec<(u32, f32)> = Vec::new();
     for &mid in &positive {
         sparse.push((mid as u32, 1.0));
@@ -399,10 +440,9 @@ pub async fn recommed_movies_from_reviews(
 
     if sparse.is_empty() {
         warn!("No sparse vector, fallback to recommend_movies");
-        return self::recommend_movies(db, user_id, party_id, limit).await;
+        return self::recommend_movies(ctx, user_id, party_id, vector_type, limit).await;
     }
 
-    let prefs = db.get_user_preferences(user_id).await?;
     // add all eg positive negative and skipped too into the excluded list
     let excluded: Vec<i64> = positive
         .into_iter()
@@ -414,8 +454,6 @@ pub async fn recommed_movies_from_reviews(
     const MAX_MATCH_ANY: usize = 2000;
     let filter_ids: Vec<i64> = excluded.iter().copied().take(MAX_MATCH_ANY).collect();
 
-    // movie_id is [int]; must_not match_any(excluded) = exclude users whose movie_id list
-    // contains any excluded id. No NestedCondition (that's for arrays of objects, e.g. diet[]).
     let builder = if filter_ids.is_empty() {
         QueryPointsBuilder::new("ratings")
             .query(sparse)
@@ -432,7 +470,7 @@ pub async fn recommed_movies_from_reviews(
             .filter(filter)
     };
 
-    let client = db.vector.client.clone();
+    let client = ctx.db().vector.client.clone();
     let response = client
         .query(builder)
         .await
@@ -456,11 +494,12 @@ pub async fn recommed_movies_from_reviews(
     let mut sorted: Vec<(i64, f64)> = movie_scores.into_iter().collect();
     sorted.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
 
-    // PG-side filter per-id: loop best-scored, check each via filter_check_movie, collect until limit.
-    // Avoids loading all allowed IDs into memory (could be 1000+).
     let mut recommended_ids: Vec<i64> = Vec::with_capacity(limit);
     for (id, _) in &sorted {
-        if db.filter_check_movie(*id, &prefs, excluded_slice).await? {
+        if Movie::new(*id)
+            .matches_prefs(ctx, &prefs_record, excluded_slice)
+            .await?
+        {
             recommended_ids.push(*id);
             if recommended_ids.len() == limit {
                 break;
@@ -470,7 +509,7 @@ pub async fn recommed_movies_from_reviews(
 
     if recommended_ids.is_empty() {
         warn!("No recommendations from reviews, using recommend_movies fallback");
-        return recommend_movies(db, user_id, party_id, limit).await;
+        return recommend_movies(ctx, user_id, party_id, vector_type, limit).await;
     }
     Ok(recommended_ids)
 }

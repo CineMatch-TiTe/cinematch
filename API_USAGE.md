@@ -1,22 +1,24 @@
-# Cinematch API Usage Guide
+API Usage Guide
+===============
 
-Complete flow from guest user creation through movie selection and voting.
+Overview of the workflow from guest user creation through movie selection and voting.
 
-## Base URL
+Base URL
+--------
 
 ```
 http://localhost:8085/api
 ```
 
-## Authentication
+Authentication
+--------------
 
-All endpoints (except guest login) require cookie-based authentication. The `id` cookie is set automatically on login and must be included in subsequent requests.
+All endpoints (except `POST /user/login/guest`) require cookie-based authentication. The `id` cookie is set upon successful login and MUST be included in subsequent requests.
 
----
+Workflow
+--------
 
-## Complete Flow
-
-### 1. Create Guest User
+### 1. User Creation (Guest)
 
 **POST** `/user/login/guest`
 

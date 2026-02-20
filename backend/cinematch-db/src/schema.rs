@@ -8,6 +8,10 @@ pub mod sql_types {
     #[derive(diesel::query_builder::QueryId, diesel::sql_types::SqlType)]
     #[diesel(postgres_type(name = "party_state"))]
     pub struct PartyState;
+
+    #[derive(diesel::query_builder::QueryId, diesel::sql_types::SqlType)]
+    #[diesel(postgres_type(name = "timeout_type"))]
+    pub struct TimeoutType;
 }
 
 diesel::table! {
@@ -160,6 +164,17 @@ diesel::table! {
 }
 
 diesel::table! {
+    party_picks (taste_id) {
+        taste_id -> Uuid,
+        user_id -> Uuid,
+        party_id -> Uuid,
+        movie_id -> Int8,
+        liked -> Nullable<Bool>,
+        updated_at -> Timestamptz,
+    }
+}
+
+diesel::table! {
     prefs_exclude_genre (user_id, genre_id) {
         user_id -> Uuid,
         genre_id -> Uuid,
@@ -179,6 +194,19 @@ diesel::table! {
         country_code -> Bpchar,
         #[max_length = 255]
         name -> Varchar,
+    }
+}
+
+diesel::table! {
+    use diesel::sql_types::*;
+    use super::sql_types::TimeoutType;
+
+    schedules (id) {
+        id -> Uuid,
+        party_id -> Nullable<Uuid>,
+        timeout_type -> TimeoutType,
+        created_at -> Timestamptz,
+        execute_at -> Timestamptz,
     }
 }
 
@@ -210,14 +238,13 @@ diesel::table! {
 }
 
 diesel::table! {
-    user_tastes (taste_id) {
-        taste_id -> Uuid,
+    user_ratings (rating_id) {
+        rating_id -> Uuid,
         user_id -> Uuid,
-        party_id -> Nullable<Uuid>,
         movie_id -> Int8,
         liked -> Nullable<Bool>,
+        rating -> Nullable<Int4>,
         updated_at -> Timestamptz,
-        review -> Nullable<Int4>,
     }
 }
 
@@ -260,15 +287,18 @@ diesel::joinable!(parties -> users (party_leader_id));
 diesel::joinable!(party_codes -> parties (party_id));
 diesel::joinable!(party_members -> parties (party_id));
 diesel::joinable!(party_members -> users (user_id));
+diesel::joinable!(party_picks -> movies (movie_id));
 diesel::joinable!(prefs_exclude_genre -> genres (genre_id));
 diesel::joinable!(prefs_exclude_genre -> users (user_id));
 diesel::joinable!(prefs_include_genre -> genres (genre_id));
 diesel::joinable!(prefs_include_genre -> users (user_id));
+diesel::joinable!(schedules -> parties (party_id));
 diesel::joinable!(shown_movies -> movies (movie_id));
 diesel::joinable!(shown_movies -> parties (party_id));
 diesel::joinable!(shown_movies -> users (user_id));
 diesel::joinable!(user_preferences -> users (user_id));
-diesel::joinable!(user_tastes -> movies (movie_id));
+diesel::joinable!(user_ratings -> movies (movie_id));
+diesel::joinable!(user_ratings -> users (user_id));
 
 diesel::allow_tables_to_appear_in_same_query!(
     cast_members,
@@ -286,13 +316,15 @@ diesel::allow_tables_to_appear_in_same_query!(
     parties,
     party_codes,
     party_members,
+    party_picks,
     prefs_exclude_genre,
     prefs_include_genre,
     production_countries,
+    schedules,
     shown_movies,
     trailers,
     user_preferences,
-    user_tastes,
+    user_ratings,
     users,
     votes,
 );
