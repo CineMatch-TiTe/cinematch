@@ -65,7 +65,7 @@ impl AppContext for AppState {
                     let user_ids: Vec<Uuid> = members
                         .into_iter()
                         .map(|m| m.user_id)
-                        .filter(|uid| exclude.map_or(true, |ex| *uid != ex))
+                        .filter(|uid| exclude != Some(*uid))
                         .collect();
                     ws.send_to_users(&user_ids, &msg);
                 }

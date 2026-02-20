@@ -37,7 +37,7 @@ impl<C: AppContext> Recommendation<C> {
         vector_type: VectorType,
         limit: usize,
     ) -> Result<Vec<i64>, DomainError> {
-        cinematch_recommendation_engine::recommed_movies_from_reviews(
+        cinematch_recommendation_engine::recommend_from_reviews(
             &self.ctx,
             self.user_id,
             self.party_id,
