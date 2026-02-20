@@ -23,4 +23,6 @@ pub enum Command {
     RemoveAll,
     /// Download datasets (WIP)
     Download,
+    /// Run the entropy-based onboarding data update (clusters + candidate movies)
+    UpdateOnboarding,
 }

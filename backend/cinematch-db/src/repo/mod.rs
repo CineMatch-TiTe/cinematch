@@ -8,6 +8,7 @@
 //! - `taste` - User/party taste preferences (shared across user and party contexts)
 
 pub mod movie;
+pub mod onboarding;
 pub mod party;
 pub mod schedules;
 pub mod taste;

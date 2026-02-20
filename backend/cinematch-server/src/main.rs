@@ -81,6 +81,11 @@ async fn main() -> std::io::Result<()> {
     reschedule_timeouts_on_startup(&scheduler, Arc::new(app_state.clone())).await;
     let data = web::Data::new(app_state);
 
+    // Initialize Onboarding Service
+    use cinematch_abi::domain::onboarding::OnboardingService;
+    let onboarding_service = OnboardingService::new(Arc::clone(&db));
+    let onboarding_data = web::Data::new(onboarding_service);
+
     let server_host = std::env::var("SERVER_HOST").unwrap_or_else(|_| "0.0.0.0".to_string());
     let server_port = std::env::var("SERVER_PORT").unwrap_or_else(|_| "8080".to_string());
 
@@ -148,6 +153,7 @@ async fn main() -> std::io::Result<()> {
             })
             .map(|app| app.wrap(Logger::default()))
             .app_data(data.clone()) // unified application state
+            .app_data(onboarding_data.clone()) // Onboarding service
             // /api/auth, /api/user, /api/party, /api/ws, etc
             .service(
                 utoipa_actix_web::scope("/api/auth")
@@ -172,6 +178,11 @@ async fn main() -> std::io::Result<()> {
             .service(
                 utoipa_actix_web::scope("/api/ws")
                     .configure(cinematch_server::routes::configure_websocket()),
+            )
+            // Onboarding routes
+            .service(
+                utoipa_actix_web::scope("/onboarding")
+                    .configure(cinematch_server::onboarding::configure()),
             )
             .openapi_service(|api| Redoc::with_url("/redoc", api))
             .openapi_service(|api| {

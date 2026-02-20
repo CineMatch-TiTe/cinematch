@@ -20,6 +20,7 @@
 //! ```
 
 mod error;
+mod onboarding;
 mod party;
 mod recommendation;
 mod user;
