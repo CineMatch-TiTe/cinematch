@@ -268,7 +268,6 @@ impl PartyCrud for Party {
         movie_id: i64,
         like: bool,
     ) -> Result<(u32, u32), DomainError> {
-        // Validation handled by caller? No, we should validate here or delegate to cast_vote validation if any.
         // Party::can_user_vote is usually called before. But we can call it here.
         if !self
             .can_user_vote(ctx, user_id, movie_id)

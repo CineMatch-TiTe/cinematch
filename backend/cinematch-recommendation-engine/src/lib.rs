@@ -10,14 +10,10 @@ pub mod ballots;
 pub mod engine;
 pub mod utils;
 
-// Re-export core functions for backward compatibility and convenience
+// Re-export core functions for convenient access
 pub use engine::pool::recommend_from_pool;
 pub use engine::reviews::recommend_from_reviews;
 pub use engine::standard::recommend_movies;
-
-// Re-export for ABI compatibility (maintaining the typo for now if needed, but better to fix it)
-/// Typo-fix alias for `recommend_from_reviews`
-pub use engine::reviews::recommend_from_reviews as recommed_movies_from_reviews;
 
 pub use ballots::v1::build_voting_ballots_for_party;
 pub use ballots::v2::build_round2_ballots_for_party;

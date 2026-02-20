@@ -73,7 +73,6 @@ impl PartyJoin for Party {
         party.add_member_checked(ctx, user_id).await?;
 
         // Broadcast joined
-        // We need username for the message. Access user logic?
         // Or just fetch it.
         // Server handler did this. Now we do it here.
         use cinematch_db::domain::User;
