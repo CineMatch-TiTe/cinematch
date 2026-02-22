@@ -87,8 +87,11 @@ pub struct SearchResponse {
 }
 
 #[derive(Debug, Serialize, Deserialize, ToSchema, utoipa::IntoParams)]
+#[into_params(parameter_in = Query)]
 pub struct SearchQuery {
+    /// Movie title to search for.
     pub title: String,
+    /// (Optional) Page number for search results. Defaults to 1.
     #[param(default = 1)]
     pub page: Option<i64>,
 }

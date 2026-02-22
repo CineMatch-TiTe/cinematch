@@ -205,4 +205,80 @@ impl User {
     ) -> DbResult<()> {
         ctx.db().remove_user_exclude_genre(self.id, genre_id).await
     }
+
+    // ========================================================================
+    // External Account & Persistence
+    // ========================================================================
+
+    /// Find a user by their linked external account.
+    pub async fn from_external_id(
+        ctx: &impl AppContext,
+        provider: crate::models::AuthProvider,
+        provider_user_id: &str,
+    ) -> DbResult<Option<Self>> {
+        match ctx
+            .db()
+            .get_external_account_by_id(provider, provider_user_id)
+            .await?
+        {
+            Some(account) => Ok(Some(Self {
+                id: account.user_id,
+            })),
+            None => Ok(None),
+        }
+    }
+
+    /// Link an external account to this user.
+    pub async fn link_account(
+        &self,
+        ctx: &impl AppContext,
+        provider: crate::models::AuthProvider,
+        provider_user_id: &str,
+        email: Option<&str>,
+        display_name: Option<&str>,
+    ) -> DbResult<crate::models::ExternalAccount> {
+        use crate::models::NewExternalAccount;
+        let new_account = NewExternalAccount {
+            user_id: self.id,
+            provider,
+            provider_user_id,
+            email,
+            display_name,
+        };
+        ctx.db().link_external_account(new_account).await
+    }
+
+    /// Unlink an external account from this user.
+    pub async fn unlink_account(
+        &self,
+        ctx: &impl AppContext,
+        provider: crate::models::AuthProvider,
+    ) -> DbResult<()> {
+        ctx.db().unlink_external_account(self.id, provider).await?;
+        Ok(())
+    }
+
+    /// Get all external accounts linked to this user.
+    pub async fn external_accounts(
+        &self,
+        ctx: &impl AppContext,
+    ) -> DbResult<Vec<crate::models::ExternalAccount>> {
+        ctx.db().get_user_external_accounts(self.id).await
+    }
+
+    /// Mark the user as persistent (oneshot = false).
+    /// Note: This will fail if no external accounts are linked due to DB trigger.
+    pub async fn make_persistent(&self, ctx: &impl AppContext) -> DbResult<()> {
+        use crate::repo::user::models::UpdateUser;
+        ctx.db()
+            .update_user(
+                self.id,
+                UpdateUser {
+                    username: None,
+                    oneshot: Some(false),
+                },
+            )
+            .await?;
+        Ok(())
+    }
 }

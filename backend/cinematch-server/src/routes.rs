@@ -1,13 +1,18 @@
 //! User API routing configuration
 use utoipa_actix_web::service_config::ServiceConfig;
 
-use crate::{auth, movie, party, recommendation, user, websocket};
+use crate::{auth, handlers, movie, party, recommendation, user, websocket};
 
 /// Configure auth API routes under /auth
 pub fn configure_auth() -> impl FnOnce(&mut ServiceConfig) {
     |cfg: &mut ServiceConfig| {
         cfg.service(auth::handlers::login_guest)
             .service(auth::handlers::logout_user);
+
+        if cinematch_common::Config::get().github.is_some() {
+            cfg.service(auth::github::login_github)
+                .service(auth::github::callback_github);
+        }
     }
 }
 
@@ -59,5 +64,11 @@ pub fn configure_recommendation() -> impl FnOnce(&mut ServiceConfig) {
 pub fn configure_websocket() -> impl FnOnce(&mut ServiceConfig) {
     |cfg: &mut ServiceConfig| {
         cfg.service(websocket::websocket_controller);
+    }
+}
+
+pub fn configure_system() -> impl FnOnce(&mut ServiceConfig) {
+    |cfg: &mut ServiceConfig| {
+        cfg.service(handlers::version::get_version);
     }
 }

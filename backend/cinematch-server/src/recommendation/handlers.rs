@@ -7,10 +7,16 @@ use actix_web::{get, web};
 use cinematch_abi::domain::{PartyValidation, Recommendation};
 use cinematch_common::models::{ErrorResponse, RecommendationMethod, VectorType};
 use cinematch_db::domain::{Movie, Party};
-use rand::seq::SliceRandom;
 use serde::Deserialize;
 use utoipa::{IntoParams, ToSchema};
 use uuid::Uuid;
+
+#[derive(utoipa::OpenApi)]
+#[openapi(
+    paths(get_recommendations),
+    components(schemas(RecommendationMethod, VectorType, RecommendationQuery))
+)]
+pub struct RecommendationApi;
 
 #[derive(Debug, Deserialize, ToSchema, IntoParams)]
 pub struct RecommendationQuery {
@@ -81,25 +87,8 @@ pub async fn get_recommendations(
 
     let movie_ids = match method {
         RecommendationMethod::Reviews => rec_handle.get_from_reviews(vector, limit).await?,
-        RecommendationMethod::Semantic => rec_handle.get_standard(vector, limit).await?,
-        RecommendationMethod::Default => {
-            // Default logic: mix reviews and standard
-            let reviews_ids = rec_handle
-                .get_from_reviews(vector, 5)
-                .await
-                .unwrap_or_default();
-            let standard_ids = rec_handle.get_standard(vector, 2).await.unwrap_or_default();
-
-            let mut combined = reviews_ids;
-            for id in standard_ids {
-                if !combined.contains(&id) {
-                    combined.push(id);
-                }
-            }
-
-            combined.shuffle(&mut rand::rng());
-            combined.into_iter().take(limit).collect::<Vec<_>>()
-        }
+        RecommendationMethod::Semantic => rec_handle.get_semantic(vector, limit).await?,
+        RecommendationMethod::Default => rec_handle.get_hybrid(vector, limit).await?,
     };
 
     if movie_ids.is_empty() {

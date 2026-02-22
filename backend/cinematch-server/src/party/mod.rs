@@ -225,38 +225,52 @@ impl StatusResponse {
     }
 }
 #[derive(Debug, Deserialize, ToSchema, utoipa::IntoParams)]
+#[into_params(parameter_in = Query)]
 pub struct OptionalIdParam {
     /// Optional resource ID (UUID). If omitted, the system auto-selects from session.
     pub id: Option<Uuid>,
 }
 
 #[derive(Debug, Deserialize, ToSchema, utoipa::IntoParams)]
+#[into_params(parameter_in = Query)]
 pub struct MovieIdQuery {
+    /// Movie ID.
     pub movie_id: i64,
 }
 
 #[derive(Debug, Deserialize, ToSchema, utoipa::IntoParams)]
+#[into_params(parameter_in = Query)]
 pub struct JoinQuery {
+    /// The 4-character join code.
     pub code: String,
 }
 
 #[derive(Debug, Deserialize, ToSchema, utoipa::IntoParams)]
+#[into_params(parameter_in = Query)]
 pub struct ReadyQuery {
+    /// Whether the user is ready.
     pub is_ready: bool,
 }
 
 #[derive(Debug, Deserialize, ToSchema, utoipa::IntoParams)]
+#[into_params(parameter_in = Query)]
 pub struct KickQuery {
+    /// User ID to kick from the party.
     pub target_user_id: Uuid,
 }
 
 #[derive(Debug, Deserialize, ToSchema, utoipa::IntoParams)]
+#[into_params(parameter_in = Query)]
 pub struct TransferQuery {
+    /// User ID of the new party leader.
     pub new_leader_id: Uuid,
 }
 
 #[derive(Debug, Deserialize, ToSchema, utoipa::IntoParams)]
+#[into_params(parameter_in = Query)]
 pub struct VoteQuery {
+    /// Movie ID being voted on.
     pub movie_id: i64,
+    /// Whether the vote is a like (true) or dislike (false).
     pub like: bool,
 }

@@ -18,6 +18,8 @@ use std::time::Duration;
 
 use log::error;
 
+use cinematch_common::Config;
+use secrecy::ExposeSecret;
 use utoipa_actix_web::AppExt;
 use utoipa_rapidoc::RapiDoc;
 use utoipa_redoc::{Redoc, Servable};
@@ -38,29 +40,24 @@ async fn main() -> std::io::Result<()> {
     dotenvy::dotenv().ok();
     env_logger::init();
 
-    let db_loc = std::env::var("DATABASE_URL")
-        .unwrap_or_else(|_| "postgres://user:password@localhost/cinematch".to_string());
-    log::info!("Connecting to database at {}", db_loc);
+    let config = Config::get();
 
-    let redis_loc =
-        std::env::var("REDIS_URL").unwrap_or_else(|_| "redis://127.0.0.1:6379".to_string());
-    log::info!("Connecting to Redis at {}", redis_loc);
+    let db_loc = config.database_url.expose_secret();
+    log::info!("Connecting to database...");
 
-    let vector_loc =
-        std::env::var("QDRANT_URL").unwrap_or_else(|_| "http://localhost:6333".to_string());
+    let redis_loc = config.redis_url.expose_secret();
+    log::info!("Connecting to Redis...");
+
+    let vector_loc = &config.qdrant_url;
     log::info!("Connecting to Qdrant at {}", vector_loc);
 
     let db_pool =
-        Database::new(&db_loc, &redis_loc, &vector_loc).expect("Failed to initialize databases");
+        Database::new(db_loc, redis_loc, vector_loc).expect("Failed to initialize databases");
 
-    let cfg = deadpool_redis::Config::from_url(redis_loc.clone());
-    let pool = cfg
-        .create_pool(Some(deadpool_redis::Runtime::Tokio1))
-        .unwrap_or_else(|_| panic!("Failed to create Redis pool using {}", redis_loc));
-    let redis_store = RedisSessionStore::new_pooled(pool).await.unwrap();
+    let redis_store = RedisSessionStore::new(redis_loc).await.unwrap();
 
     // Run database migrations
-    if let Err(e) = db_pool.run_migrations(&db_loc).await {
+    if let Err(e) = db_pool.run_migrations(db_loc).await {
         error!("Failed to run database migrations: {}", e);
         return Err(std::io::Error::other("migration error"));
     }
@@ -81,39 +78,17 @@ async fn main() -> std::io::Result<()> {
     reschedule_timeouts_on_startup(&scheduler, app_state.clone()).await;
     let data = web::Data::new(app_state);
 
-    let server_host = std::env::var("SERVER_HOST").unwrap_or_else(|_| "0.0.0.0".to_string());
-    let server_port = std::env::var("SERVER_PORT").unwrap_or_else(|_| "8080".to_string());
-
-    // ...
-
-    let host: Ipv4Addr = server_host.parse().map_err(|err| {
-        error!("Invalid SERVER_HOST '{}': {}", server_host, err);
+    let host: Ipv4Addr = config.server_host.parse().map_err(|err| {
+        error!("Invalid SERVER_HOST '{}': {}", config.server_host, err);
         std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid SERVER_HOST")
     })?;
 
-    let port: u16 = server_port.parse().map_err(|err| {
-        error!("Invalid SERVER_PORT '{}': {}", server_port, err);
-        std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid SERVER_PORT")
-    })?;
+    let port: u16 = config.server_port;
 
-    log::info!("Starting server bind on [{}]:{}", host, port);
+    let secret_key = Key::from(config.secret_token.expose_secret().as_bytes());
 
-    // try read from env, else random
-    // TODO! we shouldnt use as bytes since this can crash if entropy (byte count is too low)
-    let secret_key = match std::env::var("SECRET_TOKEN") {
-        Ok(key_str) => {
-            log::info!("Using JWT secret key from environment variable");
-            Key::from(key_str.as_bytes())
-        }
-        Err(_) => {
-            log::warn!("SECRET_TOKEN not set, generating random key for debug build");
-            Key::generate()
-        }
-    };
-
-    // Identity session limits (10x previous: 10 days visit deadline, 300 days login deadline)
     let deadline_expiration = Duration::from_secs(10 * 24 * 60 * 60);
-    let last_login_duration = Duration::from_secs(300 * 24 * 60 * 60);
+    let last_login_duration = Duration::from_secs(30 * 24 * 60 * 60);
 
     let server = HttpServer::new(move || {
         let identity_mw = IdentityMiddleware::builder()
@@ -170,6 +145,10 @@ async fn main() -> std::io::Result<()> {
                     .configure(cinematch_server::routes::configure_recommendation()),
             )
             .service(
+                utoipa_actix_web::scope("/api/system")
+                    .configure(cinematch_server::routes::configure_system()),
+            )
+            .service(
                 utoipa_actix_web::scope("/api/ws")
                     .configure(cinematch_server::routes::configure_websocket()),
             )
@@ -187,5 +166,6 @@ async fn main() -> std::io::Result<()> {
             .into_app()
     });
 
+    log::info!("Starting server bind on [{}]:{}", host, port);
     server.bind((host, port))?.run().await
 }

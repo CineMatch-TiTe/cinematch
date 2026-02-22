@@ -39,6 +39,8 @@ actix-session.workspace = true
 
 actix.workspace = true
 actix-web-actors.workspace = true
+octocrab.workspace = true
+secrecy.workspace = true
 
 # Local crates
 cinematch-db.workspace = true

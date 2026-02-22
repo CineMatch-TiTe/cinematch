@@ -36,6 +36,7 @@ pub fn validate_username(input: &str) -> Result<String, ApiError> {
 }
 
 mod auth;
+mod handlers;
 mod movie;
 mod party;
 mod recommendation;
@@ -73,15 +74,11 @@ impl Modify for SecurityAddon {
 #[derive(OpenApi)]
 #[openapi(
     modifiers(&SecurityAddon),
-    components(schemas(
-        crate::api_error::ApiError,
-        cinematch_common::models::RecommendationMethod,
-        cinematch_common::models::VectorType,
-        cinematch_common::models::ErrorResponse,
-        crate::movie::MovieResponse,
-        crate::movie::CastMemberResponse,
-        crate::movie::RecommendedMoviesResponse,
+    nest((
+        path = "/api/recommend",
+        api = crate::recommendation::handlers::RecommendationApi
     )),
+    components(schemas(crate::api_error::ApiError)),
     tags(
         (name = "Auth", description = "Authentication and session management."),
         (name = "User", description = "User profile and global preferences."),

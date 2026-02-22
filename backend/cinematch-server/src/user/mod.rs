@@ -91,19 +91,28 @@ pub struct UserPreferencesResponse {
 }
 
 #[derive(Debug, Deserialize, ToSchema, utoipa::IntoParams)]
+#[into_params(parameter_in = Query)]
 pub struct RenameQuery {
+    /// New username (3–32 characters).
     pub name: String,
 }
 
 #[derive(Debug, Deserialize, ToSchema, utoipa::IntoParams)]
+#[into_params(parameter_in = Query)]
 pub struct UpdateTasteQuery {
+    /// Movie ID to update taste for.
     pub movie_id: i64,
+    /// (Optional) Liked status. Defaults to true.
+    #[param(default = true)]
     pub liked: Option<bool>,
+    /// (Optional) Numeric rating for the movie.
     pub rating: Option<i32>,
 }
 
 #[allow(dead_code)]
 #[derive(Debug, Deserialize, ToSchema, utoipa::IntoParams)]
+#[into_params(parameter_in = Query)]
 pub struct GetTasteQuery {
+    /// Movie ID to retrieve taste for.
     pub movie_id: i64,
 }

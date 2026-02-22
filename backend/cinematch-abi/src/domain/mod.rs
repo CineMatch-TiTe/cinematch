@@ -19,11 +19,14 @@
 //! party.advance_phase(user_id).await?;   // From PartyStateMachine trait
 //! ```
 
+mod auth;
 mod error;
 mod party;
 mod recommendation;
 mod user;
 
+pub use auth::ExternalAuthLogic;
+pub use cinematch_db::domain::User;
 pub use error::DomainError;
 pub use party::{
     EndVotingTransition, PartyAdvanceOutcome, PartyCrud, PartyJoin, PartyLogic, PartyStateMachine,

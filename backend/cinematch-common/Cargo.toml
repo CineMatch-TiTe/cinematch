@@ -13,3 +13,6 @@ serde.workspace = true
 serde_json.workspace = true
 actix-web.workspace = true
 chrono.workspace = true
+octocrab.workspace = true
+log.workspace = true
+secrecy.workspace = true

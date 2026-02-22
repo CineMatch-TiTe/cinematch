@@ -3,6 +3,7 @@
 use crate::domain::DomainError;
 use cinematch_common::models::VectorType;
 use cinematch_db::AppContext;
+use rand::seq::SliceRandom;
 use uuid::Uuid;
 
 /// Domain model for movie recommendations.
@@ -48,8 +49,8 @@ impl<C: AppContext> Recommendation<C> {
         .map_err(DomainError::from)
     }
 
-    /// Fetch standard recommendations (Qdrant average vector query).
-    pub async fn get_standard(
+    /// Fetch semantic recommendations (Qdrant average vector query).
+    pub async fn get_semantic(
         &self,
         vector_type: VectorType,
         limit: usize,
@@ -63,5 +64,28 @@ impl<C: AppContext> Recommendation<C> {
         )
         .await
         .map_err(DomainError::from)
+    }
+
+    /// Fetch hybrid recommendations (mix of reviews and semantic).
+    pub async fn get_hybrid(
+        &self,
+        vector_type: VectorType,
+        limit: usize,
+    ) -> Result<Vec<i64>, DomainError> {
+        let reviews_ids = self
+            .get_from_reviews(vector_type, 5)
+            .await
+            .unwrap_or_default();
+        let semantic_ids = self.get_semantic(vector_type, 2).await.unwrap_or_default();
+
+        let mut combined = reviews_ids;
+        for id in semantic_ids {
+            if !combined.contains(&id) {
+                combined.push(id);
+            }
+        }
+
+        combined.shuffle(&mut rand::rng());
+        Ok(combined.into_iter().take(limit).collect())
     }
 }
