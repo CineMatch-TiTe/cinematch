@@ -1,46 +1,49 @@
 [package]
 name = "cinematch-server"
-version = "0.1.0"
-edition = "2024"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description.workspace = true
 
 [dependencies]
-actix-web = "4"
-actix-cors = "0.7"
+actix-web.workspace = true
+actix-cors.workspace = true
 
-tokio = { version = "1", features = ["full"] }
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
-env_logger = "0.11.0"
-log = "0.4"
+tokio.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+env_logger.workspace = true
+log.workspace = true
 dotenvy = "0.15"
-futures = "0.3"
+thiserror = "2.0"
+futures.workspace = true
 
-utoipa = { version = "5.4", features = ["chrono", "uuid", "actix_extras"] }
-utoipa-swagger-ui = { version = "9.0.2", features = ["actix-web"] }
-utoipa-actix-web = "0.1.2"
+utoipa = { workspace = true, features = ["actix_extras"] }
+utoipa-swagger-ui.workspace = true
+utoipa-actix-web.workspace = true
 
-utoipa-rapidoc = { version = "6.0.0", features = ["actix-web"] }
-utoipa-redoc = { version = "6.0.0", features = ["actix-web"] }
-utoipa-scalar = { version = "0.3.0", features = ["actix-web"] }
+utoipa-rapidoc.workspace = true
+utoipa-redoc.workspace = true
+utoipa-scalar.workspace = true
 
 
-uuid = { version = "1.6", features = ["v4", "serde"] }
-rand = "0.9"
-chrono = { version = "0.4", features = ["serde"] }
+uuid.workspace = true
+rand.workspace = true
+chrono.workspace = true
 
-deadpool-redis = "0.22.1"
+deadpool-redis.workspace = true
 
-actix-identity = "0.9.0"
-actix-session = { version = "0.11", features = ["redis-pool", "redis-session-rustls"] }
+actix-identity.workspace = true
+actix-session.workspace = true
 
-actix-ws-broadcaster = "0.12.0"
-actix-ws = "0.3.1"
+actix.workspace = true
+actix-web-actors.workspace = true
+octocrab.workspace = true
+secrecy.workspace = true
 
 # Local crates
-cinematch-db = { path = "../cinematch-db" }
-cinematch-api = { path = "../cinematch-api" }
-cinematch-recommendation-engine = { path = "../cinematch-recommendation-engine" }
-cinematch-common = { path = "../cinematch-common" }
-
-
-
+cinematch-db.workspace = true
+cinematch-abi.workspace = true
+cinematch-recommendation-engine.workspace = true
+cinematch-common.workspace = true

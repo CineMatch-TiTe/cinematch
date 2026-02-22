@@ -1,0 +1,32 @@
+[package]
+name = "cinematch-abi"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description.workspace = true
+
+[dependencies]
+cinematch-db.workspace = true
+cinematch-common.workspace = true
+cinematch-recommendation-engine.workspace = true
+
+tokio.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+
+log.workspace = true
+chrono.workspace = true
+uuid.workspace = true
+redis = { workspace = true, features = ["tokio-comp"] }
+anyhow.workspace = true
+rand.workspace = true
+
+actix.workspace = true
+actix-web.workspace = true
+actix-web-actors.workspace = true
+actix-identity.workspace = true
+async-trait = "0.1"
+octocrab.workspace = true
+secrecy.workspace = true
