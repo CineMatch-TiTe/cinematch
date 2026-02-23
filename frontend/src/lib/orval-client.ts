@@ -20,10 +20,11 @@ export const customInstance = async <T>(
   }
 
   // Server-side cookie forwarding
-  if (globalThis.window === undefined) {
+  if (typeof window === 'undefined') {
     try {
-      const MODULE_NAME = 'next/headers'
-      const { cookies } = await import(MODULE_NAME)
+      // Use require to hide the import from Orval's static AST parser
+      // @ts-ignore
+      const { cookies } = require('next/headers')
       const cookieStore = await cookies()
       const allCookies = cookieStore
         .getAll()
@@ -39,7 +40,7 @@ export const customInstance = async <T>(
         }
       }
     } catch {
-      // Ignore errors during module resolution (e.g. during build/orval generation or if module missing)
+      // Ignore errors during module resolution
     }
   }
 
