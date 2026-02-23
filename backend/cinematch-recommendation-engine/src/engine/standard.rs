@@ -106,7 +106,7 @@ fn build_recommendation_filter(
         return base_filter;
     }
 
-    let excluded_ids = to_point_ids(&excluded);
+    let excluded_ids = to_point_ids(excluded);
     let mut must_not = base_filter
         .as_ref()
         .map(|f| f.must_not.clone())

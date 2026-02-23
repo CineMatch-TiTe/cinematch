@@ -124,13 +124,13 @@ pub async fn vote_movie(
 
     // Try auto-end voting if all members have voted (ONLY IN ROUND 2)
     let voting_round = party_obj.voting_round(&ctx).await?;
-    if voting_round == Some(2) {
-        if let Ok(Some(_)) = party_obj.try_auto_end_voting(&ctx).await {
-            // Broadcast handled by ABI
-            ctx.scheduler
-                .enforce_phase_timeout_and_broadcast(party_id, ctx.clone())
-                .await;
-        }
+    if voting_round == Some(2)
+        && let Ok(Some(_)) = party_obj.try_auto_end_voting(&ctx).await
+    {
+        // Broadcast handled by ABI
+        ctx.scheduler
+            .enforce_phase_timeout_and_broadcast(party_id, ctx.clone())
+            .await;
     }
 
     Ok(HttpResponse::Ok().json(VoteMovieResponse { likes, dislikes }))

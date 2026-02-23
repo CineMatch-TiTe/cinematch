@@ -23,7 +23,9 @@ export const customInstance = async <T>(
   if (typeof window === 'undefined') {
     try {
       // Use require to hide the import from Orval's static AST parser
+      // eslint-disable-next-line @typescript-eslint/ban-ts-comment
       // @ts-ignore
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
       const { cookies } = require('next/headers')
       const cookieStore = await cookies()
       const allCookies = cookieStore

@@ -20,7 +20,7 @@ const fetchGenres = async () => {
   return genres.length > 0 ? genres : ['Action', 'Comedy', 'Drama', 'Horror', 'Sci-Fi', 'Romance', 'Thriller', 'Documentary', 'Animation']
 }
 
-export const usePreferences = ({ initialPrefs, onComplete, joinCode }: UsePreferencesProps = {}) => {
+export const usePreferences = ({ initialPrefs, onComplete }: UsePreferencesProps = {}) => {
   const router = useRouter()
   const [step, setStep] = useState<PreferenceStep>(1)
   const [isSubmitting, setIsSubmitting] = useState(false)

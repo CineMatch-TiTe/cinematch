@@ -7,7 +7,7 @@ import PartyViewClient from '@/components/party/PartyViewClient'
 
 export default async function PartyRoom({ searchParams }: Readonly<{ searchParams: Promise<{ id?: string }> }>) {
   const resolvedParams = await searchParams
-  let partyId = resolvedParams.id
+  const partyId = resolvedParams.id
 
   if (!partyId) {
     const res = await getMyPartyIdAction()

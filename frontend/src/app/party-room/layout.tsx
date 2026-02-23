@@ -1,5 +1,4 @@
 import { ReactNode } from 'react'
-import { redirect } from 'next/navigation'
 import { PartyViewProvider, PartyViewType } from '@/components/party/PartyViewContext' // Make sure import is correct
 import { PartyFooterNavigation } from '@/components/party/PartyFooterNavigation'
 import { getMyPartyIdAction } from '@/actions/party-room'
@@ -11,7 +10,7 @@ export default async function PartyRoomLayout({
 }>) {
   // We cannot read searchParams in layouts reliably. So we ask the backend what party we are in.
   const res = await getMyPartyIdAction()
-  let partyId = 'id' in res ? res.id : undefined
+  const partyId = 'id' in res ? res.id : undefined
 
   if (!partyId) {
     return <>{children}</> // Should be caught by page redirect

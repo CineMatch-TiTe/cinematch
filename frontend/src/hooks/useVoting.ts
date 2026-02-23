@@ -52,7 +52,7 @@ export function useVoting(partyId: string) {
       setVotingRound(nextRound)
       setTransitionData(null)
     },
-    [transitionData]
+    [transitionData, votingRound]
   )
 
   // Initial fetch
