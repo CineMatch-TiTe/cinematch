@@ -33,7 +33,7 @@ pub async fn login_guest(
     request: HttpRequest,
     body: web::Json<GuestUserRequest>,
     user: Option<Identity>,
-) -> Result<web::Json<GuestLoginResponse>, ApiError> {
+) -> Result<HttpResponse, ApiError> {
     if let Some(existing_user) = user {
         trace!("User already logged in with ID: {:?}", existing_user.id());
         return Err(ApiError::Conflict("User already logged in".to_string()));
@@ -56,10 +56,11 @@ pub async fn login_guest(
             trace!("User identity set in session for user_id={}", user.id);
 
             let username = user.username(&ctx).await.unwrap_or_default();
-            Ok(web::Json(GuestLoginResponse {
+            let response = GuestLoginResponse {
                 user_id: user.id,
                 username,
-            }))
+            };
+            Ok(HttpResponse::Created().json(response))
         }
         Err(e) => {
             error!("Failed to create guest user: {e}");

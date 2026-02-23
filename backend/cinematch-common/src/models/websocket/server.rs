@@ -45,19 +45,16 @@ pub enum ServerMessage {
 }
 
 /// Timeout info for the current phase.
-/// For phase timeouts: includes phase_entered_at and durations (clients compute deadline).
+/// For phase timeouts: includes phase_entered_at and duration (clients compute deadline).
 /// For ready countdowns: includes deadline_at directly.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, ToSchema)]
 pub struct PartyTimeoutUpdate {
     /// When the phase started (for phase-based countdowns)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub phase_entered_at: Option<chrono::DateTime<chrono::Utc>>,
-    /// Voting phase timeout duration in seconds
+    /// Active timeout duration in seconds (for the current phase/round)
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub voting_timeout_secs: Option<u32>,
-    /// Watching phase timeout duration in seconds  
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub watching_timeout_secs: Option<u32>,
+    pub timeout_secs: Option<u32>,
     /// Direct deadline (for ready countdowns or clearing)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub deadline_at: Option<chrono::DateTime<chrono::Utc>>,

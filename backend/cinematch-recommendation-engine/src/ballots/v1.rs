@@ -7,16 +7,15 @@ use std::collections::{HashMap, HashSet};
 use uuid::Uuid;
 
 const BALLOT_SIZE: usize = 5;
-const PARTY_POOL_LIMIT: usize = 3;
-const OWN_POOL_LIMIT: usize = 2;
 const POPULAR_FALLBACK_LIMIT: i64 = 30;
 
 /// Build voting ballots using Qdrant-backed recommendations.
 ///
-/// This function constructs per-user ballots for the voting phase by mixing:
-/// - Movies liked by the user (personal favorites).
-/// - Movies liked by other party members (group favorites).
-/// - Popular movies (fallback if the pools are too small).
+/// This function constructs a Shared Party Ballot for the voting phase:
+/// - Combines all members' picks into a single party pool.
+/// - Uses the recommendation engine (via the leader's profile) to select the best 5 movies from the pool.
+/// - Pads with popular movies if the party pool is too small.
+/// - Assigns the exact same ballot to everyone in the party.
 pub async fn build_voting_ballots_for_party(
     ctx: &impl AppContext,
     party: &cinematch_db::domain::Party,
@@ -28,26 +27,48 @@ pub async fn build_voting_ballots_for_party(
         return Ok(());
     }
 
-    let (picks_by_user, party_pool) = collect_party_taste(ctx, party).await?;
-    let popular_ids = Movie::popular_ids(ctx, POPULAR_FALLBACK_LIMIT)
-        .await
-        .unwrap_or_default();
+    // Determine the user to query Qdrant with (e.g., the leader)
+    let leader_id = party.leader_id(ctx).await?;
+
+    let (_, party_pool) = collect_party_taste(ctx, party).await?;
+    let popular_ids = Movie::popular_ids(ctx, POPULAR_FALLBACK_LIMIT, None).await?;
 
     let mut rng = create_seeded_rng();
 
+    let shared_pool_size =
+        std::cmp::max(1, (members.len() * 3) / std::cmp::max(1, members.len() / 2));
+
+    // Get shared movies that best represent the whole party
+    let shared_movies = recommend_from_pool(
+        ctx,
+        leader_id,
+        &party_pool,
+        VectorType::Combined,
+        shared_pool_size,
+    )
+    .await?;
+
+    // Now build individual hybrid ballots
     for member in members {
-        let user_id = member.user_id;
-        let own_pool = picks_by_user.get(&user_id).cloned().unwrap_or_default();
+        let own_pool = collect_user_taste(ctx, party, member.user_id).await?;
 
-        let ballot =
-            construct_user_ballot(ctx, user_id, &party_pool, &own_pool, &popular_ids, &mut rng)
+        let user_ballot = construct_hybrid_ballot(
+            ctx,
+            member.user_id,
+            &shared_movies,
+            &own_pool,
+            &party_pool,
+            &popular_ids,
+            &mut rng,
+        )
+        .await?;
+
+        if !user_ballot.is_empty() {
+            party
+                .add_shown_movies(ctx, member.user_id, &user_ballot)
                 .await?;
-
-        if !ballot.is_empty() {
-            party.add_shown_movies(ctx, user_id, &ballot).await?;
         }
     }
-
     Ok(())
 }
 
@@ -71,37 +92,92 @@ async fn collect_party_taste(
     Ok((picks_by_user, party_pool))
 }
 
-/// Constructs a single user's ballot by recommending from party and personal pools.
-async fn construct_user_ballot(
+/// Collects likes for a single user.
+async fn collect_user_taste(
+    ctx: &impl AppContext,
+    party: &cinematch_db::domain::Party,
+    user_id: Uuid,
+) -> DbResult<Vec<i64>> {
+    let user_picks = party.get_user_picks(ctx, user_id).await?;
+    let mut own_pool_set: HashSet<i64> = HashSet::new();
+
+    for mid in user_picks {
+        own_pool_set.insert(mid);
+    }
+    Ok(own_pool_set.into_iter().collect())
+}
+
+/// Constructs a hybrid round-1 ballot: 3 Shared Core + 2 Personal Pad.
+async fn construct_hybrid_ballot(
     ctx: &impl AppContext,
     user_id: Uuid,
-    party_pool: &[i64],
+    shared_movies: &[i64],
     own_pool: &[i64],
+    party_pool: &[i64],
     popular_ids: &[i64],
     rng: &mut rand::rngs::StdRng,
 ) -> DbResult<Vec<i64>> {
-    let recs_party = recommend_from_pool(
-        ctx,
-        user_id,
-        party_pool,
-        VectorType::Combined,
-        PARTY_POOL_LIMIT,
-    )
-    .await?;
-    let recs_own =
-        recommend_from_pool(ctx, user_id, own_pool, VectorType::Combined, OWN_POOL_LIMIT).await?;
+    let mut ballot = Vec::new();
+    let mut used = HashSet::new();
 
-    let mut ballot = recs_party;
-    for mid in recs_own {
-        if !ballot.contains(&mid) {
+    // 1. Pick exactly 3 from the Shared Movies pool (or whatever is available)
+    let mut shared_candidates = shared_movies.to_vec();
+    shared_candidates.shuffle(rng);
+    for &mid in &shared_candidates {
+        if ballot.len() >= 3 {
+            break;
+        }
+        if !used.contains(&mid) {
             ballot.push(mid);
+            used.insert(mid);
         }
     }
 
-    ballot.shuffle(rng);
+    // 2. Pad to 3 with remaining party picks if the shared pool was short
+    if ballot.len() < 3 {
+        let mut fallback_party = party_pool.to_vec();
+        fallback_party.shuffle(rng);
+        for &mid in fallback_party.iter() {
+            if ballot.len() >= 3 {
+                break;
+            }
+            if !used.contains(&mid) {
+                ballot.push(mid);
+                used.insert(mid);
+            }
+        }
+    }
 
-    // Pad with popular movies if the pools were insufficient
-    let mut used: HashSet<i64> = ballot.iter().copied().collect();
+    // 3. Pick 2 "Personal Pad" movies from the user's explicit likes
+    let personal_recs =
+        recommend_from_pool(ctx, user_id, own_pool, VectorType::Combined, 2).await?;
+
+    for &mid in &personal_recs {
+        if ballot.len() >= BALLOT_SIZE {
+            break;
+        }
+        if !used.contains(&mid) {
+            ballot.push(mid);
+            used.insert(mid);
+        }
+    }
+
+    // 4. Pad to 5 using the remainder of the party pool
+    if ballot.len() < BALLOT_SIZE {
+        let mut fallback_party = party_pool.to_vec();
+        fallback_party.shuffle(rng);
+        for &mid in fallback_party.iter() {
+            if ballot.len() >= BALLOT_SIZE {
+                break;
+            }
+            if !used.contains(&mid) {
+                ballot.push(mid);
+                used.insert(mid);
+            }
+        }
+    }
+
+    // 5. Final safety pad with popular movies
     while ballot.len() < BALLOT_SIZE {
         let mut added = false;
         for &mid in popular_ids {
@@ -117,6 +193,7 @@ async fn construct_user_ballot(
         }
     }
 
+    // Ensure strict BALLOT_SIZE bounds and shuffle before sending down the pipe
     let mut final_ballot: Vec<i64> = ballot.into_iter().take(BALLOT_SIZE).collect();
     final_ballot.shuffle(rng);
     Ok(final_ballot)

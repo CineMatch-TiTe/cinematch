@@ -2,23 +2,18 @@
 
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
-import {
-  advancePhase,
-  kickMember,
-  leaveParty,
-  transferLeadership,
-  getMyParty,
-  getPartyRecommendations,
-  pickMovie,
-  voteMovie,
-  getVote
-} from '@/server/party/party'
+import { advancePhase, kickMember, transferLeadership } from '@/server/leader-tools/leader-tools'
+import { leaveParty, setReady } from '@/server/member-ops/member-ops'
+import { getParty } from '@/server/party/party'
+import { getRecommendations } from '@/server/recommendation/recommendation'
+import { pickMovie } from '@/server/picking/picking'
+import { voteMovie, getVote } from '@/server/voting/voting'
 
 import { SearchFilter } from '@/model/searchFilter'
 
 export async function leavePartyAction(partyId: string) {
   try {
-    await leaveParty(partyId)
+    await leaveParty({ party_id: partyId })
   } catch (error) {
     console.error('Leave Party Error', error)
     return { error: 'Failed to leave party' }
@@ -29,11 +24,11 @@ export async function leavePartyAction(partyId: string) {
 
 export async function kickMemberAction(partyId: string, memberId: string) {
   try {
-    const response = await kickMember(partyId, { target_user_id: memberId })
+    const response = await kickMember({ party_id: partyId, target_user_id: memberId })
     if (response.status !== 200) {
       return { error: 'Failed to kick member' }
     }
-    revalidatePath(`/party-room/${partyId}`)
+    revalidatePath(`/party-room?id=${partyId}`)
     return { success: true }
   } catch (error) {
     console.error('Kick Member Error', error)
@@ -43,11 +38,11 @@ export async function kickMemberAction(partyId: string, memberId: string) {
 
 export async function promoteMemberAction(partyId: string, memberId: string) {
   try {
-    const response = await transferLeadership(partyId, { new_leader_id: memberId })
+    const response = await transferLeadership({ party_id: partyId, new_leader_id: memberId })
     if (response.status !== 200) {
       return { error: 'Failed to transfer leadership' }
     }
-    revalidatePath(`/party-room/${partyId}`)
+    revalidatePath(`/party-room?id=${partyId}`)
     return { success: true }
   } catch (error) {
     console.error('Promote Member Error', error)
@@ -57,11 +52,11 @@ export async function promoteMemberAction(partyId: string, memberId: string) {
 
 export async function advancePhaseAction(partyId: string) {
   try {
-    const response = await advancePhase(partyId)
+    const response = await advancePhase({ party_id: partyId })
     if (response.status !== 200) {
       return { error: 'Failed to advance phase' }
     }
-    revalidatePath(`/party-room/${partyId}`)
+    revalidatePath(`/party-room?id=${partyId}`)
     return { success: true }
   } catch (error) {
     console.error('Advance Phase Error', error)
@@ -71,7 +66,7 @@ export async function advancePhaseAction(partyId: string) {
 
 export async function getRecommendedMoviesAction(partyId: string) {
   try {
-    const response = await getPartyRecommendations(partyId)
+    const response = await getRecommendations({ party_id: partyId })
     if (response.status === 200) {
       return { data: response.data.recommended_movies }
     }
@@ -84,7 +79,7 @@ export async function getRecommendedMoviesAction(partyId: string) {
 
 export async function pickMovieAction(partyId: string, movieId: number, liked?: boolean | null) {
   try {
-    const response = await pickMovie(partyId, movieId, { liked })
+    const response = await pickMovie({ party_id: partyId, movie_id: movieId, liked: liked !== null ? liked : undefined })
     if (response.status !== 200) {
       return { error: 'Failed to pick movie' }
     }
@@ -97,7 +92,7 @@ export async function pickMovieAction(partyId: string, movieId: number, liked?: 
 
 export async function getMyPartyIdAction() {
   try {
-    const response = await getMyParty()
+    const response = await getParty({ party_id: undefined })
     if (response.status === 200) {
       return { id: response.data.id }
     }
@@ -138,7 +133,7 @@ export async function getUserPreferencesAction() {
 
 export async function voteMovieAction(partyId: string, movieId: number, like: boolean) {
   try {
-    const response = await voteMovie(partyId, movieId, { like })
+    const response = await voteMovie({ party_id: partyId, movie_id: movieId, like })
 
     if (response.status !== 200) {
       console.error('Vote failed with status:', response.status, response.data)
@@ -153,7 +148,7 @@ export async function voteMovieAction(partyId: string, movieId: number, like: bo
 
 export async function getPartyVotesAction(partyId: string) {
   try {
-    const response = await getVote(partyId, { cache: 'no-store' })
+    const response = await getVote({ party_id: partyId }, { cache: 'no-store' })
     if (response.status === 200) {
       return { data: response.data }
     }
@@ -167,7 +162,7 @@ export async function getPartyVotesAction(partyId: string) {
 export async function getMoviesByIdsAction(movieIds: number[]) {
   const { movieGetInfo } = await import('@/server/movie/movie')
   try {
-    const promises = movieIds.map((id) => movieGetInfo(id))
+    const promises = movieIds.map((id) => movieGetInfo({ movie_id: id }))
     const responses = await Promise.all(promises)
     const movies = responses.filter((r) => r.status === 200).map((r) => r.data)
 
@@ -175,5 +170,18 @@ export async function getMoviesByIdsAction(movieIds: number[]) {
   } catch (error) {
     console.error('Get Movies By IDs Error', error)
     return { error: 'Failed to fetch movie details' }
+  }
+}
+
+export async function setReadyAction(partyId: string, isReady: boolean) {
+  try {
+    const response = await setReady({ party_id: partyId, is_ready: isReady })
+    if (response.status === 200) {
+      return { success: true }
+    }
+    return { error: 'Failed to set ready state' }
+  } catch (error) {
+    console.error('Set Ready Error', error)
+    return { error: 'Failed to set ready state' }
   }
 }

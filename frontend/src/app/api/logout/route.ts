@@ -1,6 +1,6 @@
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
-import { logoutUser } from '@/server/user/user'
+import { logoutUser } from '@/server/auth/auth'
 
 async function handleLogout() {
   await logoutUser()

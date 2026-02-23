@@ -24,7 +24,7 @@ export const usePreferences = ({ initialPrefs, onComplete, joinCode }: UsePrefer
   const router = useRouter()
   const [step, setStep] = useState<PreferenceStep>(1)
   const [isSubmitting, setIsSubmitting] = useState(false)
-  
+
   const { data: availableGenres, isLoading: isGenresLoading } = useSWR('/api/movie/genres', fetchGenres)
 
   const [preferences, setPreferences] = useState<UserPreferences>(() => {
@@ -32,7 +32,7 @@ export const usePreferences = ({ initialPrefs, onComplete, joinCode }: UsePrefer
       return {
         genres: initialPrefs.include_genres || [],
         decades: [], // Decades logic needs to be derived if possible, or kept empty
-        isStudying: initialPrefs.target_release_year ? true : null 
+        isStudying: initialPrefs.target_release_year ? true : null
       }
     }
     return {
@@ -44,14 +44,14 @@ export const usePreferences = ({ initialPrefs, onComplete, joinCode }: UsePrefer
 
   // Initialize selected decade from initialPrefs if available (for wizard flow mostly)
   const [selectedDecade, setSelectedDecade] = useState<string | null>(() => {
-     if (initialPrefs?.target_release_year) {
-        const year = initialPrefs.target_release_year
-        if (year) {
-          const decadeYear = Math.floor(year / 10) * 10
-          return `${decadeYear}s`
-        }
+    if (initialPrefs?.target_release_year) {
+      const year = initialPrefs.target_release_year
+      if (year) {
+        const decadeYear = Math.floor(year / 10) * 10
+        return `${decadeYear}s`
       }
-      return null
+    }
+    return null
   })
 
 
@@ -70,7 +70,7 @@ export const usePreferences = ({ initialPrefs, onComplete, joinCode }: UsePrefer
   }, [])
 
   const handleSelectStatus = useCallback((isStudying: boolean) => {
-     setPreferences((prev) => ({ ...prev, isStudying }))
+    setPreferences((prev) => ({ ...prev, isStudying }))
   }, [])
 
   const nextStep = useCallback(() => {
@@ -118,11 +118,7 @@ export const usePreferences = ({ initialPrefs, onComplete, joinCode }: UsePrefer
 
       const partyResult = await getMyPartyIdAction()
 
-      // If we have a join code, prioritize redirecting there
-      if (joinCode) {
-         router.push(`/party-room/${joinCode}`)
-         return
-      }
+      // We always redirect to the party UUID, even if they used a join code.
 
       if (partyResult.error || !partyResult.id) {
         console.error('Failed to get party ID for redirection')
@@ -130,7 +126,7 @@ export const usePreferences = ({ initialPrefs, onComplete, joinCode }: UsePrefer
         return
       }
 
-      router.push(`/party-room/${partyResult.id}`)
+      router.push(`/party-room?id=${partyResult.id}`)
     } catch (error) {
       console.error('Failed to submit preferences', error)
       toast.error('Failed to submit preferences')
@@ -140,26 +136,26 @@ export const usePreferences = ({ initialPrefs, onComplete, joinCode }: UsePrefer
   }
 
   const updatePreferences = async () => {
-      setIsSubmitting(true)
-      try {
-        const res = await updateUserPreferencesAction({
-          include_genres: preferences.genres,
-          exclude_genres: initialPrefs?.exclude_genres || [],
-        })
-  
-        if (res.error) {
-          toast.error(res.error)
-        } else {
-          toast.success('Preferences saved')
-          if (onComplete) onComplete()
-        }
-      } catch (error) {
-          console.error(error)
-          toast.error('Failed to update preferences')
-      } finally {
-        setIsSubmitting(false)
+    setIsSubmitting(true)
+    try {
+      const res = await updateUserPreferencesAction({
+        include_genres: preferences.genres,
+        exclude_genres: initialPrefs?.exclude_genres || [],
+      })
+
+      if (res.error) {
+        toast.error(res.error)
+      } else {
+        toast.success('Preferences saved')
+        if (onComplete) onComplete()
       }
+    } catch (error) {
+      console.error(error)
+      toast.error('Failed to update preferences')
+    } finally {
+      setIsSubmitting(false)
     }
+  }
 
   return {
     step,

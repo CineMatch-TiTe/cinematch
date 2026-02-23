@@ -17,6 +17,21 @@ pub static OCTOCRAB_BASE: LazyLock<octocrab::Octocrab> = LazyLock::new(|| {
         .expect("Failed to build Octocrab client")
 });
 
+#[derive(Debug, Clone)]
+pub struct TimeoutConfig {
+    /// Round 1 Voting phase timeout in seconds (env: `VOTING_R1_TIMEOUT_SECS`, default: 30)
+    pub voting_r1_timeout_secs: u32,
+
+    /// Round 2 Voting phase timeout in seconds (env: `VOTING_R2_TIMEOUT_SECS`, default: 20)
+    pub voting_r2_timeout_secs: u32,
+
+    /// Watching phase timeout in seconds (env: `WATCHING_TIMEOUT_SECS`, default: 900)
+    pub watching_timeout_secs: u32,
+
+    /// Ready countdown duration in seconds (env: `READY_COUNTDOWN_SECS`, default: 5.0)
+    pub ready_countdown_secs: f32,
+}
+
 /// Shared application configuration.
 ///
 /// Values are read from environment variables. Essential values are required,
@@ -24,14 +39,7 @@ pub static OCTOCRAB_BASE: LazyLock<octocrab::Octocrab> = LazyLock::new(|| {
 #[derive(Debug, Clone)]
 pub struct Config {
     // ── Timeouts ──────────────────────────────────────────────
-    /// Voting phase timeout in seconds (env: `VOTING_TIMEOUT_SECS`, default: 180)
-    pub voting_timeout_secs: u32,
-
-    /// Watching phase timeout in seconds (env: `WATCHING_TIMEOUT_SECS`, default: 900)
-    pub watching_timeout_secs: u32,
-
-    /// Ready countdown duration in seconds (env: `READY_COUNTDOWN_SECS`, default: 5.0)
-    pub ready_countdown_secs: f32,
+    pub timeouts: TimeoutConfig,
 
     // ── Databases ─────────────────────────────────────────────
     /// PostgreSQL connection URL (env: `DATABASE_URL`, required)
@@ -100,9 +108,12 @@ impl Config {
         };
 
         Self {
-            voting_timeout_secs: env_parse("VOTING_TIMEOUT_SECS", 180),
-            watching_timeout_secs: env_parse("WATCHING_TIMEOUT_SECS", 900),
-            ready_countdown_secs: env_parse("READY_COUNTDOWN_SECS", 5.0),
+            timeouts: TimeoutConfig {
+                voting_r1_timeout_secs: env_parse("VOTING_R1_TIMEOUT_SECS", 30),
+                voting_r2_timeout_secs: env_parse("VOTING_R2_TIMEOUT_SECS", 20),
+                watching_timeout_secs: env_parse("WATCHING_TIMEOUT_SECS", 900),
+                ready_countdown_secs: env_parse("READY_COUNTDOWN_SECS", 5.0),
+            },
             database_url: SecretString::from(database_url),
             redis_url: SecretString::from(redis_url),
             qdrant_url,

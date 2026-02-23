@@ -46,7 +46,7 @@ impl Database {
         }
 
         let popular = self
-            .get_popular_movie_ids(POPULAR_FALLBACK_LIMIT)
+            .get_popular_movie_ids(POPULAR_FALLBACK_LIMIT, None)
             .await
             .unwrap_or_default();
         let mut rng = rand::rng();

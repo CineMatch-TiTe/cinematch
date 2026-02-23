@@ -10,12 +10,15 @@ import { MovieResponse } from '@/model/movieResponse'
 import { getMoviesByIdsAction } from '@/actions/party-room'
 import { Card } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
+import PhaseCountdown from '../PhaseCountdown'
 
 interface WatchingFlowProps {
   movieId: number
+  phaseEnteredAt: string
+  timeoutSecs: number
 }
 
-export default function WatchingFlow({ movieId }: Readonly<WatchingFlowProps>) {
+export default function WatchingFlow({ movieId, phaseEnteredAt, timeoutSecs }: Readonly<WatchingFlowProps>) {
   const [movie, setMovie] = useState<MovieResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [isImageLoading, setIsImageLoading] = useState(true)
@@ -60,6 +63,9 @@ export default function WatchingFlow({ movieId }: Readonly<WatchingFlowProps>) {
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100 pt-8 pb-32 px-4 flex flex-col items-center">
       <div className="w-full max-w-2xl space-y-6">
+        <div className="flex justify-center mb-4">
+          <PhaseCountdown phaseEnteredAt={phaseEnteredAt} timeoutSecs={timeoutSecs} />
+        </div>
         <Card className="bg-zinc-900 border-zinc-800 overflow-hidden shadow-2xl shadow-red-900/20">
           <div className="relative aspect-video w-full bg-zinc-800">
             {movie.poster_url ? (
@@ -78,9 +84,8 @@ export default function WatchingFlow({ movieId }: Readonly<WatchingFlowProps>) {
                       alt={movie.title}
                       fill
                       sizes="(max-width: 768px) 192px, 192px"
-                      className={`object-cover transition-opacity duration-300 ${
-                        isImageLoading ? 'opacity-0' : 'opacity-100'
-                      }`}
+                      className={`object-cover transition-opacity duration-300 ${isImageLoading ? 'opacity-0' : 'opacity-100'
+                        }`}
                       onLoad={() => setIsImageLoading(false)}
                       priority
                     />

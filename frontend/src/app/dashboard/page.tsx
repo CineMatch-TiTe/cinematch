@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation'
 import { getCurrentUser } from '@/server/user/user'
-import { getMyParty } from '@/server/party/party'
+import { getParty } from '@/server/party/party'
 import { Button } from '@/components/ui/button'
 import { LogOut, Settings } from 'lucide-react'
 import Image from 'next/image'
@@ -14,9 +14,9 @@ export default async function DashboardPage() {
     redirect('/')
   }
 
-  const partyRes = await getMyParty().catch(() => null)
+  const partyRes = await getParty({}).catch(() => null)
   if (partyRes?.status === 200 && partyRes.data?.id) {
-    redirect(`/party-room/${partyRes.data.id}`)
+    redirect(`/party-room?id=${partyRes.data.id}`)
   }
 
   const user = userRes.data

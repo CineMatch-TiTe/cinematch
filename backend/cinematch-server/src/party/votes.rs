@@ -3,7 +3,7 @@ use crate::api_error::ApiError;
 use crate::extract_user_id;
 
 use actix_identity::Identity;
-use actix_web::{get, post, web};
+use actix_web::{HttpResponse, get, post, web};
 use cinematch_abi::domain::{PartyCrud, PartyStateMachine, PartyValidation};
 use cinematch_common::models::ErrorResponse;
 use cinematch_db::PartyState;
@@ -28,9 +28,9 @@ pub async fn get_vote(
     ctx: AppState,
     user: Identity,
     party_query: web::Query<OptionalIdParam>,
-) -> Result<web::Json<GetVoteResponse>, ApiError> {
+) -> Result<HttpResponse, ApiError> {
     let user_id = extract_user_id(user)?;
-    let party_id = match party_query.id {
+    let party_id = match party_query.party_id {
         Some(id) => id,
         None => {
             let user_obj = User::from_id(&ctx, user_id).await?;
@@ -50,12 +50,7 @@ pub async fn get_vote(
         return Err(ApiError::NotFound("Party is not in Voting".to_string()));
     }
 
-    let movie_ids = party_obj
-        .get_user_votes(&ctx, user_id)
-        .await?
-        .into_iter()
-        .map(|v| v.movie_id)
-        .collect();
+    let movie_ids = party_obj.get_ballot(&ctx, user_id).await?;
 
     let vote_totals: HashMap<i64, VoteTotals> = party_obj
         .get_votes(&ctx, Some(user_id))
@@ -78,7 +73,7 @@ pub async fn get_vote(
         can_vote: party_obj.can_vote(&ctx).await?,
         vote_totals,
     };
-    Ok(web::Json(response))
+    Ok(HttpResponse::Ok().json(response))
 }
 
 #[utoipa::path(
@@ -103,11 +98,11 @@ pub async fn vote_movie(
     user: Identity,
     vote_query: web::Query<VoteQuery>,
     party_query: web::Query<OptionalIdParam>,
-) -> Result<web::Json<VoteMovieResponse>, ApiError> {
+) -> Result<HttpResponse, ApiError> {
     let user_id = extract_user_id(user)?;
     let movie_id = vote_query.movie_id;
     let vote_value = vote_query.like;
-    let party_id = match party_query.id {
+    let party_id = match party_query.party_id {
         Some(id) => id,
         None => {
             let user_obj = User::from_id(&ctx, user_id).await?;
@@ -127,13 +122,16 @@ pub async fn vote_movie(
         .cast_vote_with_broadcast(&ctx, user_id, movie_id, vote_value)
         .await?;
 
-    // Try auto-end voting if all members have voted
-    if let Ok(Some(_)) = party_obj.try_auto_end_voting(&ctx).await {
-        // Broadcast handled by ABI
-        ctx.scheduler
-            .enforce_phase_timeout_and_broadcast(party_id, ctx.clone())
-            .await;
+    // Try auto-end voting if all members have voted (ONLY IN ROUND 2)
+    let voting_round = party_obj.voting_round(&ctx).await?;
+    if voting_round == Some(2) {
+        if let Ok(Some(_)) = party_obj.try_auto_end_voting(&ctx).await {
+            // Broadcast handled by ABI
+            ctx.scheduler
+                .enforce_phase_timeout_and_broadcast(party_id, ctx.clone())
+                .await;
+        }
     }
 
-    Ok(web::Json(VoteMovieResponse { likes, dislikes }))
+    Ok(HttpResponse::Ok().json(VoteMovieResponse { likes, dislikes }))
 }

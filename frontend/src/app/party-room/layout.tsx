@@ -1,22 +1,27 @@
 import { ReactNode } from 'react'
+import { redirect } from 'next/navigation'
 import { PartyViewProvider, PartyViewType } from '@/components/party/PartyViewContext' // Make sure import is correct
 import { PartyFooterNavigation } from '@/components/party/PartyFooterNavigation'
+import { getMyPartyIdAction } from '@/actions/party-room'
 
 export default async function PartyRoomLayout({
-  children,
-  params
+  children
 }: Readonly<{
   children: ReactNode
-  params: Promise<{ id: string }>
 }>) {
-  // Ensure params are awaited
-  const { id: partyId } = await params
+  // We cannot read searchParams in layouts reliably. So we ask the backend what party we are in.
+  const res = await getMyPartyIdAction()
+  let partyId = 'id' in res ? res.id : undefined
+
+  if (!partyId) {
+    return <>{children}</> // Should be caught by page redirect
+  }
 
   // Parallel fetch of user prefs and party status
   const { getUserPreferences } = await import('@/server/user/user')
   const { getParty } = await import('@/server/party/party')
 
-  const [prefsRes, partyRes] = await Promise.all([getUserPreferences(), getParty(partyId)])
+  const [prefsRes, partyRes] = await Promise.all([getUserPreferences(), getParty({ party_id: partyId })])
 
   let initialView: PartyViewType = 'room'
   const partyState = partyRes.status === 200 ? partyRes.data.state : 'created'

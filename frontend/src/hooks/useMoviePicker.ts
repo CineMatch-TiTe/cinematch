@@ -68,7 +68,12 @@ export function useMoviePicker({
       const filtered = newMovies.filter((m) => !seenMovieIds.has(m.movie_id))
 
       if (filtered.length > 0) {
-        setMovies((prev) => [...prev, ...filtered])
+        setMovies((prev) => {
+          // Double check we don't add duplicates
+          const existingIds = new Set(prev.map(m => m.movie_id))
+          const trulyNew = filtered.filter(m => !existingIds.has(m.movie_id))
+          return [...prev, ...trulyNew]
+        })
         setNoNewMovies(false)
       } else {
         setNoNewMovies(true)

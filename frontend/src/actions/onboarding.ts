@@ -3,8 +3,9 @@
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { z } from 'zod'
-import { loginGuest } from '@/server/user/user'
-import { joinParty, createParty } from '@/server/party/party'
+import { loginGuest } from '@/server/auth/auth'
+import { createParty } from '@/server/party/party'
+import { joinParty } from '@/server/member-ops/member-ops'
 
 const usernameSchema = z
   .string()
@@ -110,9 +111,10 @@ export async function guestLoginAction(prevState: unknown, formData: FormData) {
     const { cookieName, cookieValue } = loginResult
     const cookieString = `${cookieName}=${cookieValue}`
 
-    const joinResponse = await joinParty(result.data.joinCode, {
-      headers: { Cookie: cookieString }
-    })
+    const joinResponse = await joinParty(
+      { code: result.data.joinCode },
+      { headers: { Cookie: cookieString } }
+    )
 
     if (joinResponse.status === 200) {
       await setSessionCookie(cookieName, cookieValue)

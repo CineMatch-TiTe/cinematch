@@ -227,8 +227,8 @@ impl StatusResponse {
 #[derive(Debug, Deserialize, ToSchema, utoipa::IntoParams)]
 #[into_params(parameter_in = Query)]
 pub struct OptionalIdParam {
-    /// Optional resource ID (UUID). If omitted, the system auto-selects from session.
-    pub id: Option<Uuid>,
+    /// Optional party ID (UUID). If omitted, the system auto-selects from session.
+    pub party_id: Option<Uuid>,
 }
 
 #[derive(Debug, Deserialize, ToSchema, utoipa::IntoParams)]

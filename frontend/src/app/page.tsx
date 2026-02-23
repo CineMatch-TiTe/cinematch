@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { GuestLoginForm } from '@/components/forms/GuestLoginForm'
 import Image from 'next/image'
 import { getCurrentUser } from '@/server/user/user'
-import { getMyParty } from '@/server/party/party'
+import { getParty } from '@/server/party/party'
 
 export default async function HomeRoute({
   searchParams
@@ -17,9 +17,9 @@ export default async function HomeRoute({
   // Check if user is already logged in and has an active party
   const userRes = await getCurrentUser().catch(() => null)
   if (userRes?.status === 200) {
-    const partyRes = await getMyParty().catch(() => null)
+    const partyRes = await getParty({}).catch(() => null)
     if (partyRes?.status === 200 && partyRes.data?.id) {
-      redirect(`/party-room/${partyRes.data.id}`)
+      redirect(`/party-room?id=${partyRes.data.id}`)
     } else {
       redirect('/dashboard')
     }

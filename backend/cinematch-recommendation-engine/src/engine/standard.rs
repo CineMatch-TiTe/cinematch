@@ -25,12 +25,16 @@ pub async fn recommend_movies(
     let prefs_record = prefs.record(ctx).await?;
 
     // Combine preference filters with exclusions (seen/skipped movies)
-    let filter =
-        build_recommendation_filter(&prefs_record, &genre_map, &positive, &negative, &skipped);
+    let mut excluded = Vec::new();
+    excluded.extend_from_slice(&positive);
+    excluded.extend_from_slice(&negative);
+    excluded.extend_from_slice(&skipped);
+
+    let filter = build_recommendation_filter(&prefs_record, &genre_map, &excluded);
 
     // Fallback if no positive signals exist: use popular movies as seeds
     let positive_ids = if positive.is_empty() {
-        let popular = Movie::popular(ctx, 5).await?;
+        let popular = Movie::popular(ctx, 5, Some(&excluded)).await?;
         to_point_ids(&popular.into_iter().map(|m| m.movie_id).collect::<Vec<_>>())
     } else {
         to_point_ids(&positive)
@@ -57,13 +61,32 @@ async fn fetch_user_taste(
     party_id: Option<Uuid>,
 ) -> DbResult<(Vec<i64>, Vec<i64>, Vec<i64>)> {
     let user = cinematch_db::domain::user::User::new(user_id);
-    let (mut positive, negative, skipped) = user.get_ratings(ctx).await?;
+    let (mut positive, mut negative, mut skipped) = user.get_ratings(ctx).await?;
 
     if let Some(pid) = party_id {
-        let picks = user.get_party_picks(ctx, pid).await?;
-        for p in picks {
-            if !positive.contains(&p) {
-                positive.push(p);
+        // We must pull ALL picks for this user in this party (not just positive ones)
+        // to correctly exclude movies they've seen during this party session.
+        let party_picks = ctx.db().get_party_picks(pid).await?;
+
+        for (uid, movie_id, liked) in party_picks {
+            if uid == user_id {
+                match liked {
+                    Some(true) => {
+                        if !positive.contains(&movie_id) {
+                            positive.push(movie_id);
+                        }
+                    }
+                    Some(false) => {
+                        if !negative.contains(&movie_id) {
+                            negative.push(movie_id);
+                        }
+                    }
+                    None => {
+                        if !skipped.contains(&movie_id) {
+                            skipped.push(movie_id);
+                        }
+                    }
+                }
             }
         }
     }
@@ -75,16 +98,9 @@ async fn fetch_user_taste(
 fn build_recommendation_filter(
     prefs: &cinematch_common::models::FullUserPreferences,
     genre_map: &std::collections::HashMap<String, Uuid>,
-    positive: &[i64],
-    negative: &[i64],
-    skipped: &[i64],
+    excluded: &[i64],
 ) -> Option<Filter> {
     let base_filter = crate::utils::filter_from_prefs(prefs, genre_map);
-
-    let mut excluded = Vec::new();
-    excluded.extend_from_slice(positive);
-    excluded.extend_from_slice(negative);
-    excluded.extend_from_slice(skipped);
 
     if excluded.is_empty() {
         return base_filter;

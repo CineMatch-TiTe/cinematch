@@ -1,6 +1,6 @@
 import { useState, useTransition, useEffect, useRef, useCallback } from 'react'
 import { toast } from 'sonner'
-import { getMoviesByIdsAction, getPartyVotesAction, voteMovieAction } from '@/actions/party-room'
+import { getMoviesByIdsAction, getPartyVotesAction, voteMovieAction, setReadyAction } from '@/actions/party-room'
 import { MovieResponse } from '@/model'
 
 export function useVoting(partyId: string) {
@@ -9,7 +9,7 @@ export function useVoting(partyId: string) {
   const [loading, setLoading] = useState(true)
   const [countdown, setCountdown] = useState(5)
   const [showContent, setShowContent] = useState(false)
-  const [transitionData, setTransitionData] = useState<{ round: number } | null>(null)
+  const [transitionData, setTransitionData] = useState<{ round: number; restart?: boolean } | null>(null)
   const [, startTransition] = useTransition()
 
   // Track displayed movie IDs to detect changes without dependencies
@@ -32,7 +32,8 @@ export function useVoting(partyId: string) {
   const handleBallotChange = useCallback(
     async (newMovieIds: number[], nextRound: number) => {
       if (transitionData) return
-      setTransitionData({ round: nextRound })
+      const isRestart = votingRound === 2 && nextRound === 1
+      setTransitionData({ round: nextRound, restart: isRestart })
       displayedMovieIds.current = newMovieIds
 
       const moviesPromise =
@@ -92,7 +93,7 @@ export function useVoting(partyId: string) {
 
         const hasChanged =
           newMovieIds.length !== currentIds.length ||
-          !newMovieIds.every((id) => currentIds.includes(id))
+          !newMovieIds.every((id: number) => currentIds.includes(id))
 
         if (hasChanged) {
           const newRound = result.data.voting_round ?? votingRound ?? 1
@@ -122,12 +123,19 @@ export function useVoting(partyId: string) {
 
         const hasChanged =
           newMovieIds.length !== currentIds.length ||
-          !newMovieIds.every((id) => currentIds.includes(id))
+          !newMovieIds.every((id: number) => currentIds.includes(id))
 
         if (hasChanged) {
           handleBallotChange(newMovieIds, newRound)
         }
       }
+    }
+  }
+
+  const handleReady = async (isReady: boolean) => {
+    const result = await setReadyAction(partyId, isReady)
+    if (result.error) {
+      toast.error(result.error)
     }
   }
 
@@ -138,6 +146,7 @@ export function useVoting(partyId: string) {
     countdown,
     showContent,
     transitionData,
-    handleVote
+    handleVote,
+    handleReady
   }
 }

@@ -1,7 +1,8 @@
 'use server'
 
 import { redirect } from 'next/navigation'
-import { createParty, joinParty } from '@/server/party/party'
+import { createParty } from '@/server/party/party'
+import { joinParty } from '@/server/member-ops/member-ops'
 
 function isRedirectError(error: unknown) {
   return (
@@ -35,9 +36,9 @@ export async function createPartyInstantAction() {
 
       // Actually, commonly `createParty` returns the join code.
       // Let's try to get the party details to get the ID.
-      const partyRes = await import('@/server/party/party').then((mod) => mod.getMyParty())
+      const partyRes = await import('@/server/party/party').then((mod) => mod.getParty({}))
       if (partyRes.status === 200 && partyRes.data?.id) {
-        redirect(`/party-room/${partyRes.data.id}`)
+        redirect(`/party-room?id=${partyRes.data.id}`)
       }
     }
 
@@ -54,12 +55,12 @@ export async function createPartyInstantAction() {
 export async function joinPartyInstantAction(code: string) {
   if (!code) return { error: 'Code is required' }
   try {
-    const response = await joinParty(code)
+    const response = await joinParty({ code })
     if (response.status === 200) {
       // Joined successfully. Now get party ID.
-      const partyRes = await import('@/server/party/party').then((mod) => mod.getMyParty())
+      const partyRes = await import('@/server/party/party').then((mod) => mod.getParty({}))
       if (partyRes.status === 200 && partyRes.data?.id) {
-        redirect(`/party-room/${partyRes.data.id}`)
+        redirect(`/party-room?id=${partyRes.data.id}`)
       }
     } else if (response.status === 404) {
       return { error: 'Party not found' }
@@ -77,9 +78,9 @@ export async function joinPartyInstantAction(code: string) {
 }
 
 export async function getPersonalRecommendationsAction() {
-  const { getRecommendations } = await import('@/server/movie/movie')
+  const { getRecommendations } = await import('@/server/recommendation/recommendation')
   try {
-    const response = await getRecommendations()
+    const response = await getRecommendations({})
     if (response.status === 200 && response.data?.recommended_movies) {
       return { data: response.data.recommended_movies }
     }
@@ -93,7 +94,7 @@ export async function getPersonalRecommendationsAction() {
 export async function updatePersonalTasteAction(movieId: number, liked: boolean | null) {
   const { updateTaste } = await import('@/server/user/user')
   try {
-    const response = await updateTaste(movieId, { liked })
+    const response = await updateTaste({ movie_id: movieId, liked: liked !== null ? liked : undefined })
     if (response.status !== 200) {
       return { error: 'Failed to update taste' }
     }
