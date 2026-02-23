@@ -1,16 +1,28 @@
 import { redirect } from 'next/navigation'
-import { getParty, getPartyMembers } from '@/server/party/party'
+import { getParty } from '@/server/party/party'
+import { getPartyMembers } from '@/server/member-ops/member-ops'
 import { getCurrentUser } from '@/server/user/user'
+import { getMyPartyIdAction } from '@/actions/party-room'
 import PartyViewClient from '@/components/party/PartyViewClient'
 
-export default async function PartyRoom({ params }: Readonly<{ params: Promise<{ id: string }> }>) {
-  const { id: partyId } = await params
+export default async function PartyRoom({ searchParams }: Readonly<{ searchParams: Promise<{ id?: string }> }>) {
+  const resolvedParams = await searchParams
+  const partyId = resolvedParams.id
+
+  if (!partyId) {
+    const res = await getMyPartyIdAction()
+    if ('id' in res && res.id) {
+      redirect(`/party-room?id=${res.id}`)
+    } else {
+      redirect('/dashboard')
+    }
+  }
 
   // Parallel data fetching
   const [userRes, partyRes, membersRes] = await Promise.all([
     getCurrentUser(),
-    getParty(partyId),
-    getPartyMembers(partyId)
+    getParty({ party_id: partyId }),
+    getPartyMembers({ party_id: partyId })
   ])
 
   // Type safety checks (Orval returns { status, data })
@@ -20,7 +32,7 @@ export default async function PartyRoom({ params }: Readonly<{ params: Promise<{
 
   if (!currentUser || !party) {
     if (currentUser) {
-      redirect('/api/logout')
+      redirect('/dashboard')
     }
 
     redirect('/')

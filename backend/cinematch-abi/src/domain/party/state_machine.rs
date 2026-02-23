@@ -139,17 +139,38 @@ impl PartyStateMachine for Party {
                 do_review_to_created(ctx, self).await?;
                 Some(PartyState::Created)
             }
+            PartyState::Voting => {
+                let t = run_end_voting_internal(ctx, self, false).await?;
+                match &t {
+                    EndVotingTransition::Round2Started => {
+                        ctx.broadcast_party(
+                            self.id,
+                            &ServerMessage::VotingRoundStarted(VotingRoundStarted { round: 2 }),
+                            None,
+                        );
+                        Some(PartyState::Voting) // Still in Voting state, just round 2
+                    }
+                    EndVotingTransition::PhaseChanged(s) => {
+                        // Let the catch-all below broadcast the PhaseChanged event
+                        Some(*s)
+                    }
+                }
+            }
             _ => None,
         };
 
         if let Some(s) = new_state {
-            let msg = PartyStateChanged {
-                state: s.into(),
-                deadline_at: None,
-                timeout_reason: None,
-            };
-            ctx.broadcast_party(self.id, &ServerMessage::PartyStateChanged(msg), None);
-            debug!("Party {} auto-advanced (all ready) -> {:?}", self.id, s);
+            if state != PartyState::Voting || s != PartyState::Voting {
+                let msg = PartyStateChanged {
+                    state: s.into(),
+                    deadline_at: None,
+                    timeout_reason: None,
+                };
+                ctx.broadcast_party(self.id, &ServerMessage::PartyStateChanged(msg), None);
+                debug!("Party {} auto-advanced (all ready) -> {:?}", self.id, s);
+            } else {
+                debug!("Party {} auto-advanced voting round (all ready)", self.id);
+            }
         }
         Ok(new_state)
     }
@@ -454,15 +475,16 @@ async fn handle_round2_end(
 
     let total_likes: u32 = vote_map.values().map(|(l, _)| *l).sum();
     let fifty_pct = total_likes / 2;
-    let has_majority = total_likes > 0 && winner_likes >= fifty_pct;
+    // Strict majority required to win (> 50%)
+    let has_majority = total_likes > 0 && winner_likes > fifty_pct;
 
     if has_majority {
         return select_winner(ctx, party, winner_id).await;
     }
 
-    // No majority - record votes as taste and restart picking
+    // No majority - record votes as taste and restart round 1 voting
     record_votes_as_taste(ctx, party).await?;
-    restart_picking(ctx, party).await
+    restart_voting(ctx, party).await
 }
 
 /// Select a winner and move to Watching state.
@@ -537,4 +559,37 @@ async fn restart_picking(
     let _ = party.set_voting_round(ctx, None).await;
 
     Ok(EndVotingTransition::PhaseChanged(PartyState::Picking))
+}
+
+/// Restart voting by regenerating round 1 ballots.
+async fn restart_voting(
+    ctx: &impl AppContext,
+    party: &Party,
+) -> Result<EndVotingTransition, DomainError> {
+    party
+        .set_phase(ctx, PartyState::Voting)
+        .await
+        .map_err(|e| {
+            error!("Failed to maintain Voting state: {}", e);
+            DomainError::Internal("Failed to maintain Voting state".into())
+        })?;
+
+    cinematch_recommendation_engine::build_voting_ballots_for_party(ctx, party)
+        .await
+        .map_err(|e| {
+            error!("Failed to rebuild voting ballots: {}", e);
+            DomainError::Internal("Failed to rebuild voting ballots".into())
+        })?;
+
+    party.enable_voting(ctx).await.map_err(|e| {
+        error!("Failed to re-enable voting: {}", e);
+        DomainError::Internal("Failed to re-enable voting".into())
+    })?;
+
+    party.set_voting_round(ctx, Some(1)).await.map_err(|e| {
+        error!("Failed to reset voting round to 1: {}", e);
+        DomainError::Internal("Failed to reset voting round".into())
+    })?;
+
+    Ok(EndVotingTransition::PhaseChanged(PartyState::Voting))
 }

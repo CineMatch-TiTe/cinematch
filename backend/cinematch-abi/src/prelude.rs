@@ -15,5 +15,5 @@ pub use cinematch_db::prelude::*;
 // Extension traits for business logic
 pub use crate::domain::{
     DomainError, EndVotingTransition, PartyAdvanceOutcome, PartyCrud, PartyLogic,
-    PartyStateMachine, PartyValidation, UserLogic, get_timeout_secs,
+    PartyStateMachine, PartyValidation, UserLogic,
 };

@@ -6,7 +6,7 @@ use cinematch_common::models::ErrorResponse;
 
 use actix_identity::Identity;
 use actix_web::{HttpResponse, get, post, web};
-use cinematch_abi::domain::{PartyValidation, UserLogic, get_timeout_secs};
+use cinematch_abi::domain::{PartyValidation, UserLogic};
 use cinematch_db::domain::{Party, User};
 use log::debug;
 
@@ -73,7 +73,7 @@ pub async fn get_party(
     query: web::Query<super::OptionalIdParam>,
 ) -> Result<web::Json<super::PartyResponse>, ApiError> {
     let user_id = extract_user_id(user)?;
-    let party_id = match query.id {
+    let party_id = match query.party_id {
         Some(id) => id,
         None => {
             let user_obj = User::from_id(&ctx, user_id).await?;
@@ -100,7 +100,13 @@ pub async fn get_party(
     } else {
         None
     };
-    let (voting_timeout_secs, watching_timeout_secs) = get_timeout_secs();
+    let timeouts = &cinematch_common::Config::get().timeouts;
+    let watching_timeout_secs = timeouts.watching_timeout_secs;
+    let voting_timeout_secs = if party_obj.voting_round(&ctx).await.unwrap_or(Some(1)) == Some(2) {
+        timeouts.voting_r2_timeout_secs
+    } else {
+        timeouts.voting_r1_timeout_secs
+    };
 
     let response = super::PartyResponse {
         id: party_obj.id,

@@ -272,13 +272,24 @@ impl Database {
     }
 
     /// Movie IDs by popularity desc, for ballot fallback when picks are insufficient.
-    pub(crate) async fn get_popular_movie_ids(&self, limit: i64) -> DbResult<Vec<i64>> {
+    pub(crate) async fn get_popular_movie_ids(
+        &self,
+        limit: i64,
+        excluded_ids: Option<&[i64]>,
+    ) -> DbResult<Vec<i64>> {
         use crate::schema::movies;
         use diesel::prelude::*;
         use diesel_async::RunQueryDsl;
 
         let mut conn = self.conn().await?;
-        let ids = movies::table
+        let mut query = movies::table.into_boxed();
+
+        if let Some(ids) = excluded_ids.filter(|s| !s.is_empty()) {
+            use diesel::dsl::not;
+            query = query.filter(not(movies::movie_id.eq_any(ids)));
+        }
+
+        let ids = query
             .order(movies::popularity.desc())
             .limit(limit)
             .select(movies::movie_id)
@@ -288,14 +299,25 @@ impl Database {
         Ok(ids)
     }
 
-    pub(crate) async fn get_popular_movies(&self, limit: i64) -> DbResult<Vec<MovieData>> {
+    pub(crate) async fn get_popular_movies(
+        &self,
+        limit: i64,
+        excluded_ids: Option<&[i64]>,
+    ) -> DbResult<Vec<MovieData>> {
         use crate::schema::movies;
         use diesel::prelude::*;
         use diesel_async::RunQueryDsl;
 
         let mut conn = self.conn().await?;
 
-        let movie_rows: Vec<Movie> = movies::table
+        let mut query = movies::table.into_boxed();
+
+        if let Some(ids) = excluded_ids.filter(|s| !s.is_empty()) {
+            use diesel::dsl::not;
+            query = query.filter(not(movies::movie_id.eq_any(ids)));
+        }
+
+        let movie_rows: Vec<Movie> = query
             .order(movies::popularity.desc())
             .limit(limit)
             .load::<Movie>(&mut conn)

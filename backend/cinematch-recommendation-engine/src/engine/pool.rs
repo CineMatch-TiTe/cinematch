@@ -86,7 +86,7 @@ async fn determine_seed_ids(
 ) -> DbResult<Vec<PointId>> {
     let mut seeds = positive.to_vec();
     if seeds.is_empty() {
-        let popular = Movie::popular(ctx, 5).await?;
+        let popular = Movie::popular(ctx, 5, None).await?;
         seeds = popular.into_iter().map(|m| m.movie_id).collect();
     }
 

@@ -17,7 +17,7 @@ export default defineConfig({
       },
     },
     input: {
-      target: 'https://api.cinematch.space/api-docs/openapi.json',
+      target: 'http://localhost:8085/api-docs/openapi.json',
     },
   },
 });

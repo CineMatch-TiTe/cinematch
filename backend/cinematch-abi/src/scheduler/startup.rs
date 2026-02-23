@@ -5,7 +5,6 @@ use std::sync::Arc;
 use chrono::Utc;
 use log::{debug, error, info};
 
-use crate::domain::get_timeout_secs;
 use cinematch_db::domain::Party;
 use cinematch_db::repo::party::models::PartyState;
 
@@ -22,12 +21,15 @@ pub async fn reschedule_timeouts_on_startup<C: AppContext + Clone + 'static>(
     registry: &Arc<Scheduler>,
     ctx: C,
 ) {
-    let (voting_secs, watching_secs) = get_timeout_secs();
+    let timeouts = &cinematch_common::Config::get().timeouts;
+    let voting_r1_secs = timeouts.voting_r1_timeout_secs;
+    let voting_r2_secs = timeouts.voting_r2_timeout_secs;
+    let watching_secs = timeouts.watching_timeout_secs;
     let now = Utc::now();
 
     info!(
-        "[Scheduler] Rescheduling timeouts on startup (voting={}s, watching={}s)",
-        voting_secs, watching_secs
+        "[Scheduler] Rescheduling timeouts on startup (voting_r1={}s, voting_r2={}s, watching={}s)",
+        voting_r1_secs, voting_r2_secs, watching_secs
     );
 
     // Reschedule phase timeouts (Voting/Watching)
@@ -35,7 +37,18 @@ pub async fn reschedule_timeouts_on_startup<C: AppContext + Clone + 'static>(
         Ok(parties) => {
             for (party_id, state, phase_entered_at) in parties {
                 let timeout_secs = match state {
-                    PartyState::Voting => voting_secs,
+                    PartyState::Voting => {
+                        if let Ok(party) = Party::from_id(&ctx, party_id).await {
+                            let round = party.voting_round(&ctx).await.unwrap_or(Some(1));
+                            if round == Some(2) {
+                                voting_r2_secs
+                            } else {
+                                voting_r1_secs
+                            }
+                        } else {
+                            voting_r1_secs
+                        }
+                    }
                     PartyState::Watching => watching_secs,
                     _ => continue,
                 };

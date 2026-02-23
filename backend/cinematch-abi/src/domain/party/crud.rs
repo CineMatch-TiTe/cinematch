@@ -71,7 +71,7 @@ pub trait PartyCrud: PartyValidation {
         ctx: &impl AppContext,
         user_id: Uuid,
         movie_id: i64,
-        liked: bool,
+        liked: Option<bool>,
     ) -> Result<(), DomainError>;
 
     /// Remove a pick.
@@ -135,11 +135,40 @@ impl PartyCrud for Party {
         user_id: Uuid,
     ) -> Result<(), DomainError> {
         self.require_member(ctx, user_id).await?;
+
+        // Check if the user leaving is the current leader
+        let is_leader = self.leader_id(ctx).await? == user_id;
+
         self.remove_member(ctx, user_id)
             .await
             .map_err(DomainError::from)?;
 
         ctx.broadcast_party(self.id, &ServerMessage::PartyMemberLeft(user_id), None);
+
+        // Auto-promote the oldest remaining member if the leader left
+        if is_leader {
+            let mut members = self.member_records(ctx).await.unwrap_or_default();
+            if !members.is_empty() {
+                // Sort by joined_at ascending to find the oldest member
+                members.sort_by_key(|m| m.joined_at);
+                let new_leader_id = members[0].user_id;
+
+                if let Err(e) = self.transfer_leadership(ctx, new_leader_id).await {
+                    error!("Failed to auto-promote new leader {}: {}", new_leader_id, e);
+                } else {
+                    ctx.broadcast_party(
+                        self.id,
+                        &ServerMessage::PartyLeaderChanged(new_leader_id),
+                        None,
+                    );
+                }
+            } else {
+                // No members left, disband the party
+                if let Err(e) = self.disband(ctx).await {
+                    error!("Failed to auto-disband empty party {}: {}", self.id, e);
+                }
+            }
+        }
 
         Ok(())
     }
@@ -241,10 +270,10 @@ impl PartyCrud for Party {
         ctx: &impl AppContext,
         user_id: Uuid,
         movie_id: i64,
-        liked: bool,
+        liked: Option<bool>,
     ) -> Result<(), DomainError> {
         self.require_member(ctx, user_id).await?;
-        self.add_pick(ctx, user_id, movie_id, Some(liked))
+        self.add_pick(ctx, user_id, movie_id, liked)
             .await
             .map_err(DomainError::from)
     }

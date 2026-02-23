@@ -30,7 +30,7 @@ pub use cinematch_db::domain::User;
 pub use error::DomainError;
 pub use party::{
     EndVotingTransition, PartyAdvanceOutcome, PartyCrud, PartyJoin, PartyLogic, PartyStateMachine,
-    PartyValidation, utils::get_timeout_secs,
+    PartyValidation,
 };
 pub use recommendation::Recommendation;
 pub use user::{UserCreation, UserLogic};

@@ -122,7 +122,7 @@ impl Database {
     }
 
     /// List party picks for ballot building: (user_id, movie_id, liked) for all members.
-    pub(crate) async fn get_party_picks(
+    pub async fn get_party_picks(
         &self,
         party_id: Uuid,
     ) -> DbResult<Vec<(Uuid, i64, Option<bool>)>> {

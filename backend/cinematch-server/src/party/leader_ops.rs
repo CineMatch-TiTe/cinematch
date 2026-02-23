@@ -35,7 +35,7 @@ pub async fn advance_phase(
     party_query: web::Query<OptionalIdParam>,
 ) -> Result<HttpResponse, ApiError> {
     let leader_id = extract_user_id(user)?;
-    let party_id = match party_query.id {
+    let party_id = match party_query.party_id {
         Some(id) => id,
         None => {
             let user_obj = User::from_id(&ctx, leader_id).await?;
@@ -91,7 +91,7 @@ pub async fn disband_party(
     party_query: web::Query<OptionalIdParam>,
 ) -> Result<HttpResponse, ApiError> {
     let user_id = extract_user_id(user)?;
-    let party_id = match party_query.id {
+    let party_id = match party_query.party_id {
         Some(id) => id,
         None => {
             let user_obj = User::from_id(&ctx, user_id).await?;
@@ -133,7 +133,7 @@ pub async fn kick_member(
 ) -> Result<HttpResponse, ApiError> {
     let requester_id = extract_user_id(user)?;
     let target_user_id = kick_query.target_user_id;
-    let party_id = match party_query.id {
+    let party_id = match party_query.party_id {
         Some(id) => id,
         None => {
             let user_obj = User::from_id(&ctx, requester_id).await?;
@@ -176,7 +176,7 @@ pub async fn transfer_leadership(
 ) -> Result<HttpResponse, ApiError> {
     let requester_id = extract_user_id(user)?;
     let new_leader_id = transfer_query.new_leader_id;
-    let party_id = match party_query.id {
+    let party_id = match party_query.party_id {
         Some(id) => id,
         None => {
             let user_obj = User::from_id(&ctx, requester_id).await?;

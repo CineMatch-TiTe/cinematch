@@ -23,11 +23,6 @@ use cinematch_db::repo::party::models::PartyState;
 
 pub use startup::reschedule_timeouts_on_startup;
 
-/// Get ready countdown duration from config (LazyLock, read once from env).
-pub fn get_ready_countdown_secs() -> f32 {
-    cinematch_common::Config::get().ready_countdown_secs
-}
-
 /// Registry managing timeout tasks per party.
 /// Each party has at most one active timeout (phase timeout or ready countdown).
 pub struct Scheduler {
@@ -117,7 +112,9 @@ impl Scheduler {
     ) {
         self.cancel(party_id).await;
 
-        let countdown_secs = get_ready_countdown_secs();
+        let countdown_secs = cinematch_common::Config::get()
+            .timeouts
+            .ready_countdown_secs;
         let deadline_at =
             Utc::now() + chrono::Duration::milliseconds((countdown_secs * 1000.0) as i64);
 
@@ -135,7 +132,6 @@ impl Scheduler {
 
         let timeout_registry = Arc::clone(self);
         let ctx_clone = ctx.clone();
-        let ctx_for_broadcast = ctx.clone();
 
         let handle = rt::spawn(async move {
             debug!(
@@ -153,22 +149,12 @@ impl Scheduler {
         // Broadcast countdown start
         let msg = ServerMessage::PartyTimeoutUpdate(PartyTimeoutUpdate {
             phase_entered_at: None,
-            voting_timeout_secs: None,
-            watching_timeout_secs: None,
+            timeout_secs: None,
             deadline_at: Some(deadline_at),
             reason: Some(TimeoutReason::AllReady),
         });
 
-        let party = Party::new(party_id);
-        let member_ids = match party.member_ids(&ctx_for_broadcast).await {
-            Ok(ids) => ids,
-            Err(e) => {
-                debug!("Failed to get party members for timeout broadcast: {}", e);
-                vec![]
-            }
-        };
-
-        ctx.send_users(&member_ids, &msg);
+        ctx.broadcast_party(party_id, &msg, None);
 
         self.tasks
             .write()
@@ -181,21 +167,12 @@ impl Scheduler {
         self.cancel(party_id).await;
         let msg = ServerMessage::PartyTimeoutUpdate(PartyTimeoutUpdate {
             phase_entered_at: None,
-            voting_timeout_secs: None,
-            watching_timeout_secs: None,
+            timeout_secs: None,
             deadline_at: None,
             reason: None,
         });
 
-        let party = Party::new(party_id);
-        let member_ids = match party.member_ids(ctx).await {
-            Ok(ids) => ids,
-            Err(e) => {
-                debug!("Failed to get party members for timeout broadcast: {}", e);
-                vec![]
-            }
-        };
-        ctx.send_users(&member_ids, &msg);
+        ctx.broadcast_party(party_id, &msg, None);
     }
 
     /// Enforce phase-specific timeout and broadcast to clients.
@@ -205,13 +182,11 @@ impl Scheduler {
         party_id: Uuid,
         ctx: C,
     ) {
-        use crate::domain::get_timeout_secs;
-
         let party = match Party::from_id(&ctx, party_id).await {
             Ok(p) => p,
             Err(e) => {
                 log::error!(
-                    "[Scheduler] verify_phase_timeout: failed to get party {}: {:?}",
+                    "[Scheduler] enforce_phase_timeout: party {} not found: {:?}",
                     party_id,
                     e
                 );
@@ -219,65 +194,53 @@ impl Scheduler {
             }
         };
 
-        let (voting_secs, watching_secs) = get_timeout_secs();
+        let timeouts = &cinematch_common::Config::get().timeouts;
         let state = party.state(&ctx).await.unwrap_or(PartyState::Disbanded);
         let phase_entered_at = party.phase_entered_at(&ctx).await.unwrap_or(Utc::now());
 
-        let (timeout_update, deadline_opt) = match state {
-            PartyState::Voting | PartyState::Watching => {
-                let timeout_secs = match state {
-                    PartyState::Voting => voting_secs,
-                    PartyState::Watching => watching_secs,
-                    _ => 0,
-                };
-                let deadline_at = phase_entered_at + chrono::Duration::seconds(timeout_secs as i64);
-
-                (
-                    PartyTimeoutUpdate {
-                        phase_entered_at: Some(phase_entered_at),
-                        voting_timeout_secs: Some(voting_secs),
-                        watching_timeout_secs: Some(watching_secs),
-                        deadline_at: Some(deadline_at),
-                        reason: Some(TimeoutReason::PhaseTimeout),
-                    },
-                    Some(deadline_at),
-                )
+        let timeout_secs = match state {
+            PartyState::Voting => {
+                let round = party.voting_round(&ctx).await.unwrap_or(Some(1));
+                if round == Some(2) {
+                    timeouts.voting_r2_timeout_secs
+                } else {
+                    timeouts.voting_r1_timeout_secs
+                }
             }
+            PartyState::Watching => timeouts.watching_timeout_secs,
             _ => {
-                // No active timeout for other phases
-                (
-                    PartyTimeoutUpdate {
+                // Non-timed phase — broadcast config snapshot only, no deadline
+                ctx.broadcast_party(
+                    party_id,
+                    &ServerMessage::PartyTimeoutUpdate(PartyTimeoutUpdate {
                         phase_entered_at: None,
-                        voting_timeout_secs: Some(voting_secs),
-                        watching_timeout_secs: Some(watching_secs),
+                        timeout_secs: None,
                         deadline_at: None,
                         reason: None,
-                    },
+                    }),
                     None,
-                )
-            }
-        };
-
-        // Schedule the timeout in the scheduler
-        if let Some(deadline) = deadline_opt {
-            self.schedule_phase_timeout(party.id, state, deadline, ctx.clone())
-                .await;
-        }
-
-        // Broadcast to party members
-        let msg = ServerMessage::PartyTimeoutUpdate(timeout_update);
-        let member_ids = match party.member_ids(&ctx).await {
-            Ok(ids) => ids,
-            Err(e) => {
-                log::error!(
-                    "[Scheduler] verify_phase_timeout: failed to get members for party {}: {:?}",
-                    party_id,
-                    e
                 );
                 return;
             }
         };
-        ctx.send_users(&member_ids, &msg);
+
+        let deadline_at = phase_entered_at + chrono::Duration::seconds(timeout_secs as i64);
+
+        // Schedule backend timeout
+        self.schedule_phase_timeout(party.id, state, deadline_at, ctx.clone())
+            .await;
+
+        // Broadcast to party
+        ctx.broadcast_party(
+            party_id,
+            &ServerMessage::PartyTimeoutUpdate(PartyTimeoutUpdate {
+                phase_entered_at: Some(phase_entered_at),
+                timeout_secs: Some(timeout_secs),
+                deadline_at: Some(deadline_at),
+                reason: Some(TimeoutReason::PhaseTimeout),
+            }),
+            None,
+        );
     }
 
     /// Remove task from internal map (called when timeout executes).

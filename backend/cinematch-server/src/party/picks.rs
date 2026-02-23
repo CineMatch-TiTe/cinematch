@@ -28,7 +28,7 @@ pub async fn get_picks(
     party_query: web::Query<OptionalIdParam>,
 ) -> Result<web::Json<super::GetPicksResponse>, ApiError> {
     let user_id = extract_user_id(user)?;
-    let party_id = match party_query.id {
+    let party_id = match party_query.party_id {
         Some(id) => id,
         None => {
             let user_obj = User::from_id(&ctx, user_id).await?;
@@ -71,10 +71,8 @@ pub async fn pick_movie(
 ) -> Result<HttpResponse, ApiError> {
     let user_id = extract_user_id(user)?;
     let movie_id = query.movie_id;
-    let liked = query
-        .liked
-        .ok_or_else(|| ApiError::BadRequest("liked is required for party picks".to_string()))?;
-    let party_id = match party_query.id {
+    let liked = query.liked;
+    let party_id = match party_query.party_id {
         Some(id) => id,
         None => {
             let user_obj = User::from_id(&ctx, user_id).await?;
@@ -118,7 +116,7 @@ pub async fn delete_pick(
 ) -> Result<HttpResponse, ApiError> {
     let user_id = extract_user_id(user)?;
     let movie_id = query.movie_id;
-    let party_id = match party_query.id {
+    let party_id = match party_query.party_id {
         Some(id) => id,
         None => {
             let user_obj = User::from_id(&ctx, user_id).await?;

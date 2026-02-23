@@ -41,13 +41,21 @@ impl Movie {
     }
 
     /// Get popular movie IDs.
-    pub async fn popular_ids(ctx: &impl AppContext, limit: i64) -> DbResult<Vec<i64>> {
-        ctx.db().get_popular_movie_ids(limit).await
+    pub async fn popular_ids(
+        ctx: &impl AppContext,
+        limit: i64,
+        excluded_ids: Option<&[i64]>,
+    ) -> DbResult<Vec<i64>> {
+        ctx.db().get_popular_movie_ids(limit, excluded_ids).await
     }
 
     /// Get popular movies with full data.
-    pub async fn popular(ctx: &impl AppContext, limit: i64) -> DbResult<Vec<MovieData>> {
-        ctx.db().get_popular_movies(limit).await
+    pub async fn popular(
+        ctx: &impl AppContext,
+        limit: i64,
+        excluded_ids: Option<&[i64]>,
+    ) -> DbResult<Vec<MovieData>> {
+        ctx.db().get_popular_movies(limit, excluded_ids).await
     }
 
     /// Search movies by name.

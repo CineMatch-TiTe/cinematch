@@ -5,7 +5,7 @@
 
 mod crud;
 mod state_machine;
-pub mod utils;
+
 mod validation;
 
 use cinematch_db::PartyState;

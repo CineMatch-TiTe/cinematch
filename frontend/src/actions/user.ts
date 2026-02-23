@@ -7,7 +7,7 @@ import {
   renameUser,
   editUserPreferences
 } from '@/server/user/user'
-import { RenameUserRequest } from '@/model/renameUserRequest'
+
 import { UpdateUserPreferencesRequest } from '@/model/updateUserPreferencesRequest'
 
 export async function getCurrentUserAction() {
@@ -57,14 +57,10 @@ export async function renameUserAction(
       return { error: 'Username must be less than 32 characters' }
     }
 
-    const data: RenameUserRequest = {
-      new_username: rawUsername
-    }
-
-    const response = await renameUser(userId, data)
+    const response = await renameUser({ name: rawUsername })
     if (response.status === 200) {
       revalidatePath('/dashboard')
-      revalidatePath(`/party-room/[id]`, 'page')
+      revalidatePath(`/party-room`, 'page')
       return { success: true }
     }
     return { error: 'Failed to rename user' }

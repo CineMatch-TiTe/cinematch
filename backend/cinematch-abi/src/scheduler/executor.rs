@@ -5,7 +5,7 @@ use log::{debug, error, info, warn};
 use std::sync::Arc;
 use uuid::Uuid;
 
-use crate::domain::{EndVotingTransition, PartyStateMachine, get_timeout_secs};
+use crate::domain::{EndVotingTransition, PartyStateMachine};
 use cinematch_common::models::websocket::{PartyStateChanged, ServerMessage, TimeoutReason};
 use cinematch_db::AppContext;
 use cinematch_db::domain::Party;
@@ -60,7 +60,7 @@ pub async fn execute_phase_timeout<C: AppContext + Clone + 'static>(
     // Execute phase-specific timeout
     match expected_phase {
         PartyState::Voting => {
-            execute_voting_timeout(&party, party_id, ctx.clone()).await;
+            execute_voting_timeout(registry, &party, party_id, ctx.clone()).await;
         }
         PartyState::Watching => {
             execute_watching_timeout(&party, party_id, ctx.clone()).await;
@@ -74,7 +74,12 @@ pub async fn execute_phase_timeout<C: AppContext + Clone + 'static>(
     }
 }
 
-async fn execute_voting_timeout<C: AppContext>(party: &Party, party_id: Uuid, ctx: C) {
+async fn execute_voting_timeout<C: AppContext + Clone + 'static>(
+    registry: &Arc<Scheduler>,
+    party: &Party,
+    party_id: Uuid,
+    ctx: C,
+) {
     info!(
         "[Scheduler] Executing voting timeout for party {}",
         party_id
@@ -85,7 +90,9 @@ async fn execute_voting_timeout<C: AppContext>(party: &Party, party_id: Uuid, ct
             let (new_state, deadline_at, reason) = match &transition {
                 EndVotingTransition::Round2Started => {
                     // Round 2: same phase, new deadline
-                    let (voting_secs, _) = get_timeout_secs();
+                    let voting_secs = cinematch_common::Config::get()
+                        .timeouts
+                        .voting_r2_timeout_secs;
                     let deadline = Utc::now() + chrono::Duration::seconds(voting_secs as i64);
                     (
                         PartyState::Voting,
@@ -95,8 +102,29 @@ async fn execute_voting_timeout<C: AppContext>(party: &Party, party_id: Uuid, ct
                 }
                 EndVotingTransition::PhaseChanged(new_phase) => match new_phase {
                     PartyState::Watching => {
-                        let (_, watching_secs) = get_timeout_secs();
+                        let watching_secs = cinematch_common::Config::get()
+                            .timeouts
+                            .watching_timeout_secs;
                         let deadline = Utc::now() + chrono::Duration::seconds(watching_secs as i64);
+                        (
+                            *new_phase,
+                            Some(deadline),
+                            Some(TimeoutReason::PhaseTimeout),
+                        )
+                    }
+                    PartyState::Voting => {
+                        // R2 ended without majority → restarted as R1
+                        let round = party.voting_round(&ctx).await.unwrap_or(Some(1));
+                        let voting_secs = if round == Some(2) {
+                            cinematch_common::Config::get()
+                                .timeouts
+                                .voting_r2_timeout_secs
+                        } else {
+                            cinematch_common::Config::get()
+                                .timeouts
+                                .voting_r1_timeout_secs
+                        };
+                        let deadline = Utc::now() + chrono::Duration::seconds(voting_secs as i64);
                         (
                             *new_phase,
                             Some(deadline),
@@ -125,8 +153,12 @@ async fn execute_voting_timeout<C: AppContext>(party: &Party, party_id: Uuid, ct
                 None,
             );
 
-            // Note: Rescheduling next timeout for Round2 or Watching is handled
-            // by the domain layer via broadcast_party_timeout after transition.
+            // Schedule timeout for the new phase if applicable
+            if let Some(deadline) = deadline_at {
+                registry
+                    .schedule_phase_timeout(party_id, new_state, deadline, ctx)
+                    .await;
+            }
         }
         Err(e) => {
             error!("Voting timeout failed for party {}: {:?}", party_id, e);
@@ -228,12 +260,24 @@ pub async fn execute_ready_countdown<C: AppContext + Clone + 'static>(
             // Calculate timeout for the new phase if applicable
             let (deadline_at, reason) = match new_phase {
                 PartyState::Voting => {
-                    let (voting_secs, _) = get_timeout_secs();
+                    // Check which voting round we just entered
+                    let round = party.voting_round(&ctx).await.unwrap_or(Some(1));
+                    let voting_secs = if round == Some(2) {
+                        cinematch_common::Config::get()
+                            .timeouts
+                            .voting_r2_timeout_secs
+                    } else {
+                        cinematch_common::Config::get()
+                            .timeouts
+                            .voting_r1_timeout_secs
+                    };
                     let deadline = Utc::now() + chrono::Duration::seconds(voting_secs as i64);
                     (Some(deadline), Some(TimeoutReason::PhaseTimeout))
                 }
                 PartyState::Watching => {
-                    let (_, watching_secs) = get_timeout_secs();
+                    let watching_secs = cinematch_common::Config::get()
+                        .timeouts
+                        .watching_timeout_secs;
                     let deadline = Utc::now() + chrono::Duration::seconds(watching_secs as i64);
                     (Some(deadline), Some(TimeoutReason::PhaseTimeout))
                 }

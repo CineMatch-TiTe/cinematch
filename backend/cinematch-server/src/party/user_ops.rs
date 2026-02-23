@@ -69,7 +69,7 @@ pub async fn leave_party(
     party_query: web::Query<OptionalIdParam>,
 ) -> Result<HttpResponse, ApiError> {
     let user_id = extract_user_id(user)?;
-    let party_id = match party_query.id {
+    let party_id = match party_query.party_id {
         Some(id) => id,
         None => {
             let user_obj = User::from_id(&ctx, user_id).await?;
@@ -107,7 +107,7 @@ pub async fn get_party_members(
     party_query: web::Query<OptionalIdParam>,
 ) -> Result<web::Json<PartyMembersResponse>, ApiError> {
     let user_id = extract_user_id(user)?;
-    let party_id = match party_query.id {
+    let party_id = match party_query.party_id {
         Some(id) => id,
         None => {
             let user_obj = User::from_id(&ctx, user_id).await?;
@@ -178,7 +178,7 @@ pub async fn set_ready(
 ) -> Result<web::Json<ReadyStateResponse>, ApiError> {
     let is_ready = ready_query.is_ready;
     let user_id = extract_user_id(user)?;
-    let party_id = match party_query.id {
+    let party_id = match party_query.party_id {
         Some(id) => id,
         None => {
             let user_obj = User::from_id(&ctx, user_id).await?;
