@@ -18,6 +18,7 @@ use async_trait::async_trait;
 /// Result of end-voting: either round 2 started (stay in Voting) or phase changed.
 #[derive(Debug, Clone)]
 pub enum EndVotingTransition {
+    Round1Started,
     Round2Started,
     PhaseChanged(PartyState),
 }

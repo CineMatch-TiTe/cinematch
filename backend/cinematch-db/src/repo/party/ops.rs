@@ -164,16 +164,22 @@ impl Database {
     /// Get a party by its join code (for joining)
     pub(crate) async fn get_party_by_code(&self, join_code: &str) -> DbResult<Option<Party>> {
         use schema::{parties, party_codes};
-
         let mut conn = self.conn().await?;
-        party_codes::table
-            .inner_join(parties::table)
-            .filter(party_codes::code.eq(join_code.to_uppercase()))
-            .select(Party::as_select())
-            .first(&mut conn)
+
+        let result = parties::table
+            .inner_join(party_codes::table)
+            .filter(party_codes::code.eq(join_code))
+            .filter(
+                parties::state
+                    .eq(PartyState::Created)
+                    .or(parties::state.eq(PartyState::Picking)),
+            )
+            .select(Party::as_returning())
+            .get_result(&mut conn)
             .await
-            .optional()
-            .map_err(DbError::from)
+            .optional()?;
+
+        Ok(result)
     }
 
     /// Delete a party's join code (e.g., when party moves past Created state)

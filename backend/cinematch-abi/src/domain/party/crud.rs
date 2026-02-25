@@ -110,6 +110,10 @@ pub trait PartyCrud: PartyValidation {
 
     /// Get voting round number.
     async fn voting_round(&self, ctx: &impl AppContext) -> Result<i32, DomainError>;
+
+    /// Get number of unique members who have voted in this round.
+    async fn voting_participation_count(&self, ctx: &impl AppContext)
+    -> Result<usize, DomainError>;
 }
 
 #[async_trait]
@@ -363,5 +367,14 @@ impl PartyCrud for Party {
 
     async fn voting_round(&self, _ctx: &impl AppContext) -> Result<i32, DomainError> {
         Ok(1)
+    }
+
+    async fn voting_participation_count(
+        &self,
+        ctx: &impl AppContext,
+    ) -> Result<usize, DomainError> {
+        self.get_voting_participation_count(ctx)
+            .await
+            .map_err(DomainError::from)
     }
 }

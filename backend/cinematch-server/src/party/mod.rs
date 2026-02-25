@@ -52,6 +52,8 @@ pub struct PartyResponse {
     pub voting_timeout_secs: u32,
     /// Watching phase auto-advance timeout (seconds). From WATCHING_TIMEOUT_SECS.
     pub watching_timeout_secs: u32,
+    /// Deadline for current transition (e.g. All Ready countdown).
+    pub ready_deadline_at: Option<DateTime<Utc>>,
 }
 
 /// Party state for API responses

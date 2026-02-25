@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { MovieResponse } from '@/model/movieResponse'
 import { useMoviePickerContext } from '@/components/providers/MoviePickerProvider'
+import { prefetchImages } from '@/lib/utils'
 
 export interface UseMoviePickerOptions {
   key: string
@@ -34,8 +35,6 @@ export function useMoviePicker({
 
   // Initialize state from context if available, otherwise defaults
   const [movies, setMovies] = useState<MovieResponse[]>(savedState?.movies || [])
-  const [seenMovieIds, setSeenMovieIds] = useState<Set<number>>(savedState?.seenMovieIds || new Set())
-  const [currentIndex, setCurrentIndex] = useState(savedState?.currentIndex || 0)
   const [noNewMovies, setNoNewMovies] = useState(savedState?.noNewMovies || false)
 
   // If we restored state, we are not loading. If we need to fetch, we are loading.
@@ -46,33 +45,27 @@ export function useMoviePicker({
   useEffect(() => {
     setState(key, {
       movies,
-      seenMovieIds,
-      currentIndex,
       noNewMovies
     })
-  }, [key, movies, seenMovieIds, currentIndex, noNewMovies, setState])
+  }, [key, movies, noNewMovies, setState])
 
   const fetchMore = useCallback(async () => {
     setLoading(true)
     try {
       const newMovies = await fetchNext()
 
-      // Filter out movies we've already seen
-      // We use the functional update of setMovies to ensure access to latest 'movies' if needed,
-      // but here we primarily need 'seenMovieIds'.
-      // However, 'seenMovieIds' in the closure might be stale if we don't include it in deps.
-      // But we are in useCallback with dependency... wait.
-      // seenMovieIds could change if user swipes while fetching?
-      // "loading" blocks interaction so user can't swipe. Safe.
-
-      const filtered = newMovies.filter((m) => !seenMovieIds.has(m.movie_id))
-
-      if (filtered.length > 0) {
+      if (newMovies.length > 0) {
         setMovies((prev) => {
-          // Double check we don't add duplicates
-          const existingIds = new Set(prev.map(m => m.movie_id))
-          const trulyNew = filtered.filter(m => !existingIds.has(m.movie_id))
-          return [...prev, ...trulyNew]
+          // Deduplicate against the current queue in-memory
+          const currentIds = new Set(prev.map(m => m.movie_id))
+          const trulyNew = newMovies.filter(m => !currentIds.has(m.movie_id))
+
+          if (trulyNew.length > 0) {
+            // Prefetch posters for all new movies
+            prefetchImages(trulyNew.map(m => m.poster_url))
+            return [...prev, ...trulyNew]
+          }
+          return prev
         })
         setNoNewMovies(false)
       } else {
@@ -84,7 +77,7 @@ export function useMoviePicker({
     } finally {
       setLoading(false)
     }
-  }, [fetchNext, seenMovieIds])
+  }, [fetchNext])
 
   // Initial load
   useEffect(() => {
@@ -106,14 +99,16 @@ export function useMoviePicker({
   }, [savedState, fetchMore])
 
   useEffect(() => {
-    if (initialized.current && !loading && !noNewMovies && currentIndex >= movies.length) {
+    // Early fetch: trigger loading more movies when we are on the last one (index length - 1)
+    // so that hopefully they are ready by the time the user swipes.
+    if (initialized.current && !loading && !noNewMovies && movies.length <= 1) {
       fetchMore()
     }
-  }, [currentIndex, movies.length, loading, noNewMovies, fetchMore])
+  }, [movies.length, loading, noNewMovies, fetchMore])
 
   const handleAction = async (action: boolean | null) => {
     if (processing) return
-    const currentMovie = movies[currentIndex]
+    const currentMovie = movies[0]
     if (!currentMovie) return
 
     setProcessing(true)
@@ -123,13 +118,8 @@ export function useMoviePicker({
       if (result.error) {
         toast.error(result.error)
       } else {
-        // Mark as seen
-        setSeenMovieIds((prev) => {
-          const next = new Set(prev)
-          next.add(currentMovie.movie_id)
-          return next
-        })
-        setCurrentIndex((prev) => prev + 1)
+        // Remove the movie from the queue (priority queue / FIFO)
+        setMovies((prev) => prev.slice(1))
       }
     } catch (error) {
       console.error('Action failed', error)
@@ -139,11 +129,11 @@ export function useMoviePicker({
     }
   }
 
-  const hasFinishedAllMovies = noNewMovies && currentIndex >= movies.length
+  const hasFinishedAllMovies = noNewMovies && movies.length === 0
 
   return {
-    currentMovie: movies[currentIndex],
-    loading,
+    currentMovie: movies[0],
+    loading: loading && movies.length === 0,
     processing,
     noNewMovies,
     handleLike: () => handleAction(true),

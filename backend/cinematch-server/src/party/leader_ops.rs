@@ -14,6 +14,7 @@ use log::debug;
 use cinematch_abi::domain::{
     EndVotingTransition, PartyAdvanceOutcome, PartyCrud, PartyStateMachine,
 };
+use cinematch_db::PartyState;
 use cinematch_db::domain::{Party, User};
 
 #[utoipa::path(
@@ -53,15 +54,19 @@ pub async fn advance_phase(
     match &outcome {
         PartyAdvanceOutcome::PhaseChanged(s) => {
             debug!("Party {} phase advanced to {:?}", party_id, s);
-            ctx.scheduler
-                .enforce_phase_timeout_and_broadcast(party_id, ctx.clone())
-                .await;
+            if *s != PartyState::Voting {
+                ctx.scheduler
+                    .enforce_phase_timeout_and_broadcast(party_id, ctx.clone())
+                    .await;
+            }
+        }
+        PartyAdvanceOutcome::VotingEnded(EndVotingTransition::Round1Started) => {
+            debug!("Party {} voting round 1 restarted (empty votes)", party_id);
+            // No timeout scheduling here; wait for 50% participation
         }
         PartyAdvanceOutcome::VotingEnded(EndVotingTransition::Round2Started) => {
             debug!("Party {} voting round 2 started", party_id);
-            ctx.scheduler
-                .enforce_phase_timeout_and_broadcast(party_id, ctx.clone())
-                .await;
+            // No timeout scheduling here; wait for 50% participation
         }
         PartyAdvanceOutcome::VotingEnded(EndVotingTransition::PhaseChanged(s)) => {
             debug!("Party {} voting ended -> {:?}", party_id, s);
@@ -149,6 +154,12 @@ pub async fn kick_member(
     party_obj.kick(&ctx, requester_id, target_user_id).await?;
 
     debug!("User {} kicked from party {}", target_user_id, party_id);
+
+    // Re-evaluate ready status: ifEveryone else is ready, we might advance
+    ctx.scheduler
+        .reevaluate_ready_status(party_id, ctx.clone())
+        .await;
+
     Ok(HttpResponse::Ok().finish())
 }
 

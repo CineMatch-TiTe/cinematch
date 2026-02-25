@@ -128,6 +128,11 @@ impl Party {
         ctx.db().have_all_members_voted(self.id).await
     }
 
+    /// Get number of unique members who have voted in this round.
+    pub async fn get_voting_participation_count(&self, ctx: &impl AppContext) -> DbResult<usize> {
+        ctx.db().get_voting_participation_count(self.id).await
+    }
+
     /// Get all votes cast in the party.
     pub async fn get_votes(
         &self,

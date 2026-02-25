@@ -95,6 +95,13 @@ impl PartyStateMachine for Party {
                 };
                 ctx.broadcast_party(self.id, &ServerMessage::PartyStateChanged(msg), None);
             }
+            PartyAdvanceOutcome::VotingEnded(EndVotingTransition::Round1Started) => {
+                ctx.broadcast_party(
+                    self.id,
+                    &ServerMessage::VotingRoundStarted(VotingRoundStarted { round: 1 }),
+                    None,
+                );
+            }
             PartyAdvanceOutcome::VotingEnded(EndVotingTransition::Round2Started) => {
                 ctx.broadcast_party(
                     self.id,
@@ -142,6 +149,14 @@ impl PartyStateMachine for Party {
             PartyState::Voting => {
                 let t = run_end_voting_internal(ctx, self, false).await?;
                 match &t {
+                    EndVotingTransition::Round1Started => {
+                        ctx.broadcast_party(
+                            self.id,
+                            &ServerMessage::VotingRoundStarted(VotingRoundStarted { round: 1 }),
+                            None,
+                        );
+                        Some(PartyState::Voting)
+                    }
                     EndVotingTransition::Round2Started => {
                         ctx.broadcast_party(
                             self.id,
@@ -196,6 +211,13 @@ impl PartyStateMachine for Party {
         let t = run_end_voting_internal(ctx, self, false).await?;
 
         match &t {
+            EndVotingTransition::Round1Started => {
+                ctx.broadcast_party(
+                    self.id,
+                    &ServerMessage::VotingRoundStarted(VotingRoundStarted { round: 1 }),
+                    None,
+                );
+            }
             EndVotingTransition::Round2Started => {
                 ctx.broadcast_party(
                     self.id,
@@ -224,6 +246,13 @@ impl PartyStateMachine for Party {
         let t = run_end_voting_internal(ctx, self, true).await?;
 
         match &t {
+            EndVotingTransition::Round1Started => {
+                ctx.broadcast_party(
+                    self.id,
+                    &ServerMessage::VotingRoundStarted(VotingRoundStarted { round: 1 }),
+                    None,
+                );
+            }
             EndVotingTransition::Round2Started => {
                 ctx.broadcast_party(
                     self.id,
@@ -405,7 +434,10 @@ async fn handle_round1_end(
 ) -> Result<EndVotingTransition, DomainError> {
     if vote_map.is_empty() {
         if force_timeout {
-            return restart_picking(ctx, party).await;
+            // Restart Voting Phase 1 instead of rolling back to Picking
+            debug!("Round 1 timeout with zero votes, restarting phase 1 ballots");
+            do_picking_to_voting(ctx, party).await?;
+            return Ok(EndVotingTransition::Round1Started);
         }
         let _ = party.enable_voting(ctx).await;
         return Err(DomainError::BadRequest(
@@ -459,7 +491,10 @@ async fn handle_round2_end(
 ) -> Result<EndVotingTransition, DomainError> {
     if vote_map.is_empty() {
         if force_timeout {
-            return restart_picking(ctx, party).await;
+            // Restart Voting Phase 1 instead of rolling back to Picking
+            debug!("Round 2 timeout with zero votes, restarting phase 1 ballots");
+            do_picking_to_voting(ctx, party).await?;
+            return Ok(EndVotingTransition::Round1Started);
         }
         let _ = party.set_voting_round(ctx, None).await;
         return Err(DomainError::BadRequest(
@@ -482,9 +517,38 @@ async fn handle_round2_end(
         return select_winner(ctx, party, winner_id).await;
     }
 
-    // No majority - record votes as taste and restart round 1 voting
+    // No majority (tie or everyone rejected everything)
+    // Identify top movie(s) and carry over to Picking pool (as leader picks)
+    // so they appear again for everyone at next phase 1
+    let mut by_likes: Vec<(i64, u32)> = vote_map
+        .iter()
+        .map(|(&mid, &(likes, _))| (mid, likes))
+        .collect();
+    by_likes.sort_by(|a, b| b.1.cmp(&a.1));
+
+    if let Ok(leader_id) = party.leader_id(ctx).await {
+        // Take top 1, or top 2 if they have the same (highest) number of likes
+        let top_likes = by_likes.first().map(|(_, l)| *l).unwrap_or(0);
+        if top_likes > 0 {
+            for (mid, likes) in by_likes.into_iter().take(2) {
+                if likes == top_likes {
+                    debug!(
+                        "Carrying over movie {} to picks (top votes: {}) so it persists in restart",
+                        mid, likes
+                    );
+                    let _ = party.add_pick(ctx, leader_id, mid, Some(true)).await;
+                }
+            }
+        }
+    }
+
+    // Record votes as taste and restart Voting Phase 1 instead of rolling back to Picking
+    debug!(
+        "Round 2 finished without majority winner, recording taste and restarting phase 1 ballots"
+    );
     record_votes_as_taste(ctx, party).await?;
-    restart_voting(ctx, party).await
+    do_picking_to_voting(ctx, party).await?;
+    Ok(EndVotingTransition::Round1Started)
 }
 
 /// Select a winner and move to Watching state.
@@ -536,60 +600,4 @@ async fn record_votes_as_taste(ctx: &impl AppContext, party: &Party) -> Result<(
         }
     }
     Ok(())
-}
-
-/// Clear ballots and restart picking phase.
-async fn restart_picking(
-    ctx: &impl AppContext,
-    party: &Party,
-) -> Result<EndVotingTransition, DomainError> {
-    party.clear_ballots(ctx).await.map_err(|e| {
-        error!("Failed to clear ballots: {}", e);
-        DomainError::Internal("Failed to clear ballots".into())
-    })?;
-
-    party
-        .set_phase(ctx, PartyState::Picking)
-        .await
-        .map_err(|e| {
-            error!("Failed to move to Picking: {}", e);
-            DomainError::Internal("Failed to move to Picking".into())
-        })?;
-
-    let _ = party.set_voting_round(ctx, None).await;
-
-    Ok(EndVotingTransition::PhaseChanged(PartyState::Picking))
-}
-
-/// Restart voting by regenerating round 1 ballots.
-async fn restart_voting(
-    ctx: &impl AppContext,
-    party: &Party,
-) -> Result<EndVotingTransition, DomainError> {
-    party
-        .set_phase(ctx, PartyState::Voting)
-        .await
-        .map_err(|e| {
-            error!("Failed to maintain Voting state: {}", e);
-            DomainError::Internal("Failed to maintain Voting state".into())
-        })?;
-
-    cinematch_recommendation_engine::build_voting_ballots_for_party(ctx, party)
-        .await
-        .map_err(|e| {
-            error!("Failed to rebuild voting ballots: {}", e);
-            DomainError::Internal("Failed to rebuild voting ballots".into())
-        })?;
-
-    party.enable_voting(ctx).await.map_err(|e| {
-        error!("Failed to re-enable voting: {}", e);
-        DomainError::Internal("Failed to re-enable voting".into())
-    })?;
-
-    party.set_voting_round(ctx, Some(1)).await.map_err(|e| {
-        error!("Failed to reset voting round to 1: {}", e);
-        DomainError::Internal("Failed to reset voting round".into())
-    })?;
-
-    Ok(EndVotingTransition::PhaseChanged(PartyState::Voting))
 }

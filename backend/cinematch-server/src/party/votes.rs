@@ -4,10 +4,11 @@ use crate::extract_user_id;
 
 use actix_identity::Identity;
 use actix_web::{HttpResponse, get, post, web};
-use cinematch_abi::domain::{PartyCrud, PartyStateMachine, PartyValidation};
+use cinematch_abi::domain::{PartyCrud, PartyValidation};
 use cinematch_common::models::ErrorResponse;
 use cinematch_db::PartyState;
 use cinematch_db::domain::{Party, User};
+use log::debug;
 use std::collections::HashMap;
 
 #[utoipa::path(
@@ -122,14 +123,18 @@ pub async fn vote_movie(
         .cast_vote_with_broadcast(&ctx, user_id, movie_id, vote_value)
         .await?;
 
-    // Try auto-end voting if all members have voted (ONLY IN ROUND 2)
-    let voting_round = party_obj.voting_round(&ctx).await?;
-    if voting_round == Some(2)
-        && let Ok(Some(_)) = party_obj.try_auto_end_voting(&ctx).await
-    {
-        // Broadcast handled by ABI
+    // Participation-based timeout: check if >= 50% have voted
+    let participation = party_obj.voting_participation_count(&ctx).await?;
+    let total_members = party_obj.member_count(&ctx).await?;
+    let has_fifty_pct = total_members > 0 && participation * 2 >= total_members;
+
+    if has_fifty_pct && !ctx.scheduler.is_scheduled(party_id).await {
+        debug!(
+            "Voting participation reached {}/{} (>= 50%), triggering timeout",
+            participation, total_members
+        );
         ctx.scheduler
-            .enforce_phase_timeout_and_broadcast(party_id, ctx.clone())
+            .trigger_voting_timeout(party_id, ctx.clone())
             .await;
     }
 
