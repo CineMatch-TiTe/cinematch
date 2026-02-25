@@ -3,9 +3,8 @@
 
 use super::{AppState, KickQuery, OptionalIdParam, TransferQuery};
 use crate::api_error::ApiError;
-use crate::extract_user_id;
+use crate::auth::guard::Auth;
 
-use actix_identity::Identity;
 use actix_web::{HttpResponse, post, web};
 use cinematch_common::models::ErrorResponse;
 use log::debug;
@@ -25,16 +24,18 @@ use cinematch_db::domain::{Party, User};
     ),
     params(super::OptionalIdParam),
     tags = ["Leader Tools"],
-    security(("cookie_auth" = [])),
+    security(("cookie_auth" = []), ("bearer_auth" = [])),
     operation_id = "advance_phase"
 )]
 #[post("/advance")]
 pub async fn advance_phase(
     ctx: AppState,
-    user: Identity,
+    auth: Option<Auth>,
     party_query: web::Query<OptionalIdParam>,
 ) -> Result<HttpResponse, ApiError> {
-    let leader_id = extract_user_id(user)?;
+    let leader_id = auth
+        .ok_or_else(|| ApiError::Unauthorized("No identity provided".to_string()))?
+        .user_id();
     let party_id = match party_query.party_id {
         Some(id) => id,
         None => {
@@ -81,16 +82,18 @@ pub async fn advance_phase(
     ),
     params(super::OptionalIdParam),
     tags = ["Leader Tools"],
-    security(("cookie_auth" = [])),
+    security(("cookie_auth" = []), ("bearer_auth" = [])),
     operation_id = "disband_party"
 )]
 #[post("/disband")]
 pub async fn disband_party(
     ctx: AppState,
-    user: Identity,
+    auth: Option<Auth>,
     party_query: web::Query<OptionalIdParam>,
 ) -> Result<HttpResponse, ApiError> {
-    let user_id = extract_user_id(user)?;
+    let user_id = auth
+        .ok_or_else(|| ApiError::Unauthorized("No identity provided".to_string()))?
+        .user_id();
     let party_id = match party_query.party_id {
         Some(id) => id,
         None => {
@@ -121,17 +124,19 @@ pub async fn disband_party(
         super::OptionalIdParam
     ),
     tags = ["Leader Tools"],
-    security(("cookie_auth" = [])),
+    security(("cookie_auth" = []), ("bearer_auth" = [])),
     operation_id = "kick_member"
 )]
 #[post("/kick")]
 pub async fn kick_member(
     ctx: AppState,
-    user: Identity,
+    auth: Option<Auth>,
     kick_query: web::Query<KickQuery>,
     party_query: web::Query<OptionalIdParam>,
 ) -> Result<HttpResponse, ApiError> {
-    let requester_id = extract_user_id(user)?;
+    let requester_id = auth
+        .ok_or_else(|| ApiError::Unauthorized("No identity provided".to_string()))?
+        .user_id();
     let target_user_id = kick_query.target_user_id;
     let party_id = match party_query.party_id {
         Some(id) => id,
@@ -164,17 +169,19 @@ pub async fn kick_member(
         super::OptionalIdParam
     ),
     tags = ["Leader Tools"],
-    security(("cookie_auth" = [])),
+    security(("cookie_auth" = []), ("bearer_auth" = [])),
     operation_id = "transfer_leadership"
 )]
 #[post("/transfer-leadership")]
 pub async fn transfer_leadership(
     ctx: AppState,
-    user: Identity,
+    auth: Option<Auth>,
     transfer_query: web::Query<TransferQuery>,
     party_query: web::Query<OptionalIdParam>,
 ) -> Result<HttpResponse, ApiError> {
-    let requester_id = extract_user_id(user)?;
+    let requester_id = auth
+        .ok_or_else(|| ApiError::Unauthorized("No identity provided".to_string()))?
+        .user_id();
     let new_leader_id = transfer_query.new_leader_id;
     let party_id = match party_query.party_id {
         Some(id) => id,

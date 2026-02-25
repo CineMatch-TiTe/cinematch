@@ -2,7 +2,9 @@ use crate::AppState;
 use crate::api_error::ApiError;
 use actix_identity::Identity;
 use actix_web::{HttpMessage, HttpRequest, HttpResponse, get, web};
+use cinematch_abi::auth::jwt::sign_token;
 use cinematch_abi::domain::{ExternalAuthLogic as _, User};
+use cinematch_common::Config;
 use cinematch_common::models::ErrorResponse;
 use cinematch_db::models::AuthProvider;
 use log::{debug, error};
@@ -11,6 +13,21 @@ use log::{debug, error};
 pub struct CallbackParams {
     pub code: String,
     pub state: Option<String>,
+}
+
+// Response body returned by the OAuth callback when JWT is issued.
+#[derive(Debug, serde::Serialize, utoipa::ToSchema)]
+pub struct OAuthCallbackResponse {
+    /// short-lived JWT for API calls
+    pub jwt: String,
+    /// Unix timestamp when the token expires
+    pub expires_at: i64,
+    /// Seconds until expiration
+    pub expires_in: i64,
+    /// logged-in user ID
+    pub user_id: uuid::Uuid,
+    /// user display name (if available)
+    pub username: Option<String>,
 }
 
 /// Redirect to GitHub OAuth login page.
@@ -52,7 +69,7 @@ pub async fn login_github() -> Result<HttpResponse, ApiError> {
 /// **Auth**: None (or session user to link account).
 #[utoipa::path(
     responses(
-        (status = 302, description = "Login successful, redirect back to app"),
+        (status = 200, description = "OAuth login payload", body = OAuthCallbackResponse),
         (status = 400, description = "OAuth state/code error", body = ErrorResponse),
         (status = 409, description = "Account already linked to another user", body = ErrorResponse),
         (status = 500, description = "OAuth exchange failed", body = ErrorResponse)
@@ -66,7 +83,7 @@ pub async fn callback_github(
     req: HttpRequest,
     params: web::Query<CallbackParams>,
     identity: Option<Identity>,
-) -> Result<HttpResponse, ApiError> {
+) -> Result<web::Json<OAuthCallbackResponse>, ApiError> {
     debug!(
         "GitHub callback triggered with code: {} and state: {:?}",
         &params.code, &params.state
@@ -96,7 +113,7 @@ pub async fn callback_github(
     )
     .await?;
 
-    // 3. Log in the user (or refresh session)
+    // 3. Log in the user (or refresh session); identity cookie remains.
     if let Err(e) = Identity::login(&req.extensions(), user.id.to_string()) {
         error!("Failed to set user identity in session: {e}");
         return Err(ApiError::InternalServerError(
@@ -104,8 +121,27 @@ pub async fn callback_github(
         ));
     }
 
-    // Success - redirect back to home (root)
-    Ok(HttpResponse::Found()
-        .append_header(("Location", "/"))
-        .finish())
+    // generate JWT payload
+    let jwt_token = sign_token(user.id).map_err(|e| {
+        error!("Failed to sign JWT for github callback: {}", e);
+        ApiError::InternalServerError("Failed to generate token".to_string())
+    })?;
+
+    let now = chrono::Utc::now().timestamp();
+    let expires_at = now + Config::get().jwt_expiry_secs as i64;
+    let expires_in = if expires_at > now {
+        expires_at - now
+    } else {
+        0
+    };
+
+    let resp = OAuthCallbackResponse {
+        jwt: jwt_token,
+        expires_at,
+        expires_in,
+        user_id: user.id,
+        username: user.username(&ctx).await.ok(),
+    };
+
+    Ok(web::Json(resp))
 }

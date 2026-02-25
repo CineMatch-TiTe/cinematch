@@ -1,8 +1,7 @@
 use super::{AppState, GetVoteResponse, OptionalIdParam, VoteMovieResponse, VoteQuery, VoteTotals};
 use crate::api_error::ApiError;
-use crate::extract_user_id;
+use crate::auth::guard::Auth;
 
-use actix_identity::Identity;
 use actix_web::{HttpResponse, get, post, web};
 use cinematch_abi::domain::{PartyCrud, PartyStateMachine, PartyValidation};
 use cinematch_common::models::ErrorResponse;
@@ -20,16 +19,18 @@ use std::collections::HashMap;
     ),
     params(super::OptionalIdParam),
     tags = ["Voting"],
-    security(("cookie_auth" = [])),
+    security(("cookie_auth" = []), ("bearer_auth" = [])),
     operation_id = "get_vote"
 )]
 #[get("/vote")]
 pub async fn get_vote(
     ctx: AppState,
-    user: Identity,
+    auth: Option<Auth>,
     party_query: web::Query<OptionalIdParam>,
 ) -> Result<HttpResponse, ApiError> {
-    let user_id = extract_user_id(user)?;
+    let user_id = auth
+        .ok_or_else(|| ApiError::Unauthorized("No identity provided".to_string()))?
+        .user_id();
     let party_id = match party_query.party_id {
         Some(id) => id,
         None => {
@@ -89,17 +90,19 @@ pub async fn get_vote(
         super::OptionalIdParam
     ),
     tags = ["Voting"],
-    security(("cookie_auth" = [])),
+    security(("cookie_auth" = []), ("bearer_auth" = [])),
     operation_id = "vote_movie"
 )]
 #[post("/vote")]
 pub async fn vote_movie(
     ctx: AppState,
-    user: Identity,
+    auth: Option<Auth>,
     vote_query: web::Query<VoteQuery>,
     party_query: web::Query<OptionalIdParam>,
 ) -> Result<HttpResponse, ApiError> {
-    let user_id = extract_user_id(user)?;
+    let user_id = auth
+        .ok_or_else(|| ApiError::Unauthorized("No identity provided".to_string()))?
+        .user_id();
     let movie_id = vote_query.movie_id;
     let vote_value = vote_query.like;
     let party_id = match party_query.party_id {

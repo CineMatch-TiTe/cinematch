@@ -13,10 +13,18 @@ export interface CurrentUserResponse {
   created_at: string;
   /** Whether this is a guest/oneshot user */
   is_guest: boolean;
-  /** Token expiry timestamp (Unix seconds) */
-  token_expires_at: number;
-  /** Seconds until token expiry */
-  token_expires_in: number;
+  /**
+   * Token expiry timestamp (Unix seconds)
+This is optional because we can only get if user logged in via JWT; cookie-authenticated users won't have this field.
+   * @nullable
+   */
+  token_expires_at?: number | null;
+  /**
+   * Seconds until token expiry
+This is optional because we can only get if user logged in via JWT; cookie-authenticated users won't have this field.
+   * @nullable
+   */
+  token_expires_in?: number | null;
   /** When the user was last updated */
   updated_at: string;
   /** The user's unique ID */

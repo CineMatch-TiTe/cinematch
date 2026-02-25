@@ -36,6 +36,9 @@ deadpool-redis.workspace = true
 
 actix-identity.workspace = true
 actix-session.workspace = true
+# JWT and bearer extraction support
+actix-web-httpauth.workspace = true
+jsonwebtoken.workspace = true
 
 actix.workspace = true
 actix-web-actors.workspace = true

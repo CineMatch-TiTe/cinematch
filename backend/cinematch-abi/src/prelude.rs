@@ -17,3 +17,6 @@ pub use crate::domain::{
     DomainError, EndVotingTransition, PartyAdvanceOutcome, PartyCrud, PartyLogic,
     PartyStateMachine, PartyValidation, UserLogic,
 };
+
+// JWT helpers for signing/verifying tokens
+pub use crate::auth::jwt::{sign_token, verify_token};

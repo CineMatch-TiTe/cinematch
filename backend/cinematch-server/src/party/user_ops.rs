@@ -4,13 +4,12 @@ use super::{
 };
 
 use crate::AppState;
-use actix_identity::Identity;
 use actix_web::{HttpResponse, get, patch, post, web};
 use cinematch_common::models::ErrorResponse;
 use log::debug;
 
 use crate::api_error::ApiError;
-use crate::extract_user_id;
+use crate::auth::guard::Auth;
 
 use cinematch_abi::domain::{PartyCrud, PartyJoin, PartyValidation};
 use cinematch_db::domain::{Party, User};
@@ -23,17 +22,19 @@ use cinematch_db::domain::{Party, User};
     ),
     params(super::JoinQuery),
     tags = ["Member Ops"],
-    security(("cookie_auth" = [])),
+    security(("cookie_auth" = []), ("bearer_auth" = [])),
     operation_id = "join_party"
 )]
 #[post("/join")]
 pub async fn join_party(
     ctx: AppState,
-    user: Identity,
+    auth: Option<Auth>,
     query: web::Query<JoinQuery>,
 ) -> Result<web::Json<CreatePartyResponse>, ApiError> {
     let code = query.into_inner().code;
-    let user_id = extract_user_id(user)?;
+    let user_id = auth
+        .ok_or_else(|| ApiError::Unauthorized("No identity provided".to_string()))?
+        .user_id();
 
     // Use ABI Join by code
     let party_obj = Party::join_by_code(&ctx, user_id, &code).await?;
@@ -59,16 +60,18 @@ pub async fn join_party(
     ),
     params(super::OptionalIdParam),
     tags = ["Member Ops"],
-    security(("cookie_auth" = [])),
+    security(("cookie_auth" = []), ("bearer_auth" = [])),
     operation_id = "leave_party"
 )]
 #[post("/leave")]
 pub async fn leave_party(
     ctx: AppState,
-    user: Identity,
+    auth: Option<Auth>,
     party_query: web::Query<OptionalIdParam>,
 ) -> Result<HttpResponse, ApiError> {
-    let user_id = extract_user_id(user)?;
+    let user_id = auth
+        .ok_or_else(|| ApiError::Unauthorized("No identity provided".to_string()))?
+        .user_id();
     let party_id = match party_query.party_id {
         Some(id) => id,
         None => {
@@ -97,16 +100,18 @@ pub async fn leave_party(
     ),
     params(super::OptionalIdParam),
     tags = ["Member Ops"],
-    security(("cookie_auth" = [])),
+    security(("cookie_auth" = []), ("bearer_auth" = [])),
     operation_id = "get_party_members"
 )]
 #[get("/members")]
 pub async fn get_party_members(
     ctx: AppState,
-    user: Identity,
+    auth: Option<Auth>,
     party_query: web::Query<OptionalIdParam>,
 ) -> Result<web::Json<PartyMembersResponse>, ApiError> {
-    let user_id = extract_user_id(user)?;
+    let user_id = auth
+        .ok_or_else(|| ApiError::Unauthorized("No identity provided".to_string()))?
+        .user_id();
     let party_id = match party_query.party_id {
         Some(id) => id,
         None => {
@@ -166,18 +171,20 @@ pub async fn get_party_members(
         super::OptionalIdParam
     ),
     tags = ["Member Ops"],
-    security(("cookie_auth" = [])),
+    security(("cookie_auth" = []), ("bearer_auth" = [])),
     operation_id = "set_ready"
 )]
 #[patch("/ready")]
 pub async fn set_ready(
     ctx: AppState,
-    user: Identity,
+    auth: Option<Auth>,
     ready_query: web::Query<ReadyQuery>,
     party_query: web::Query<OptionalIdParam>,
 ) -> Result<web::Json<ReadyStateResponse>, ApiError> {
     let is_ready = ready_query.is_ready;
-    let user_id = extract_user_id(user)?;
+    let user_id = auth
+        .ok_or_else(|| ApiError::Unauthorized("No identity provided".to_string()))?
+        .user_id();
     let party_id = match party_query.party_id {
         Some(id) => id,
         None => {

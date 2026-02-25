@@ -61,6 +61,9 @@ pub struct Config {
     /// Secret token for sessions and JWT (env: `SECRET_TOKEN`, required, >= 64 bytes)
     pub secret_token: SecretString,
 
+    /// Lifetime of a signed JWT in seconds (env: `JWT_EXPIRY_SECS`, default: 3600)
+    pub jwt_expiry_secs: u64,
+
     // ── GitHub OAuth ──────────────────────────────────────────
     /// Optional GitHub OAuth configuration.
     pub github: Option<GithubConfig>,
@@ -120,6 +123,7 @@ impl Config {
             server_host: std::env::var("SERVER_HOST").unwrap_or_else(|_| "0.0.0.0".to_string()),
             server_port: env_parse("SERVER_PORT", 8080),
             secret_token: SecretString::from(secret_token),
+            jwt_expiry_secs: env_parse("JWT_EXPIRY_SECS", 3600),
             github,
         }
     }

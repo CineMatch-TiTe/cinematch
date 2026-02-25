@@ -1,8 +1,7 @@
 use crate::AppState;
 use crate::api_error::ApiError;
-use crate::extract_user_id;
+use crate::auth::guard::Auth;
 use crate::movie::MovieResponse;
-use actix_identity::Identity;
 use actix_web::{get, web};
 use cinematch_abi::domain::{PartyValidation, Recommendation};
 use cinematch_common::models::{ErrorResponse, RecommendationMethod, VectorType};
@@ -54,16 +53,18 @@ use crate::movie::RecommendedMoviesResponse;
     ),
     params(RecommendationQuery),
     tags = ["Recommendation"],
-    security(("cookie_auth" = [])),
+    security(("cookie_auth" = []), ("bearer_auth" = [])),
     operation_id = "get_recommendations"
 )]
 #[get("")]
 pub async fn get_recommendations(
     ctx: AppState,
-    user: Identity,
+    auth: Option<Auth>,
     query: web::Query<RecommendationQuery>,
 ) -> Result<web::Json<RecommendedMoviesResponse>, ApiError> {
-    let user_id = extract_user_id(user)?;
+    let user_id = auth
+        .ok_or_else(|| ApiError::Unauthorized("No identity provided".to_string()))?
+        .user_id();
     let query = query.into_inner();
 
     let party_id = if let Some(pid) = query.party_id {

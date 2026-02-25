@@ -1,9 +1,8 @@
 use super::{AppState, GetPicksResponse, OptionalIdParam};
 use crate::api_error::ApiError;
-use crate::extract_user_id;
 use cinematch_common::models::ErrorResponse;
 
-use actix_identity::Identity;
+use crate::auth::guard::Auth;
 use actix_web::{HttpResponse, delete, get, put, web};
 use cinematch_abi::domain::PartyCrud;
 use cinematch_db::domain::{Party, User};
@@ -18,16 +17,18 @@ use cinematch_db::domain::{Party, User};
     ),
     params(super::OptionalIdParam),
     tags = ["Picking"],
-    security(("cookie_auth" = [])),
+    security(("cookie_auth" = []), ("bearer_auth" = [])),
     operation_id = "get_picks"
 )]
 #[get("/pick")]
 pub async fn get_picks(
     ctx: AppState,
-    user: Identity,
+    auth: Option<Auth>,
     party_query: web::Query<OptionalIdParam>,
 ) -> Result<web::Json<super::GetPicksResponse>, ApiError> {
-    let user_id = extract_user_id(user)?;
+    let user_id = auth
+        .ok_or_else(|| ApiError::Unauthorized("No identity provided".to_string()))?
+        .user_id();
     let party_id = match party_query.party_id {
         Some(id) => id,
         None => {
@@ -59,17 +60,19 @@ pub async fn get_picks(
         super::OptionalIdParam
     ),
     tags = ["Picking"],
-    security(("cookie_auth" = [])),
+    security(("cookie_auth" = []), ("bearer_auth" = [])),
     operation_id = "pick_movie"
 )]
 #[put("/pick")]
 pub async fn pick_movie(
     ctx: AppState,
-    user: Identity,
+    auth: Option<Auth>,
     query: web::Query<crate::user::UpdateTasteQuery>,
     party_query: web::Query<OptionalIdParam>,
 ) -> Result<HttpResponse, ApiError> {
-    let user_id = extract_user_id(user)?;
+    let user_id = auth
+        .ok_or_else(|| ApiError::Unauthorized("No identity provided".to_string()))?
+        .user_id();
     let movie_id = query.movie_id;
     let liked = query.liked;
     let party_id = match party_query.party_id {
@@ -104,17 +107,19 @@ pub async fn pick_movie(
         super::OptionalIdParam
     ),
     tags = ["Picking"],
-    security(("cookie_auth" = [])),
+    security(("cookie_auth" = []), ("bearer_auth" = [])),
     operation_id = "delete_pick"
 )]
 #[delete("/pick")]
 pub async fn delete_pick(
     ctx: AppState,
-    user: Identity,
+    auth: Option<Auth>,
     query: web::Query<super::MovieIdQuery>,
     party_query: web::Query<OptionalIdParam>,
 ) -> Result<HttpResponse, ApiError> {
-    let user_id = extract_user_id(user)?;
+    let user_id = auth
+        .ok_or_else(|| ApiError::Unauthorized("No identity provided".to_string()))?
+        .user_id();
     let movie_id = query.movie_id;
     let party_id = match party_query.party_id {
         Some(id) => id,

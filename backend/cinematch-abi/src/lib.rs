@@ -1,6 +1,8 @@
 // Domain module with lazy-loading types and extension traits
 pub mod domain;
 
+pub mod auth;
+
 // Prelude for convenient imports
 pub mod prelude;
 

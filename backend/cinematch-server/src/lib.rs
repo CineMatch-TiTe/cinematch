@@ -3,18 +3,10 @@ use utoipa::{Modify, OpenApi};
 
 pub fn extract_user_id(
     identity: impl Into<Option<actix_identity::Identity>>,
+    jwt: Option<crate::Jwt>,
 ) -> Result<uuid::Uuid, ApiError> {
     let identity_opt: Option<actix_identity::Identity> = identity.into();
-    match identity_opt {
-        Some(id) => match id.id() {
-            Ok(id_str) => match uuid::Uuid::parse_str(&id_str) {
-                Ok(uuid) => Ok(uuid),
-                Err(_) => Err(ApiError::InternalServerError("Invalid user ID".to_string())),
-            },
-            Err(_) => Err(ApiError::Unauthorized("No user ID found".to_string())),
-        },
-        None => Err(ApiError::Unauthorized("No identity provided".to_string())),
-    }
+    crate::auth::guard::user_id_from(identity_opt, jwt)
 }
 
 pub fn validate_username(input: &str) -> Result<String, ApiError> {
@@ -43,6 +35,9 @@ mod recommendation;
 mod user;
 mod websocket;
 
+// convenient re-exports
+pub use auth::guard::Jwt;
+
 pub mod api_error;
 pub mod routes;
 pub use api_error::ApiError;
@@ -67,6 +62,12 @@ impl Modify for SecurityAddon {
                 "cookie_auth",
                 SecurityScheme::ApiKey(ApiKey::Cookie(ApiKeyValue::new("id"))),
             );
+            // bearer scheme with JWT format
+            let mut http = utoipa::openapi::security::Http::new(
+                utoipa::openapi::security::HttpAuthScheme::Bearer,
+            );
+            http.bearer_format = Some("JWT".to_string());
+            components.add_security_scheme("bearer_auth", SecurityScheme::Http(http));
         }
     }
 }

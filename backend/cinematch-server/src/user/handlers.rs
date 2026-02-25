@@ -3,14 +3,13 @@
 //! These handlers implement the user management endpoints.
 //!
 
-use actix_identity::Identity;
+use crate::auth::guard::Auth;
 use actix_web::{HttpResponse, get, post, put, web};
 
 use super::{CurrentUserResponse, GetTasteQuery, UpdateTasteQuery};
 
 use crate::AppState;
 use crate::api_error::ApiError;
-use crate::extract_user_id;
 
 use cinematch_abi::domain::UserLogic;
 use cinematch_common::models::{ErrorResponse, UserTasteResponse};
@@ -34,7 +33,7 @@ use cinematch_db::domain::User;
     ),
     params(crate::user::RenameQuery),
     tags = ["User"],
-    security(("cookie_auth" = [])),
+    security(("cookie_auth" = []), ("bearer_auth" = [])),
     operation_id = "rename_user"
 )]
 #[post("/rename")]
@@ -42,10 +41,12 @@ pub async fn rename_user(
     ctx: AppState,
     #[allow(unused_variables)] _user_id: web::Query<crate::party::OptionalIdParam>, // Kept for future path-based admin overrides
     query: web::Query<crate::user::RenameQuery>,
-    user: Identity,
+    auth: Option<Auth>,
 ) -> Result<HttpResponse, ApiError> {
     let new_username = &query.name;
-    let claims = extract_user_id(user)?;
+    let claims = auth
+        .ok_or_else(|| ApiError::Unauthorized("No identity provided".to_string()))?
+        .user_id();
 
     let user_obj = User::from_id(&ctx, claims).await?;
 
@@ -62,15 +63,16 @@ pub async fn rename_user(
         (status = 500, description = "Internal server error", body = ErrorResponse)
     ),
     tags = ["User"],
-    security(("cookie_auth" = [])),
+    security(("cookie_auth" = []), ("bearer_auth" = [])),
     operation_id = "get_current_user"
 )]
 #[get("")]
 pub async fn get_current_user(
-    user: Identity,
+    auth: Option<Auth>,
     ctx: AppState,
 ) -> Result<web::Json<CurrentUserResponse>, ApiError> {
-    let user_id = extract_user_id(user)?;
+    let auth = auth.ok_or_else(|| ApiError::Unauthorized("No identity provided".to_string()))?;
+    let user_id = auth.user_id();
     let user_obj = User::from_id(&ctx, user_id).await?;
 
     // Fetch details
@@ -78,10 +80,14 @@ pub async fn get_current_user(
     let is_guest = user_obj.is_oneshot(&ctx).await?;
     let record = user_obj.record(&ctx).await?;
 
-    // Token expiry: 24 hours from now
     let now = chrono::Utc::now().timestamp();
-    let token_expires_in = 24 * 60 * 60; // 24 hours in seconds
-    let token_expires_at = now + token_expires_in;
+
+    // derive expiration from the JWT if we have one
+    let token_expires_at = auth.token_expires_at();
+    let token_expires_in = match token_expires_at {
+        Some(exp) if exp > now => Some(exp - now),
+        _ => None,
+    };
 
     let response = CurrentUserResponse {
         user_id: user_obj.id,
@@ -105,16 +111,18 @@ pub async fn get_current_user(
     ),
     params(crate::user::UpdateTasteQuery),
     tags = ["User"],
-    security(("cookie_auth" = [])),
+    security(("cookie_auth" = []), ("bearer_auth" = [])),
     operation_id = "update_taste"
 )]
 #[put("/taste")]
 pub async fn update_taste(
     ctx: AppState,
-    user: Identity,
+    auth: Option<Auth>,
     query: web::Query<UpdateTasteQuery>,
 ) -> Result<HttpResponse, ApiError> {
-    let _user_id = extract_user_id(user)?;
+    let _user_id = auth
+        .ok_or_else(|| ApiError::Unauthorized("No identity provided".to_string()))?
+        .user_id();
     let movie_id = query.movie_id;
     let liked = query.liked;
     let rating = query.rating;
@@ -137,16 +145,18 @@ pub async fn update_taste(
     ),
     params(crate::user::GetTasteQuery),
     tags = ["User"],
-    security(("cookie_auth" = [])),
+    security(("cookie_auth" = []), ("bearer_auth" = [])),
     operation_id = "get_taste"
 )]
 #[get("/taste")]
 pub async fn get_taste(
     ctx: AppState,
-    user: Identity,
+    auth: Option<Auth>,
     query: web::Query<GetTasteQuery>,
 ) -> Result<web::Json<UserTasteResponse>, ApiError> {
-    let user_id = extract_user_id(user)?;
+    let user_id = auth
+        .ok_or_else(|| ApiError::Unauthorized("No identity provided".to_string()))?
+        .user_id();
     let movie_id = query.movie_id;
 
     let user_obj = User::from_id(&ctx, user_id).await?;

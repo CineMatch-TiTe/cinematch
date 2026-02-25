@@ -7,7 +7,9 @@
 import type {
   ErrorResponse,
   GuestLoginResponse,
-  GuestUserRequest
+  GuestUserRequest,
+  OAuthCallbackResponse,
+  RenewJwtResponse
 } from '../../model';
 
 import { customInstance } from '../../lib/orval-client';
@@ -18,9 +20,9 @@ import { customInstance } from '../../lib/orval-client';
 **Auth**: None (or session user to link account).
  * @summary GitHub OAuth callback handler.
  */
-export type callbackGithubResponse302 = {
-  data: void
-  status: 302
+export type callbackGithubResponse200 = {
+  data: OAuthCallbackResponse
+  status: 200
 }
 
 export type callbackGithubResponse400 = {
@@ -38,12 +40,14 @@ export type callbackGithubResponse500 = {
   status: 500
 }
     
-;
-export type callbackGithubResponseError = (callbackGithubResponse302 | callbackGithubResponse400 | callbackGithubResponse409 | callbackGithubResponse500) & {
+export type callbackGithubResponseSuccess = (callbackGithubResponse200) & {
+  headers: Headers;
+};
+export type callbackGithubResponseError = (callbackGithubResponse400 | callbackGithubResponse409 | callbackGithubResponse500) & {
   headers: Headers;
 };
 
-export type callbackGithubResponse = (callbackGithubResponseError)
+export type callbackGithubResponse = (callbackGithubResponseSuccess | callbackGithubResponseError)
 
 export const getCallbackGithubUrl = () => {
 
@@ -190,6 +194,55 @@ export const getLogoutUserUrl = () => {
 export const logoutUser = async ( options?: RequestInit): Promise<logoutUserResponse> => {
   
   return customInstance<logoutUserResponse>(getLogoutUserUrl(),
+  {      
+    ...options,
+    method: 'POST'
+    
+    
+  }
+);}
+
+
+/**
+ * Requires existing authentication (cookie or bearer). WebSocket sessions
+continue uninterrupted – the new token is only for future HTTP/API calls.
+ * @summary Renew the client's JWT by issuing a fresh token with a new expiry.
+ */
+export type renewJwtResponse200 = {
+  data: RenewJwtResponse
+  status: 200
+}
+
+export type renewJwtResponse401 = {
+  data: ErrorResponse
+  status: 401
+}
+
+export type renewJwtResponse500 = {
+  data: ErrorResponse
+  status: 500
+}
+    
+export type renewJwtResponseSuccess = (renewJwtResponse200) & {
+  headers: Headers;
+};
+export type renewJwtResponseError = (renewJwtResponse401 | renewJwtResponse500) & {
+  headers: Headers;
+};
+
+export type renewJwtResponse = (renewJwtResponseSuccess | renewJwtResponseError)
+
+export const getRenewJwtUrl = () => {
+
+
+  
+
+  return `/api/auth/renew`
+}
+
+export const renewJwt = async ( options?: RequestInit): Promise<renewJwtResponse> => {
+  
+  return customInstance<renewJwtResponse>(getRenewJwtUrl(),
   {      
     ...options,
     method: 'POST'
