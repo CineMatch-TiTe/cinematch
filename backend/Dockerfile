@@ -17,5 +17,7 @@ RUN cargo install --path cinematch-server --target x86_64-unknown-linux-musl
 FROM scratch
 COPY --from=builder /usr/local/cargo/bin/cinematch-server /usr/local/bin/cinematch-server
 
+USER 1000:1000
+
 EXPOSE 8085
 CMD ["cinematch-server"]

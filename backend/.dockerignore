@@ -1,0 +1,10 @@
+# ignore rust build files
+**/target
+
+.env
+**/*.csv
+**/*.md
+
+Dockerfile
+.dockerignore
+.git
