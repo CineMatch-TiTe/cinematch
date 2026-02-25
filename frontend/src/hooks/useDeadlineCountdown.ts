@@ -16,8 +16,12 @@ export function useDeadlineCountdown(deadline?: string | null): number {
 
     const [left, setLeft] = useState(compute)
 
+    // keep `left` in sync when the deadline or compute function changes
     useEffect(() => {
         setLeft(compute())
+    }, [compute])
+
+    useEffect(() => {
         if (!deadline) return
 
         const id = setInterval(() => {
