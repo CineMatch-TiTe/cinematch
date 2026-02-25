@@ -4,7 +4,7 @@ import { useActionState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { User, Loader2, LogIn } from 'lucide-react'
+import { User, Loader2, LogIn, Github } from 'lucide-react'
 import { loginAction } from '@/actions/onboarding'
 
 const initialState = {
@@ -14,6 +14,10 @@ const initialState = {
 
 export function LoginForm() {
   const [state, formAction, isPending] = useActionState(loginAction, initialState)
+
+  const handleGithubLogin = () => {
+    window.location.href = '/api/auth/login/github'
+  }
 
   return (
     <form action={formAction} className="space-y-4">
@@ -33,9 +37,8 @@ export function LoginForm() {
               name="username"
               placeholder="Your name"
               defaultValue=""
-              className={`pl-10 bg-zinc-950/50 border-zinc-700 text-zinc-100 placeholder:text-zinc-500 focus-visible:ring-red-600 focus-visible:border-red-600 ${
-                state?.errors?.username ? 'border-red-500 focus-visible:ring-red-500' : ''
-              }`}
+              className={`pl-10 bg-zinc-950/50 border-zinc-700 text-zinc-100 placeholder:text-zinc-500 focus-visible:ring-red-600 focus-visible:border-red-600 ${state?.errors?.username ? 'border-red-500 focus-visible:ring-red-500' : ''
+                }`}
             />
           </div>
           {state?.errors?.username && (
@@ -60,6 +63,25 @@ export function LoginForm() {
             Login
           </>
         )}
+      </Button>
+
+      <div className="relative py-2">
+        <div className="absolute inset-0 flex items-center">
+          <span className="w-full border-t border-zinc-800" />
+        </div>
+        <div className="relative flex justify-center text-xs uppercase">
+          <span className="bg-zinc-900 px-2 text-zinc-500">Or continue with</span>
+        </div>
+      </div>
+
+      <Button
+        type="button"
+        variant="outline"
+        className="w-full border-zinc-700 bg-zinc-950 text-zinc-200 hover:bg-zinc-900 hover:text-white py-6"
+        onClick={handleGithubLogin}
+      >
+        <Github className="mr-2 h-5 w-5" />
+        GitHub
       </Button>
     </form>
   )
