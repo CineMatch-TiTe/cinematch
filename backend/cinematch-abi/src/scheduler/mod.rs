@@ -327,4 +327,56 @@ impl Scheduler {
         self.tasks.write().await.remove(&party_id);
         debug!("[Scheduler] Removed completed task for party {}", party_id);
     }
+
+    /// Re-evaluate if all members are ready and trigger advance/countdown if so.
+    /// Used when members leave, are kicked, or toggle ready status.
+    pub async fn reevaluate_ready_status<C: AppContext + Clone + 'static>(
+        self: &Arc<Self>,
+        party_id: Uuid,
+        ctx: C,
+    ) {
+        let party = match Party::from_id(&ctx, party_id).await {
+            Ok(p) => p,
+            Err(_) => return,
+        };
+
+        let (ready_count, total) = match party.ready_status(&ctx).await {
+            Ok(res) => res,
+            Err(_) => return,
+        };
+
+        let all_ready = total > 0 && ready_count == total;
+
+        if all_ready {
+            let state = party
+                .state(&ctx)
+                .await
+                .unwrap_or(cinematch_db::repo::party::models::PartyState::Disbanded);
+
+            if state == cinematch_db::repo::party::models::PartyState::Voting {
+                debug!(
+                    "[Scheduler] All members ready in Voting phase for party {}, instant advance!",
+                    party_id
+                );
+                self.trigger_ready_advance_instantly(party_id, ctx.clone())
+                    .await;
+            } else {
+                debug!(
+                    "[Scheduler] All members ready in {:?} phase for party {}, scheduling countdown",
+                    state, party_id
+                );
+                self.schedule_ready_countdown(party_id, ctx.clone()).await;
+            }
+        } else {
+            // If NOT all ready, ensure any pending ready-countdown is cancelled.
+            // Note: This only cancels if it's a ready countdown (via reason check if we added it,
+            // but for now, simple cancel is fine if we're in a phase that supports ready counts).
+            // We should only cancel if it's a "Wait for all ready" countdown.
+            if self.is_scheduled(party_id).await {
+                // Check if the current timeout is a PhaseTimeout or ReadyCountdown.
+                // For now, if anyone becomes unready, we cancel.
+                self.cancel_and_broadcast(party_id, &ctx).await;
+            }
+        }
+    }
 }

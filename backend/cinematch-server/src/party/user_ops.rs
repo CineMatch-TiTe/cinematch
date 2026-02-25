@@ -35,8 +35,10 @@ pub async fn join_party(
     let code = query.into_inner().code;
     let user_id = extract_user_id(user)?;
 
-    // Use ABI Join by code
     let party_obj = Party::join_by_code(&ctx, user_id, &code).await?;
+
+    // Cancel any pending ready countdown because a new unready user just joined
+    ctx.scheduler.cancel_and_broadcast(party_obj.id, &ctx).await;
 
     debug!(
         "User {} successfully joined party {}",
@@ -85,6 +87,11 @@ pub async fn leave_party(
     party_obj.remove_member_checked(&ctx, user_id).await?;
 
     debug!("User {} left party {}", user_id, party_id);
+
+    // Re-evaluate ready status: ifEveryone else is ready, we might advance
+    ctx.scheduler
+        .reevaluate_ready_status(party_id, ctx.clone())
+        .await;
 
     Ok(HttpResponse::Ok().finish())
 }
@@ -195,29 +202,12 @@ pub async fn set_ready(
 
     debug!("Ready state toggled for user {}", user_id);
 
-    if !is_ready {
-        ctx.scheduler.cancel_and_broadcast(party_id, &ctx).await;
-    }
+    ctx.scheduler
+        .reevaluate_ready_status(party_id, ctx.clone())
+        .await;
 
     let (ready_count, total) = party_obj.ready_status(&ctx).await?;
     let all_ready = total > 0 && ready_count == total;
-
-    if all_ready {
-        let state = party_obj
-            .state(&ctx)
-            .await
-            .unwrap_or(cinematch_db::PartyState::Disbanded);
-        if state == cinematch_db::PartyState::Voting {
-            debug!("All members ready in Voting phase, instant advance!");
-            ctx.scheduler
-                .trigger_ready_advance_instantly(party_id, ctx.clone())
-                .await;
-        } else {
-            ctx.scheduler
-                .schedule_ready_countdown(party_id, ctx.clone())
-                .await;
-        }
-    }
 
     Ok(web::Json(ReadyStateResponse { all_ready }))
 }

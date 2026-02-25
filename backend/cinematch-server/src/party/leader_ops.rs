@@ -154,6 +154,12 @@ pub async fn kick_member(
     party_obj.kick(&ctx, requester_id, target_user_id).await?;
 
     debug!("User {} kicked from party {}", target_user_id, party_id);
+
+    // Re-evaluate ready status: ifEveryone else is ready, we might advance
+    ctx.scheduler
+        .reevaluate_ready_status(party_id, ctx.clone())
+        .await;
+
     Ok(HttpResponse::Ok().finish())
 }
 
