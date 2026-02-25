@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 
 import Image from 'next/image'
-import { LogOut, Play, Settings, CheckCircle2, XCircle } from 'lucide-react'
+import { LogOut, SkipForward, Settings, CheckCircle2, XCircle } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import { ActionConfirmationDialog } from '@/components/common/ActionConfirmationDialog'
@@ -18,6 +18,8 @@ import PickingFlow from './picking/PickingFlow'
 import WatchingFlow from './watching/WatchingFlow'
 import { usePartyView } from './PartyViewContext'
 import { usePartyViewLogic } from '@/hooks/usePartyViewLogic'
+import { useDeadlineCountdown } from '@/hooks/useDeadlineCountdown'
+import PhaseCountdown from './PhaseCountdown'
 import { setReadyAction } from '@/actions/party-room'
 import { toast } from 'sonner'
 
@@ -33,6 +35,8 @@ export default function PartyViewClient({
     currentUser
 }: Readonly<PartyViewClientProps>) {
     const { activeView, setActiveView } = usePartyView()
+    const [mounted, setMounted] = useState(false)
+    useEffect(() => { setMounted(true) }, [])
 
     const {
         isManualPending,
@@ -76,21 +80,12 @@ export default function PartyViewClient({
     const isWatchingView = activeView === 'watching'
     const isPartyView = activeView === 'room'
 
-    const renderAdvanceButton = () => {
-        const text = getAdvanceButtonText()
+    // Phase transition countdown for "All Ready"
+    const transitionSecondsLeft = useDeadlineCountdown(party.ready_deadline_at)
+    const showAllReadyCountdown = party.ready_deadline_at && transitionSecondsLeft > 0
 
-        if (!text) return null
-
-        return (
-            <Button
-                size="lg"
-                disabled={isManualPending}
-                className="w-full font-semibold text-lg py-6 shadow-lg shadow-red-500/20 bg-red-600 hover:bg-red-700 text-white animate-in fade-in slide-in-from-bottom-4"
-                onClick={handleAdvanceClick}
-            >
-                <Play className="mr-2 w-5 h-5 fill-current" /> {text}
-            </Button>
-        )
+    if (!mounted) {
+        return <div className="min-h-screen bg-zinc-950" />
     }
 
     return (
@@ -108,13 +103,23 @@ export default function PartyViewClient({
 
             {party.state === 'voting' && (
                 <div style={{ display: isVotingView ? 'block' : 'none' }}>
-                    <VotingFlow partyId={party.id} phaseEnteredAt={party.phase_entered_at} timeoutSecs={party.voting_timeout_secs} />
+                    <VotingFlow
+                        partyId={party.id}
+                        phaseEnteredAt={party.phase_entered_at}
+                        timeoutSecs={party.voting_timeout_secs}
+                        deadlineAt={party.ready_deadline_at}
+                    />
                 </div>
             )}
 
             {party.state === 'watching' && party.selected_movie_id && (
                 <div style={{ display: isWatchingView ? 'block' : 'none' }}>
-                    <WatchingFlow movieId={party.selected_movie_id} phaseEnteredAt={party.phase_entered_at} timeoutSecs={party.watching_timeout_secs} />
+                    <WatchingFlow
+                        movieId={party.selected_movie_id}
+                        phaseEnteredAt={party.phase_entered_at}
+                        timeoutSecs={party.watching_timeout_secs}
+                        deadlineAt={party.ready_deadline_at}
+                    />
                 </div>
             )}
 
@@ -128,11 +133,26 @@ export default function PartyViewClient({
 
                 <div className="w-full max-w-md p-4 flex-1 flex flex-col z-10 relative">
                     <header className="flex flex-col items-center mb-6">
-                        <div className="flex flex-row items-center mb-2 gap-2">
+                        <div className="flex flex-row items-center mb-2 gap-2 relative w-full justify-center">
                             <Image src="/Logo.png" alt="Logo" width={32} height={32} />
                             <h1 className="text-2xl font-bold tracking-tight text-white">Party Room</h1>
+
+                            {isLeader && getAdvanceButtonText() && (
+                                <div className="absolute right-0">
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        disabled={isManualPending}
+                                        className="text-zinc-500 hover:text-white hover:bg-zinc-800 transition-colors"
+                                        onClick={handleAdvanceClick}
+                                        title={getAdvanceButtonText() ?? "Advance Phase"}
+                                    >
+                                        <SkipForward className="h-5 w-5" />
+                                    </Button>
+                                </div>
+                            )}
                         </div>
-                        <div className="absolute top-4 right-4 z-50">
+                        <div className="absolute top-4 left-4 z-50">
                             <PreferencesDialog
                                 trigger={
                                     <Button
@@ -176,7 +196,20 @@ export default function PartyViewClient({
                         {showReadyButton && (
                             <>
                                 <div className="text-center text-sm text-zinc-500 font-medium">
-                                    {allReady ? (
+                                    {showAllReadyCountdown ? (
+                                        <div className="flex flex-col items-center gap-1">
+                                            <span className="text-emerald-400 font-semibold">Everyone Ready!</span>
+                                            <div className="flex items-center gap-2 text-zinc-400">
+                                                <span>Starting in</span>
+                                                <div className="scale-75 origin-center">
+                                                    <PhaseCountdown
+                                                        phaseEnteredAt={new Date().toISOString()}
+                                                        timeoutSecs={transitionSecondsLeft}
+                                                    />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ) : allReady ? (
                                         <span className="text-emerald-400 animate-pulse font-semibold">All Ready! Starting soon...</span>
                                     ) : (
                                         <span>{readyCount}/{members.length} ready</span>
@@ -199,7 +232,7 @@ export default function PartyViewClient({
                             </>
                         )}
 
-                        {renderAdvanceButton()}
+
 
                         <Button
                             variant="ghost"

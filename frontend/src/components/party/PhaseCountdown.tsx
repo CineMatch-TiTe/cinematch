@@ -6,11 +6,16 @@ import { usePhaseCountdown } from '@/hooks/usePhaseCountdown'
 interface PhaseCountdownProps {
     phaseEnteredAt: string
     timeoutSecs: number
+    deadlineAt?: string | null
 }
 
 /** Floating countdown pill — shows mm:ss remaining in the current phase. */
-export default function PhaseCountdown({ phaseEnteredAt, timeoutSecs }: Readonly<PhaseCountdownProps>) {
-    const secondsLeft = usePhaseCountdown(phaseEnteredAt, timeoutSecs)
+export default function PhaseCountdown({ phaseEnteredAt, timeoutSecs, deadlineAt }: Readonly<PhaseCountdownProps>) {
+    const secondsLeft = usePhaseCountdown(phaseEnteredAt, timeoutSecs, deadlineAt)
+
+    // If we're in a participation-based phase and no deadline is set, don't show the pill
+    if (!deadlineAt && timeoutSecs === 0) return null
+    if (secondsLeft === 0 && !deadlineAt && timeoutSecs === 0) return null
 
     const minutes = Math.floor(secondsLeft / 60)
     const secs = secondsLeft % 60
@@ -21,8 +26,8 @@ export default function PhaseCountdown({ phaseEnteredAt, timeoutSecs }: Readonly
     return (
         <div
             className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-mono font-semibold border transition-colors ${isUrgent
-                    ? 'border-red-500/50 bg-red-500/10 text-red-400 animate-pulse'
-                    : 'border-zinc-700 bg-zinc-800/80 text-zinc-300'
+                ? 'border-red-500/50 bg-red-500/10 text-red-400 animate-pulse'
+                : 'border-zinc-700 bg-zinc-800/80 text-zinc-300'
                 }`}
         >
             <Timer className="w-3.5 h-3.5" />

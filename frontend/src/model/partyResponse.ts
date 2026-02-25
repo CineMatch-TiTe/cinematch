@@ -25,6 +25,11 @@ export interface PartyResponse {
   /** When the party entered the current phase (Voting, Watching, etc.). Used with timeout secs for client countdown. */
   phase_entered_at: string;
   /**
+   * Deadline for current transition (e.g. All Ready countdown).
+   * @nullable
+   */
+  ready_deadline_at?: string | null;
+  /**
    * Selected winner movie ID (set when voting ends with a majority; in Watching/Review).
    * @nullable
    */

@@ -2,6 +2,7 @@ import { useState, useTransition, useEffect, useRef, useCallback } from 'react'
 import { toast } from 'sonner'
 import { getMoviesByIdsAction, getPartyVotesAction, voteMovieAction, setReadyAction } from '@/actions/party-room'
 import { MovieResponse } from '@/model'
+import { prefetchImages } from '@/lib/utils'
 
 export function useVoting(partyId: string) {
   const [movies, setMovies] = useState<MovieResponse[]>([])
@@ -32,7 +33,12 @@ export function useVoting(partyId: string) {
   const handleBallotChange = useCallback(
     async (newMovieIds: number[], nextRound: number) => {
       if (transitionData) return
-      const isRestart = votingRound === 2 && nextRound === 1
+      // Detection: 
+      // 1. Moving from round 2 to 1 (fallback)
+      // 2. Staying in round 1 but we already HAD movies (manual or auto-restart on empty)
+      const isRestart = (votingRound === 2 && nextRound === 1) ||
+        (votingRound === 1 && nextRound === 1 && movies.length > 0)
+
       setTransitionData({ round: nextRound, restart: isRestart })
       displayedMovieIds.current = newMovieIds
 
@@ -46,6 +52,7 @@ export function useVoting(partyId: string) {
 
       if (moviesResult.data) {
         setMovies(moviesResult.data)
+        prefetchImages(moviesResult.data.map(m => m.poster_url))
       } else {
         setMovies([])
       }
@@ -73,6 +80,7 @@ export function useVoting(partyId: string) {
         const moviesResult = await getMoviesByIdsAction(ballotIds)
         if (moviesResult.data) {
           setMovies(moviesResult.data)
+          prefetchImages(moviesResult.data.map(m => m.poster_url))
         }
       }
       setLoading(false)

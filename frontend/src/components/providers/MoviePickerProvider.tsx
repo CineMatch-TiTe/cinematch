@@ -5,8 +5,6 @@ import { MovieResponse } from '@/model/movieResponse'
 
 interface PickerState {
     movies: MovieResponse[]
-    seenMovieIds: Set<number>
-    currentIndex: number
     noNewMovies: boolean
 }
 

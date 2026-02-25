@@ -1,6 +1,7 @@
 use crate::models::{NewShownMovie, NewVote, Vote};
 use crate::schema::{shown_movies, votes};
 use crate::{Database, DbError, DbResult};
+use diesel::AggregateExpressionMethods;
 use diesel::prelude::*;
 use diesel_async::RunQueryDsl;
 use rand::seq::SliceRandom;
@@ -287,6 +288,18 @@ impl Database {
             }
         }
         Ok(true)
+    }
+
+    /// Count how many unique members have cast at least one vote for this party round.
+    pub(crate) async fn get_voting_participation_count(&self, party_id: Uuid) -> DbResult<usize> {
+        let mut conn = self.conn().await?;
+        let count: i64 = votes::table
+            .filter(votes::party_id.eq(party_id))
+            .select(diesel::dsl::count(votes::user_id).aggregate_distinct())
+            .get_result::<i64>(&mut conn)
+            .await?;
+
+        Ok(count as usize)
     }
 
     /// Get all votes for a user in a party

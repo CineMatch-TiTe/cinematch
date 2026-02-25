@@ -40,10 +40,10 @@ export default function MovieCard({
             alt={movie.title}
             fill
             sizes="(max-width: 768px) 100vw, 500px"
-            className={`object-cover transition-opacity duration-500 ${
-              isImageLoading ? 'opacity-0' : 'opacity-60'
-            }`}
+            className={`object-cover transition-opacity duration-500 ${isImageLoading ? 'opacity-0' : 'opacity-60'
+              }`}
             priority
+            unoptimized
             onLoad={() => setIsImageLoading(false)}
           />
           {isImageLoading && <Skeleton className="absolute inset-0 bg-zinc-800" />}

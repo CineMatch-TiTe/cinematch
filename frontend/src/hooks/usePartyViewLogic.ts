@@ -85,6 +85,8 @@ export function usePartyViewLogic({ party, currentUser, setActiveView }: UsePart
     if (!isLeader) return null
     if (party.state === 'created') return 'Start Picking'
     if (party.state === 'picking') return 'Start Voting'
+    if (party.state === 'voting') return 'Skip Phase'
+    if (party.state === 'review' || party.state === 'watching') return 'New Round'
     return null
   }
 

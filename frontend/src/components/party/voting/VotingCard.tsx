@@ -24,9 +24,8 @@ function VotingCard({
 
   return (
     <Card
-      className={`bg-zinc-900/50 border-zinc-800 overflow-hidden transition-colors ${
-        hasVoted ? 'border-red-600' : 'hover:border-zinc-700'
-      }`}
+      className={`bg-zinc-900/50 border-zinc-800 overflow-hidden transition-colors ${hasVoted ? 'border-red-600' : 'hover:border-zinc-700'
+        }`}
     >
       <div className="flex flex-row h-40 sm:h-48 px-4">
         <div className="relative w-28 sm:w-36 shrink-0 bg-zinc-800">
@@ -37,10 +36,10 @@ function VotingCard({
                 alt={movie.title}
                 fill
                 loading="eager"
+                unoptimized
                 sizes="(max-width: 640px) 112px, 144px"
-                className={`object-cover transition-opacity duration-300 ${
-                  isImageLoading ? 'opacity-0' : 'opacity-100'
-                }`}
+                className={`object-cover transition-opacity duration-300 ${isImageLoading ? 'opacity-0' : 'opacity-100'
+                  }`}
                 onLoad={() => setIsImageLoading(false)}
               />
               {isImageLoading && <Skeleton className="absolute inset-0 bg-zinc-800" />}

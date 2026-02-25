@@ -11,9 +11,10 @@ interface VotingFlowProps {
   partyId: string
   phaseEnteredAt: string
   timeoutSecs: number
+  deadlineAt?: string | null
 }
 
-export default function VotingFlow({ partyId, phaseEnteredAt, timeoutSecs }: Readonly<VotingFlowProps>) {
+export default function VotingFlow({ partyId, phaseEnteredAt, timeoutSecs, deadlineAt }: Readonly<VotingFlowProps>) {
   const { movies, votingRound, loading, countdown, showContent, transitionData, handleVote, handleReady } =
     useVoting(partyId)
   const [isVotingReady, setIsVotingReady] = useState(false)
@@ -66,13 +67,20 @@ export default function VotingFlow({ partyId, phaseEnteredAt, timeoutSecs }: Rea
     <div className="min-h-screen bg-zinc-950 text-zinc-100 pb-32 pt-8 px-4 flex flex-col items-center">
       <div className="w-full max-w-2xl space-y-6">
         <div className="flex flex-col items-center justify-center mb-8 gap-2">
-          <PhaseCountdown phaseEnteredAt={phaseEnteredAt} timeoutSecs={timeoutSecs} />
+          <PhaseCountdown
+            phaseEnteredAt={phaseEnteredAt}
+            timeoutSecs={deadlineAt ? timeoutSecs : 0}
+            deadlineAt={deadlineAt}
+          />
           <div className="text-sm font-medium text-red-500 uppercase tracking-widest border border-red-500/30 px-3 py-1 rounded-full bg-red-500/10">
             Round {votingRound}
           </div>
           <h2 className="text-3xl font-bold text-center bg-clip-text bg-linear-to-r text-white">
-            Vote for your Top {votingRound === 1 ? '5' : '3'}
+            Vote for multiple movies!
           </h2>
+          <div className="text-zinc-400 text-sm font-medium">
+            (Pick your Top {votingRound === 1 ? '5' : '3'})
+          </div>
           {votingRound === 1 && (
             <Button
               onClick={() => {

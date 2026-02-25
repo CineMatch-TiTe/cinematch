@@ -26,7 +26,7 @@ pub use startup::reschedule_timeouts_on_startup;
 /// Registry managing timeout tasks per party.
 /// Each party has at most one active timeout (phase timeout or ready countdown).
 pub struct Scheduler {
-    tasks: RwLock<HashMap<Uuid, AbortHandle>>,
+    tasks: RwLock<HashMap<Uuid, (AbortHandle, DateTime<Utc>)>>,
 }
 
 impl Default for Scheduler {
@@ -44,12 +44,22 @@ impl Scheduler {
 
     /// Cancel any pending timeout for a party.
     pub async fn cancel(&self, party_id: Uuid) {
-        if let Some(handle) = self.tasks.write().await.remove(&party_id) {
+        if let Some((handle, _)) = self.tasks.write().await.remove(&party_id) {
             handle.abort();
             info!("[Scheduler] ❌ Cancelled timeout for party {}", party_id);
         } else {
             debug!("[Scheduler] No timeout to cancel for party {}", party_id);
         }
+    }
+
+    /// Check if a timeout is currently scheduled for a party.
+    pub async fn is_scheduled(&self, party_id: Uuid) -> bool {
+        self.tasks.read().await.contains_key(&party_id)
+    }
+
+    /// Get the deadline for a party's pending timeout.
+    pub async fn get_deadline(&self, party_id: Uuid) -> Option<DateTime<Utc>> {
+        self.tasks.read().await.get(&party_id).map(|(_, d)| *d)
     }
 
     /// Schedule a phase timeout (Voting/Watching).
@@ -100,7 +110,7 @@ impl Scheduler {
         self.tasks
             .write()
             .await
-            .insert(party_id, handle.abort_handle());
+            .insert(party_id, (handle.abort_handle(), deadline_at));
     }
 
     /// Schedule ready countdown.
@@ -159,7 +169,17 @@ impl Scheduler {
         self.tasks
             .write()
             .await
-            .insert(party_id, handle.abort_handle());
+            .insert(party_id, (handle.abort_handle(), deadline_at));
+    }
+
+    /// Advance phase instantly (skipping ready countdown).
+    pub async fn trigger_ready_advance_instantly<C: AppContext + Clone + 'static>(
+        self: &Arc<Self>,
+        party_id: Uuid,
+        ctx: C,
+    ) {
+        self.cancel(party_id).await;
+        executor::execute_ready_countdown(self, party_id, ctx).await;
     }
 
     /// Cancel timeout and broadcast that deadline is cleared.
@@ -182,6 +202,8 @@ impl Scheduler {
         party_id: Uuid,
         ctx: C,
     ) {
+        self.cancel(party_id).await;
+
         let party = match Party::from_id(&ctx, party_id).await {
             Ok(p) => p,
             Err(e) => {
@@ -200,12 +222,19 @@ impl Scheduler {
 
         let timeout_secs = match state {
             PartyState::Voting => {
-                let round = party.voting_round(&ctx).await.unwrap_or(Some(1));
-                if round == Some(2) {
-                    timeouts.voting_r2_timeout_secs
-                } else {
-                    timeouts.voting_r1_timeout_secs
-                }
+                // By default, we don't schedule Voting timeout automatically on entry.
+                // However, we still broadcast the phase config snapshot so clients know timeouts are POSSIBLE.
+                ctx.broadcast_party(
+                    party_id,
+                    &ServerMessage::PartyTimeoutUpdate(PartyTimeoutUpdate {
+                        phase_entered_at: Some(phase_entered_at),
+                        timeout_secs: None,
+                        deadline_at: None,
+                        reason: None,
+                    }),
+                    None,
+                );
+                return;
             }
             PartyState::Watching => timeouts.watching_timeout_secs,
             _ => {
@@ -240,6 +269,56 @@ impl Scheduler {
                 reason: Some(TimeoutReason::PhaseTimeout),
             }),
             None,
+        );
+    }
+
+    /// Explicitly trigger and schedule the voting timeout (participation threshold met).
+    pub async fn trigger_voting_timeout<C: AppContext + Clone + 'static>(
+        self: &Arc<Self>,
+        party_id: Uuid,
+        ctx: C,
+    ) {
+        if self.is_scheduled(party_id).await {
+            return;
+        }
+
+        let party = match Party::from_id(&ctx, party_id).await {
+            Ok(p) => p,
+            Err(_) => return,
+        };
+
+        let round = party.voting_round(&ctx).await.unwrap_or(None).unwrap_or(1);
+        let timeout_secs = if round == 2 {
+            cinematch_common::Config::get()
+                .timeouts
+                .voting_r2_timeout_secs
+        } else {
+            cinematch_common::Config::get()
+                .timeouts
+                .voting_r1_timeout_secs
+        };
+
+        let deadline_at = Utc::now() + chrono::Duration::seconds(timeout_secs as i64);
+
+        self.schedule_phase_timeout(party_id, PartyState::Voting, deadline_at, ctx.clone())
+            .await;
+
+        ctx.broadcast_party(
+            party_id,
+            &ServerMessage::PartyTimeoutUpdate(PartyTimeoutUpdate {
+                phase_entered_at: None,
+                timeout_secs: Some(timeout_secs),
+                deadline_at: Some(deadline_at),
+                reason: Some(TimeoutReason::PhaseTimeout),
+            }),
+            None,
+        );
+
+        info!(
+            "[Scheduler] Voting timeout triggered for party {} (Round {}) | deadline: {}",
+            party_id,
+            round,
+            deadline_at.format("%H:%M:%S UTC")
         );
     }
 

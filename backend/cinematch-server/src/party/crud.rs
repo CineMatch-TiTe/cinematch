@@ -102,11 +102,16 @@ pub async fn get_party(
     };
     let timeouts = &cinematch_common::Config::get().timeouts;
     let watching_timeout_secs = timeouts.watching_timeout_secs;
-    let voting_timeout_secs = if party_obj.voting_round(&ctx).await.unwrap_or(Some(1)) == Some(2) {
-        timeouts.voting_r2_timeout_secs
-    } else {
-        timeouts.voting_r1_timeout_secs
-    };
+    let mut voting_timeout_secs =
+        if party_obj.voting_round(&ctx).await.unwrap_or(Some(1)) == Some(2) {
+            timeouts.voting_r2_timeout_secs
+        } else {
+            timeouts.voting_r1_timeout_secs
+        };
+
+    if state == cinematch_db::PartyState::Voting && !ctx.scheduler.is_scheduled(party_id).await {
+        voting_timeout_secs = 0;
+    }
 
     let response = super::PartyResponse {
         id: party_obj.id,
@@ -119,6 +124,7 @@ pub async fn get_party(
         phase_entered_at: party_obj.phase_entered_at(&ctx).await?,
         voting_timeout_secs,
         watching_timeout_secs,
+        ready_deadline_at: ctx.scheduler.get_deadline(party_id).await,
     };
     Ok(web::Json(response))
 }

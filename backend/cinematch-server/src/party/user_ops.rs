@@ -203,9 +203,20 @@ pub async fn set_ready(
     let all_ready = total > 0 && ready_count == total;
 
     if all_ready {
-        ctx.scheduler
-            .schedule_ready_countdown(party_id, ctx.clone())
-            .await;
+        let state = party_obj
+            .state(&ctx)
+            .await
+            .unwrap_or(cinematch_db::PartyState::Disbanded);
+        if state == cinematch_db::PartyState::Voting {
+            debug!("All members ready in Voting phase, instant advance!");
+            ctx.scheduler
+                .trigger_ready_advance_instantly(party_id, ctx.clone())
+                .await;
+        } else {
+            ctx.scheduler
+                .schedule_ready_countdown(party_id, ctx.clone())
+                .await;
+        }
     }
 
     Ok(web::Json(ReadyStateResponse { all_ready }))
