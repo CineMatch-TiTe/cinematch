@@ -3,7 +3,6 @@ use async_trait::async_trait;
 use cinematch_common::Config;
 use cinematch_db::domain::User;
 use cinematch_db::models::AuthProvider;
-use octocrab::Octocrab;
 use secrecy::ExposeSecret;
 use uuid::Uuid;
 
@@ -12,6 +11,7 @@ pub struct GithubUserInfo {
     pub provider_user_id: String,
     pub display_name: Option<String>,
     pub email: Option<String>,
+    pub avatar_url: String,
 }
 
 #[async_trait]
@@ -40,14 +40,23 @@ impl ExternalAuthLogic for User {
             .as_ref()
             .ok_or_else(|| DomainError::Internal("GitHub OAuth is not configured".to_string()))?;
 
-        // 1. Exchange code for access token using Octocrab with explicit Accept header
-        // Using unwrap() for "accept" parsing as it's a known valid header name, matching the user's example.
-        let oauth_client = Octocrab::builder()
+        // 1. Exchange code for access token using a one-off builder for the auth endpoint.
+        // We use a separate builder because this hits github.com, not api.github.com.
+        let oauth_client = octocrab::Octocrab::builder()
             .base_uri("https://github.com")
-            .unwrap()
-            .add_header("accept".parse().unwrap(), "application/json".to_string()) // unwrap safe, "accept" is a valid header name
+            .map_err(|e| DomainError::Internal(format!("Invalid GitHub URI: {}", e)))?
+            .add_header(
+                "accept"
+                    .parse()
+                    .map_err(|e| DomainError::Internal(format!("Invalid header: {}", e)))?,
+                "application/json"
+                    .parse()
+                    .map_err(|e| DomainError::Internal(format!("Invalid header: {}", e)))?,
+            )
             .build()
-            .unwrap();
+            .map_err(|e| {
+                DomainError::Internal(format!("Failed to build Octocrab client: {}", e))
+            })?;
 
         let token_res = oauth_client
             .post::<_, serde_json::Value>(
@@ -67,20 +76,26 @@ impl ExternalAuthLogic for User {
             })?;
 
         // 2. Fetch user info from GitHub
-        let crab = Octocrab::builder()
+        let crab = octocrab::Octocrab::builder()
             .user_access_token(oauth.access_token.expose_secret())
             .build()
-            .map_err(|e| DomainError::Internal(e.to_string()))?;
+            .map_err(|e| DomainError::Internal(format!("Failed to build user Octocrab: {}", e)))?;
 
         let gh_user =
             crab.current().user().await.map_err(|e| {
                 DomainError::Internal(format!("Failed to fetch GitHub user: {}", e))
             })?;
 
+        let name = match gh_user.name {
+            Some(name) => name,
+            None => gh_user.login,
+        };
+
         Ok(GithubUserInfo {
             provider_user_id: gh_user.id.to_string(),
-            display_name: Some(gh_user.login), // Fallback to login
-            email: None, // Author model doesn't have email directly in this version
+            display_name: Some(name),
+            email: gh_user.email,
+            avatar_url: gh_user.avatar_url.to_string(),
         })
     }
 
