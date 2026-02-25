@@ -39,7 +39,7 @@ export default async function PartyRoomLayout({
 
   return (
     <PartyViewProvider initialView={initialView} partyState={partyState}>
-      <div className="relative min-h-screen bg-zinc-950">
+      <div className="relative">
         {children}
         <PartyFooterNavigation />
       </div>
