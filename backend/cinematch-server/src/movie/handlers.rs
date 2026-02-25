@@ -1,7 +1,6 @@
 use super::{AppState, GenreResponse, MovieResponse, SearchQuery, SearchResponse};
 use crate::api_error::ApiError;
-use crate::extract_user_id;
-use actix_identity::Identity;
+use crate::auth::guard::Auth;
 use actix_web::{get, post, web};
 use cinematch_common::SearchFilter;
 use cinematch_common::models::ErrorResponse;
@@ -16,16 +15,16 @@ use cinematch_db::domain::Movie;
     ),
     params(("movie_id" = i64, Query, description = "TMDB movie ID")),
     tags = ["Movie"],
-    security(("cookie_auth" = [])),
+    security(("cookie_auth" = []), ("bearer_auth" = [])),
     operation_id = "movie_get_info"
 )]
 #[get("")]
 pub async fn get_movie(
     ctx: AppState,
-    user: Option<Identity>,
+    auth: Option<Auth>,
     query: web::Query<crate::party::MovieIdQuery>,
 ) -> Result<web::Json<super::MovieResponse>, ApiError> {
-    let _ = extract_user_id(user)?;
+    let _ = auth.ok_or_else(|| ApiError::Unauthorized("No identity provided".to_string()))?;
     let movie_id = query.movie_id;
 
     let movie = Movie::new(movie_id)
@@ -44,15 +43,15 @@ pub async fn get_movie(
         (status = 500, description = "Internal server error", body = ErrorResponse)
     ),
     tags = ["Movie"],
-    security(("cookie_auth" = [])),
+    security(("cookie_auth" = []), ("bearer_auth" = [])),
     operation_id = "get_genres"
 )]
 #[get("/genres")]
 pub async fn get_genres(
     ctx: AppState,
-    user: Option<Identity>,
+    auth: Option<Auth>,
 ) -> Result<web::Json<super::GenreResponse>, ApiError> {
-    let _ = extract_user_id(user)?;
+    let _ = auth.ok_or_else(|| ApiError::Unauthorized("No identity provided".to_string()))?;
 
     let genre_map = Movie::all_genres(&ctx).await?;
     let mut names: Vec<String> = genre_map.keys().cloned().collect();
@@ -75,17 +74,17 @@ pub async fn get_genres(
         (status = 500, description = "Internal server error", body = ErrorResponse)
     ),
     tags = ["Movie"],
-    security(("cookie_auth" = [])),
+    security(("cookie_auth" = []), ("bearer_auth" = [])),
     operation_id = "search_movies"
 )]
 #[post("/search")]
 pub async fn search(
     ctx: AppState,
-    user: Option<Identity>,
+    auth: Option<Auth>,
     query: web::Query<SearchQuery>,
     body: Option<web::Json<cinematch_common::SearchFilter>>,
 ) -> Result<web::Json<SearchResponse>, ApiError> {
-    let _ = extract_user_id(user)?;
+    let _ = auth.ok_or_else(|| ApiError::Unauthorized("No identity provided".to_string()))?;
 
     let query_inner = query.into_inner();
     let filter = body.map(|b| b.into_inner());

@@ -7,7 +7,8 @@ use crate::{auth, handlers, movie, party, recommendation, user, websocket};
 pub fn configure_auth() -> impl FnOnce(&mut ServiceConfig) {
     |cfg: &mut ServiceConfig| {
         cfg.service(auth::handlers::login_guest)
-            .service(auth::handlers::logout_user);
+            .service(auth::handlers::logout_user)
+            .service(auth::handlers::renew_jwt);
 
         if cinematch_common::Config::get().github.is_some() {
             cfg.service(auth::github::login_github)

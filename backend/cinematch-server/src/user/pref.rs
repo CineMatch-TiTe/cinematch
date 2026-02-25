@@ -1,11 +1,10 @@
-use actix_identity::Identity;
+use crate::auth::guard::Auth;
 use actix_web::{get, patch, web};
 use log::error;
 use uuid::Uuid;
 
 use crate::AppState;
 use crate::api_error::ApiError;
-use crate::extract_user_id;
 use cinematch_common::models::ErrorResponse;
 use cinematch_db::UpdateUserPreferences;
 use cinematch_db::domain::{Movie, User};
@@ -20,15 +19,17 @@ use super::{UpdateUserPreferencesRequest, UserPreferencesResponse};
         (status = 500, description = "Internal server error", body = ErrorResponse)
     ),
     tags = ["User"],
-    security(("cookie_auth" = [])),
+    security(("cookie_auth" = []), ("bearer_auth" = [])),
     operation_id = "get_user_preferences"
 )]
 #[get("/preferences")]
 pub async fn get_user_pref(
     ctx: AppState,
-    user: Option<Identity>,
+    auth: Option<Auth>,
 ) -> Result<web::Json<UserPreferencesResponse>, ApiError> {
-    let user_id = extract_user_id(user)?;
+    let user_id = auth
+        .ok_or_else(|| ApiError::Unauthorized("No identity provided".to_string()))?
+        .user_id();
     let user_obj = User::from_id(&ctx, user_id).await?;
     let prefs_handle = user_obj.preferences(&ctx).await?;
     let prefs_record = prefs_handle.record(&ctx).await?;
@@ -82,16 +83,18 @@ pub async fn get_user_pref(
         (status = 500, description = "Internal server error", body = ErrorResponse)
     ),
     tags = ["User"],
-    security(("cookie_auth" = [])),
+    security(("cookie_auth" = []), ("bearer_auth" = [])),
     operation_id = "edit_user_preferences"
 )]
 #[patch("/preferences")]
 pub async fn edit_user_pref(
     ctx: AppState,
-    user: Option<Identity>,
+    auth: Option<Auth>,
     update: web::Json<UpdateUserPreferencesRequest>,
 ) -> Result<web::Json<UserPreferencesResponse>, ApiError> {
-    let user_id = extract_user_id(user)?;
+    let user_id = auth
+        .ok_or_else(|| ApiError::Unauthorized("No identity provided".to_string()))?
+        .user_id();
     let user_obj = User::from_id(&ctx, user_id).await?;
     let prefs_handle = user_obj.preferences(&ctx).await?;
 

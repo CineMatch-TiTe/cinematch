@@ -1,6 +1,5 @@
 //! WebSocket handler and broadcast helpers using actor-based WsRegistry.
 
-use actix_identity::Identity;
 use actix_web::{HttpRequest, HttpResponse, get, web::Payload};
 use actix_web_actors::ws;
 use log::{error, trace};
@@ -8,7 +7,7 @@ use uuid::Uuid;
 
 use crate::AppState;
 use crate::api_error::ApiError;
-use crate::extract_user_id;
+use crate::auth::guard::Auth;
 use cinematch_abi::websocket::session::WsSession;
 use cinematch_db::domain::Party;
 
@@ -22,7 +21,7 @@ pub use cinematch_common::models::websocket::ServerMessage;
         (status = 401, description = "Unauthorized")
     ),
     tags = ["websocket"],
-    security(("cookie_auth" = [])),
+    security(("cookie_auth" = []), ("bearer_auth" = [])),
     operation_id = "websocket"
 )]
 #[get("")]
@@ -30,9 +29,9 @@ pub async fn websocket_controller(
     req: HttpRequest,
     stream: Payload,
     ctx: AppState,
-    user: Identity,
+    auth: Auth,
 ) -> Result<HttpResponse, ApiError> {
-    let user_id = extract_user_id(user)?;
+    let user_id = auth.user_id();
 
     trace!("WebSocket upgrade for user {}", user_id);
 

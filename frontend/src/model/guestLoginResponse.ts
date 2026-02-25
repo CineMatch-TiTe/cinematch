@@ -9,6 +9,12 @@
  * Response when creating a guest user
  */
 export interface GuestLoginResponse {
+  /** Short-lived JWT for API access (1h) */
+  jwt: string;
+  /** Token expiry timestamp (Unix seconds) */
+  token_expires_at: number;
+  /** Seconds until token expiry */
+  token_expires_in: number;
   /** The newly created user ID */
   user_id: string;
   /** The username */

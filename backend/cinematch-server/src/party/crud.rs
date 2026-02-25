@@ -1,11 +1,11 @@
 use super::{CreatePartyResponse, PartyResponse};
 use crate::AppState;
 use crate::api_error::ApiError;
-use crate::extract_user_id;
 use cinematch_common::models::ErrorResponse;
 
-use actix_identity::Identity;
 use actix_web::{HttpResponse, get, post, web};
+
+use crate::auth::guard::Auth; // unified authorization extractor
 use cinematch_abi::domain::{PartyValidation, UserLogic};
 use cinematch_db::domain::{Party, User};
 use log::debug;
@@ -19,12 +19,14 @@ use log::debug;
         (status = 500, description = "Internal server error", body = ErrorResponse)
     ),
     tags = ["Party"],
-    security(("cookie_auth" = [])),
+    security(("cookie_auth" = []), ("bearer_auth" = [])),
     operation_id = "create_party"
 )]
 #[post("")]
-pub async fn create_party(ctx: AppState, user: Identity) -> Result<HttpResponse, ApiError> {
-    let user_id = extract_user_id(user)?;
+pub async fn create_party(ctx: AppState, auth: Option<Auth>) -> Result<HttpResponse, ApiError> {
+    let user_id = auth
+        .ok_or_else(|| ApiError::Unauthorized("No identity provided".to_string()))?
+        .user_id();
 
     let user_obj = User::from_id(&ctx, user_id).await?;
 
@@ -63,16 +65,18 @@ pub async fn create_party(ctx: AppState, user: Identity) -> Result<HttpResponse,
     ),
     params(super::OptionalIdParam),
     tags = ["Party"],
-    security(("cookie_auth" = [])),
+    security(("cookie_auth" = []), ("bearer_auth" = [])),
     operation_id = "get_party"
 )]
 #[get("")]
 pub async fn get_party(
     ctx: AppState,
-    user: Identity,
+    auth: Option<Auth>,
     query: web::Query<super::OptionalIdParam>,
 ) -> Result<web::Json<super::PartyResponse>, ApiError> {
-    let user_id = extract_user_id(user)?;
+    let user_id = auth
+        .ok_or_else(|| ApiError::Unauthorized("No identity provided".to_string()))?
+        .user_id();
     let party_id = match query.party_id {
         Some(id) => id,
         None => {

@@ -23,6 +23,12 @@ pub struct GuestLoginResponse {
     pub user_id: Uuid,
     /// The username
     pub username: String,
+    /// Short-lived JWT for API access (1h)
+    pub jwt: String,
+    /// Token expiry timestamp (Unix seconds)
+    pub token_expires_at: i64,
+    /// Seconds until token expiry
+    pub token_expires_in: i64,
 }
 
 /// Response with user details
@@ -55,9 +61,11 @@ pub struct CurrentUserResponse {
     /// When the user was last updated
     pub updated_at: DateTime<Utc>,
     /// Token expiry timestamp (Unix seconds)
-    pub token_expires_at: i64,
+    /// This is optional because we can only get if user logged in via JWT; cookie-authenticated users won't have this field.
+    pub token_expires_at: Option<i64>,
     /// Seconds until token expiry
-    pub token_expires_in: i64,
+    /// This is optional because we can only get if user logged in via JWT; cookie-authenticated users won't have this field.
+    pub token_expires_in: Option<i64>,
 }
 
 // ============================================================================
