@@ -91,4 +91,4 @@ pnpm dev
 License
 -------
 
-MIT License. See LICENSE for details.
+GPL-3.0-or-later. See LICENSE for details.
