@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
     redirect('/?error=missing_code')
   }
 
-  const baseUrl = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:8085'
+  const baseUrl = process.env.NEXT_PUBLIC_API_BASE || 'https://api.cinematch.space'
 
   // Build the backend callback URL with the same query params
   const backendUrl = new URL(`${baseUrl}/api/auth/callback/github`)

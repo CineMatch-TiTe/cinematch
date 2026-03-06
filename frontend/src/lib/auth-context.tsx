@@ -87,7 +87,7 @@ export function AuthProvider({ children }: Readonly<{ children: ReactNode }>) {
 
       refreshTimerRef.current = setTimeout(async () => {
         try {
-          const baseUrl = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:8085'
+          const baseUrl = process.env.NEXT_PUBLIC_API_BASE || 'https://api.cinematch.space'
           const response = await fetch(`${baseUrl}/api/auth/renew`, {
             method: 'POST',
             headers: {
@@ -141,7 +141,7 @@ export function AuthProvider({ children }: Readonly<{ children: ReactNode }>) {
         }
 
         // Try to renew using the existing token
-        const baseUrl = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:8085'
+        const baseUrl = process.env.NEXT_PUBLIC_API_BASE || 'https://api.cinematch.space'
         const response = await fetch(`${baseUrl}/api/auth/renew`, {
           method: 'POST',
           headers: {
