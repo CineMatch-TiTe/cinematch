@@ -42,6 +42,9 @@ pub enum ServerMessage {
 
     /// Timeout config for the current phase. Sent whenever phase changes (or round 2). Clients use for countdown.
     PartyTimeoutUpdate(PartyTimeoutUpdate),
+
+    /// Optional new code for the party
+    PartyCodeChanged(String),
 }
 
 /// Timeout info for the current phase.

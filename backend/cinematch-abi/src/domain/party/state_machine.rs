@@ -358,6 +358,22 @@ async fn do_review_to_created(ctx: &impl AppContext, party: &Party) -> Result<()
         DomainError::Internal(format!("Failed to start new round: {}", e))
     })?;
     debug!("Party {} started new round", party.id);
+
+    let code = match party.join_code(ctx).await.map_err(|e| {
+        error!("Failed to get party join code: {}", e);
+        DomainError::Internal(format!("Failed to get party join code: {}", e))
+    })? {
+        Some(code) => code,
+        None => {
+            error!("Party {} has no join code", party.id);
+            return Err(DomainError::Internal("Party has no join code".into()));
+        }
+    };
+
+    debug!("Party {} new join code: {}", party.id, code);
+
+    ctx.broadcast_party(party.id, &ServerMessage::PartyCodeChanged(code), None);
+
     Ok(())
 }
 
