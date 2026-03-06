@@ -68,7 +68,8 @@ export type ServerMessage =
   | { PartyMemberLeft: string } // uuid string
   | { PartyStateChanged: PartyStateChangedPayload }
   | { UpdateReadyState: ReadyStateUpdatePayload }
-  | 'PartyDisbanded' // This might be serialized as a string "PartyDisbanded" if it has no payload
+  | 'PartyDisbanded'
+  | 'ResetReadiness'
   | { MovieVoteUpdate: MovieVotesPayload }
   | { VotingRoundStarted: VotingRoundStartedPayload }
   | { PartyTimeoutUpdate: PartyTimeoutUpdatePayload }
