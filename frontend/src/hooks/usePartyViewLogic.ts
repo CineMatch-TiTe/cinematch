@@ -26,7 +26,9 @@ export function usePartyViewLogic({ party, currentUser, setActiveView }: UsePart
   // Effect to handle view switching based on party state
   useEffect(() => {
     if (prevPartyState.current !== party.state) {
-      if (party.state === 'voting') {
+      if (party.state === 'picking') {
+        setActiveView('picking')
+      } else if (party.state === 'voting') {
         setActiveView('voting')
       } else if (party.state === 'watching') {
         setActiveView('watching')

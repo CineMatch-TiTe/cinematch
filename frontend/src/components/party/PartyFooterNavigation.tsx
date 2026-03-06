@@ -12,7 +12,7 @@ export function PartyFooterNavigation() {
     { id: 'room', label: 'Party', icon: Users }
   ]
 
-  if (partyState !== 'voting' && partyState !== 'watching') {
+  if (partyState === 'created' || partyState === 'picking') {
     navItems.push({ id: 'picking', label: 'Picking', icon: Clapperboard })
   }
 

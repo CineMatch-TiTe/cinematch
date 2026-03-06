@@ -57,7 +57,7 @@ export default function PartyViewClient({
     const currentMember = members.find(m => m.user_id === currentUser.user_id)
     const serverReady = currentMember?.is_ready ?? false
     const [optimisticReady, setOptimisticReady] = useState(serverReady)
-    const showReadyButton = party.state === 'created' || party.state === 'picking'
+    const showReadyButton = party.state === 'picking'
 
     // Sync optimistic state from server when it changes
     useEffect(() => { setOptimisticReady(serverReady) }, [serverReady])
@@ -104,16 +104,11 @@ export default function PartyViewClient({
                     </Button>
                 </div>
             )}
-            <div
-                style={{
-                    display:
-                        isPickingView && party.state !== 'voting' && party.state !== 'watching'
-                            ? 'block'
-                            : 'none'
-                }}
-            >
-                <PickingFlow partyId={party.id} />
-            </div>
+            {(party.state === 'created' || party.state === 'picking') && (
+                <div style={{ display: isPickingView ? 'block' : 'none' }}>
+                    <PickingFlow partyId={party.id} />
+                </div>
+            )}
 
             {party.state === 'voting' && (
                 <div style={{ display: isVotingView ? 'block' : 'none' }}>
