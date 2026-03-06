@@ -31,7 +31,7 @@ export const customInstance = async <T>(
   url: string,
   options: RequestInit & { params?: Record<string, string> } = {}
 ): Promise<T> => {
-  const baseUrl = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:8085'
+  const baseUrl = process.env.NEXT_PUBLIC_API_BASE || 'https://api.cinematch.space'
 
   // Resolve absolute URL
   const absoluteUrl = url.startsWith('http') ? url : `${baseUrl}${url}`
