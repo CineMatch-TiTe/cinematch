@@ -27,11 +27,13 @@ async function resolveToken(): Promise<string | null> {
   }
 }
 
+import { getApiBaseUrl } from './api-config'
+
 export const customInstance = async <T>(
   url: string,
   options: RequestInit & { params?: Record<string, string> } = {}
 ): Promise<T> => {
-  const baseUrl = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:8085'
+  const baseUrl = getApiBaseUrl()
 
   // Resolve absolute URL
   const absoluteUrl = url.startsWith('http') ? url : `${baseUrl}${url}`

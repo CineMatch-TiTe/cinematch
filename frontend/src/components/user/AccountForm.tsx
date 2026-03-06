@@ -5,6 +5,7 @@ import { CurrentUserResponse } from '@/model'
 import { useRouter } from 'next/navigation'
 import { useActionState, useEffect, useCallback } from 'react'
 import { renameUserAction, ActionState } from '@/actions/user'
+import { getApiBaseUrl } from '@/lib/api-config'
 import { toast } from 'sonner'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
@@ -20,7 +21,7 @@ const AccountForm = ({
   const router = useRouter()
 
   const handleLinkGithub = () => {
-    const baseUrl = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:8085'
+    const baseUrl = getApiBaseUrl()
     globalThis.location.href = `${baseUrl}/api/auth/login/github`
   }
   // Bind userId to the action
