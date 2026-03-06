@@ -5,13 +5,22 @@ import { MovieResponse } from '@/model'
 import { prefetchImages } from '@/lib/utils'
 import { usePartyView } from '@/components/party/PartyViewContext'
 
-export function useVoting(partyId: string) {
+export function useVoting(partyId: string, phaseEnteredAt: string) {
+  const storageKey = `voting-countdown-${partyId}`
+  const alreadyShown = () => {
+    try {
+      return sessionStorage.getItem(storageKey) === phaseEnteredAt
+    } catch {
+      return false
+    }
+  }
+
   const [movies, setMovies] = useState<MovieResponse[]>([])
   const [votingRound, setVotingRound] = useState<number | null>(null)
   const [voteTotals, setVoteTotals] = useState<Record<number, { likes: number; dislikes: number }>>({})
   const [loading, setLoading] = useState(true)
-  const [countdown, setCountdown] = useState(5)
-  const [showContent, setShowContent] = useState(false)
+  const [countdown, setCountdown] = useState(() => (alreadyShown() ? 0 : 5))
+  const [showContent, setShowContent] = useState(() => alreadyShown())
   const [transitionData, setTransitionData] = useState<{ round: number; restart?: boolean } | null>(null)
   const [, startTransition] = useTransition()
   const { lastMessage } = usePartyView()
@@ -27,10 +36,13 @@ export function useVoting(partyId: string) {
     }
 
     if (countdown === 0) {
+      try {
+        sessionStorage.setItem(storageKey, phaseEnteredAt)
+      } catch {}
       const t = setTimeout(() => setShowContent(true), 0)
       return () => clearTimeout(t)
     }
-  }, [countdown])
+  }, [countdown, storageKey, phaseEnteredAt])
 
   // Helper to handle transition
   const handleBallotChange = useCallback(
