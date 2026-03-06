@@ -21,6 +21,9 @@ pub struct PartyStateChanged {
     pub deadline_at: Option<DateTime<Utc>>,
     /// Why the timeout was set
     pub timeout_reason: Option<TimeoutReason>,
+    /// The selected movie ID, relevant when state transitions to Watching
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub selected_movie_id: Option<i64>,
 }
 
 /// Message types sent from server to clients

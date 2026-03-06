@@ -128,12 +128,19 @@ async fn execute_voting_timeout<C: AppContext + Clone + 'static>(
                 }
             };
 
+            let selected_movie_id = if new_state == PartyState::Watching {
+                party.selected_movie_id(&ctx).await.unwrap_or(None)
+            } else {
+                None
+            };
+
             ctx.broadcast_party(
                 party_id,
                 &ServerMessage::PartyStateChanged(PartyStateChanged {
                     state: new_state.into(),
                     deadline_at,
                     timeout_reason: reason,
+                    selected_movie_id,
                 }),
                 None,
             );
@@ -175,6 +182,7 @@ async fn execute_watching_timeout<C: AppContext>(party: &Party, party_id: Uuid, 
             state: PartyState::Review.into(),
             deadline_at: None,
             timeout_reason: None,
+            selected_movie_id: None,
         }),
         None,
     );
@@ -270,12 +278,19 @@ pub async fn execute_ready_countdown<C: AppContext + Clone + 'static>(
                 }
             };
 
+            let selected_movie_id = if new_phase == PartyState::Watching {
+                party.selected_movie_id(&ctx).await.unwrap_or(None)
+            } else {
+                None
+            };
+
             ctx.broadcast_party(
                 party_id,
                 &ServerMessage::PartyStateChanged(PartyStateChanged {
                     state: new_phase.into(),
                     deadline_at,
                     timeout_reason: reason,
+                    selected_movie_id,
                 }),
                 None,
             );

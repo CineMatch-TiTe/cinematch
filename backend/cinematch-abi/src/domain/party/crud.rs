@@ -108,9 +108,6 @@ pub trait PartyCrud: PartyValidation {
     /// Check if user can vote.
     async fn can_vote(&self, ctx: &impl AppContext) -> Result<bool, DomainError>;
 
-    /// Get voting round number.
-    async fn voting_round(&self, ctx: &impl AppContext) -> Result<i32, DomainError>;
-
     /// Get number of unique members who have voted in this round.
     async fn voting_participation_count(&self, ctx: &impl AppContext)
     -> Result<usize, DomainError>;
@@ -363,10 +360,6 @@ impl PartyCrud for Party {
             cinematch_db::PartyState::Voting => Ok(true),
             _ => Ok(false),
         }
-    }
-
-    async fn voting_round(&self, _ctx: &impl AppContext) -> Result<i32, DomainError> {
-        Ok(1)
     }
 
     async fn voting_participation_count(
