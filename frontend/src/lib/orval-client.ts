@@ -7,7 +7,7 @@ const JWT_COOKIE_NAME = 'jwt'
  */
 async function resolveToken(): Promise<string | null> {
   // Client-side: read from cookie directly
-  if (typeof window !== 'undefined') {
+  if (globalThis.window !== undefined) {
     const match = document.cookie.match(new RegExp(`(?:^|; )${JWT_COOKIE_NAME}=([^;]*)`))
     return match ? decodeURIComponent(match[1]) : null
   }
