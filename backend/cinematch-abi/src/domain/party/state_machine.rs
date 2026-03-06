@@ -99,6 +99,7 @@ impl PartyStateMachine for Party {
                     timeout_reason: None,
                     selected_movie_id,
                 };
+                ctx.broadcast_party(self.id, &ServerMessage::ResetReadiness, None);
                 ctx.broadcast_party(self.id, &ServerMessage::PartyStateChanged(msg), None);
             }
             PartyAdvanceOutcome::VotingEnded(EndVotingTransition::Round1Started) => {
@@ -127,6 +128,7 @@ impl PartyStateMachine for Party {
                     timeout_reason: None,
                     selected_movie_id,
                 };
+                ctx.broadcast_party(self.id, &ServerMessage::ResetReadiness, None);
                 ctx.broadcast_party(self.id, &ServerMessage::PartyStateChanged(msg), None);
             }
         }
@@ -175,9 +177,11 @@ impl PartyStateMachine for Party {
                             &ServerMessage::VotingRoundStarted(VotingRoundStarted { round: 2 }),
                             None,
                         );
+                        ctx.broadcast_party(self.id, &ServerMessage::ResetReadiness, None);
                         Some(PartyState::Voting) // Still in Voting state, just round 2
                     }
                     EndVotingTransition::PhaseChanged(s) => {
+                        ctx.broadcast_party(self.id, &ServerMessage::ResetReadiness, None);
                         // Let the catch-all below broadcast the PhaseChanged event
                         Some(*s)
                     }
@@ -243,6 +247,7 @@ impl PartyStateMachine for Party {
                     timeout_reason: None,
                     selected_movie_id,
                 };
+                ctx.broadcast_party(self.id, &ServerMessage::ResetReadiness, None);
                 ctx.broadcast_party(self.id, &ServerMessage::PartyStateChanged(msg), None);
             }
         }
@@ -456,6 +461,11 @@ async fn handle_round1_end(
     party.set_phase_entered_at_now(ctx).await.map_err(|e| {
         error!("Failed to update phase time: {}", e);
         DomainError::Internal("Failed to update phase time".into())
+    })?;
+
+    party.reset_ready_states(ctx).await.map_err(|e| {
+        error!("Failed to reset ready states for round 2: {}", e);
+        DomainError::Internal("Failed to reset ready states".into())
     })?;
 
     Ok(EndVotingTransition::Round2Started)

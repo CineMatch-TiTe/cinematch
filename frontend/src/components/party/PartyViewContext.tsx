@@ -51,6 +51,8 @@ export function PartyViewProvider({
       if (msg === 'PartyDisbanded') {
         toast.info('The party has been disbanded')
         router.push('/dashboard')
+      } else if (msg === 'ResetReadiness') {
+        setMembers((prev) => prev.map((m) => ({ ...m, is_ready: false })))
       }
       return
     }

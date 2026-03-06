@@ -372,10 +372,19 @@ impl Scheduler {
             // Note: This only cancels if it's a ready countdown (via reason check if we added it,
             // but for now, simple cancel is fine if we're in a phase that supports ready counts).
             // We should only cancel if it's a "Wait for all ready" countdown.
+            let state = party
+                .state(&ctx)
+                .await
+                .unwrap_or(cinematch_db::repo::party::models::PartyState::Disbanded);
+
             if self.is_scheduled(party_id).await {
-                // Check if the current timeout is a PhaseTimeout or ReadyCountdown.
-                // For now, if anyone becomes unready, we cancel.
-                self.cancel_and_broadcast(party_id, &ctx).await;
+                // Do NOT cancel the timeout if the party is in a timed phase (Voting/Watching).
+                // Unreadying should not cancel the voting countdown or watching timer.
+                if state != cinematch_db::repo::party::models::PartyState::Voting
+                    && state != cinematch_db::repo::party::models::PartyState::Watching
+                {
+                    self.cancel_and_broadcast(party_id, &ctx).await;
+                }
             }
         }
     }

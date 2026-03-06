@@ -134,6 +134,7 @@ async fn execute_voting_timeout<C: AppContext + Clone + 'static>(
                 None
             };
 
+            ctx.broadcast_party(party_id, &ServerMessage::ResetReadiness, None);
             ctx.broadcast_party(
                 party_id,
                 &ServerMessage::PartyStateChanged(PartyStateChanged {
@@ -176,6 +177,7 @@ async fn execute_watching_timeout<C: AppContext>(party: &Party, party_id: Uuid, 
         }
     };
 
+    ctx.broadcast_party(party_id, &ServerMessage::ResetReadiness, None);
     ctx.broadcast_party(
         party_id,
         &ServerMessage::PartyStateChanged(PartyStateChanged {
@@ -284,6 +286,7 @@ pub async fn execute_ready_countdown<C: AppContext + Clone + 'static>(
                 None
             };
 
+            ctx.broadcast_party(party_id, &ServerMessage::ResetReadiness, None);
             ctx.broadcast_party(
                 party_id,
                 &ServerMessage::PartyStateChanged(PartyStateChanged {

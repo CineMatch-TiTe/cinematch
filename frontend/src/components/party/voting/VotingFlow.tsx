@@ -5,7 +5,8 @@ import { CheckCircle2, XCircle } from 'lucide-react'
 import { useVoting } from '@/hooks/useVoting'
 import VotingCard from './VotingCard'
 import PhaseCountdown from '../PhaseCountdown'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { usePartyView } from '@/components/party/PartyViewContext'
 
 interface VotingFlowProps {
   partyId: string
@@ -17,7 +18,11 @@ interface VotingFlowProps {
 export default function VotingFlow({ partyId, phaseEnteredAt, timeoutSecs, deadlineAt }: Readonly<VotingFlowProps>) {
   const { movies, votingRound, voteTotals, loading, countdown, showContent, transitionData, handleVote, handleReady } =
     useVoting(partyId)
-  const [isVotingReady, setIsVotingReady] = useState(false)
+  const { members, currentUser } = usePartyView()
+  const serverReady = members.find((m) => m.user_id === currentUser.user_id)?.is_ready ?? false
+  const [isVotingReady, setIsVotingReady] = useState(serverReady)
+
+  useEffect(() => { setIsVotingReady(serverReady) }, [serverReady])
 
   if (loading || !showContent) {
     return (
