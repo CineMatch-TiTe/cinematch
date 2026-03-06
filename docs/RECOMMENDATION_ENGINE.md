@@ -1,86 +1,161 @@
-# Recommendation Engine
+Recommendation Algorithm
+========================
 
-## Overview
+[← Back to main README](../README.md)
 
-The `cinematch-recommendation-engine` crate provides ML-based movie recommendations using **Qdrant** vector search. It supports multiple strategies and generates voting ballots for the party flow.
+Cinematch uses three recommendation strategies, selected automatically based on user context (solo vs. party).
 
-## Vector Types
+Strategy Selection
+------------------
 
-Movies are represented by four embedding types stored in Qdrant:
-
-| Vector | Field | Source |
-|--------|-------|--------|
-| Plot | `plot_vector` | Movie plot/overview text embeddings |
-| Cast & Crew | `cast_crew_vector` | Actor/director combination embeddings |
-| Reviews | `reviews_vector` | Aggregated user review embeddings |
-| Combined | `combined_vector` | Weighted blend of all vectors |
-
-## Recommendation Strategies
-
-### 1. Standard (`engine/standard.rs`)
-
-The default strategy for personalized recommendations.
-
-- Builds a user taste profile from their `user_ratings` (likes/dislikes)
-- Queries Qdrant with the `combined_vector` for nearest-neighbor search
-- Applies filters from user preferences (genre include/exclude, year range, runtime)
-- Returns ranked movie IDs
-
-### 2. Reviews-Based (`engine/reviews.rs`)
-
-Uses review vectors for users with sufficient rating history.
-
-- Computes a centroid from movies the user has liked
-- Searches Qdrant's `reviews_vector` space
-- Better for users with strong taste signals
-
-### 3. Pool-Based (`engine/pool.rs`)
-
-Party-scoped recommendations.
-
-- Aggregates preferences from all party members
-- Finds movies that satisfy the group's combined taste profile
-- Used during the Picking phase to suggest movies the whole party might enjoy
-
-## Ballot Generation
-
-### Round 1 (`ballots/v1.rs`)
-
-`build_voting_ballots_for_party()`:
-- Takes all party picks (movies selected by members during Picking)
-- Enriches with movie metadata
-- Returns the ballot for the Voting phase
-
-### Round 2 (`ballots/v2.rs`)
-
-`build_round2_ballots_for_party()`:
-- Narrows the ballot based on Round 1 results
-- Eliminates movies with net-negative votes
-- Creates a tighter ballot for the final vote
-
-## Filter Utilities (`utils.rs`)
-
-Qdrant filter builders that translate user preferences into vector search constraints:
-
-- Genre inclusion/exclusion filters
-- Year range filters
-- Runtime range filters
-- Already-shown movie exclusion (`shown_movies` table)
-
-## Integration
-
-The recommendation engine is called from `cinematch-server` handlers:
-
-```
-GET /api/recommend  →  recommendation::handlers::get_recommendations
-                          → recommend_movies() / recommend_from_reviews()
+```mermaid
+flowchart TD
+    REQ["/api/recommend"] --> METHOD{method param?}
+    METHOD -->|"reviews"| REV[Review-Based: Collaborative Filtering]
+    METHOD -->|"semantic"| SEM[Semantic: Vector Similarity]
+    METHOD -->|default| SEM
+    
+    PARTY["Party Voting Phase"] --> BALLOT[Pool-Based: Ballot Builder]
 ```
 
-During party phase transitions, ballot functions are called directly by the party handlers.
+1. Semantic Recommendation (Standard Strategy)
+--------------------------------------------
 
-## Dependencies
+Utilizes Qdrant's `RecommendPoints` API with the `AverageVector` strategy.
 
-- **Qdrant Client** (`qdrant-client 1.16`) — vector database queries
-- **Linfa** (`linfa 0.8`) — ML toolkit for clustering (onboarding clusters)
-- **ndarray** — numerical array operations
-- **rayon** — parallel iteration for batch processing
+### Mechanism
+
+```mermaid
+flowchart LR
+    subgraph "User Profile"
+        POS[Liked Movies]
+        NEG[Disliked Movies]
+        PREFS[Preferences: Genres, Year, etc.]
+    end
+
+    subgraph "Qdrant"
+        AVG["Average positive vectors - negative vectors"]
+        FILT[Filters: Genre, Year, Exclude seen]
+        NN[Nearest neighbors]
+    end
+
+    POS --> AVG
+    NEG --> AVG
+    AVG --> FILT
+    PREFS --> FILT
+    FILT --> NN
+    NN --> RES[Ranked Movie IDs]
+```
+
+### Vector Types
+
+Each movie has 4 named embedding vectors (1024-dim, generated via Ollama) bge-m3 model:
+
+| Vector | Description |
+|--------|-------------|
+| `plot_vector` | Plot similarity |
+| `cast_crew_vector` | Cast/Crew similarity |
+| `reviews_vector` | Critical reception similarity |
+| `combined_vector` | General purpose (default) |
+
+### Fallback
+
+If no positive ratings exist, the engine uses the top 5 most popular movies as positive seeds.
+
+2. Review-Based Recommendation (Collaborative Filtering)
+------------------------------------------------------
+
+**Condition**: User has explicitly requested `method=reviews`.
+
+Uses sparse user-movie vectors in Qdrant's `ratings` collection to identify similar users.
+
+### Mechanism
+
+```mermaid
+flowchart TD
+    A[Build sparse vector from user ratings: liked=+1.0, disliked=-1.0] --> B[Query 'ratings' collection: Find 200 similar users]
+    B --> C[Aggregate movie scores from similar users' profiles]
+    C --> D[Filter by preferences: Genre, year, exclusions]
+    D --> E[Return top N movies]
+    
+    E -->|Empty?| F[Fallback to Semantic Strategy]
+```
+
+### Sparse Vector Format
+
+```
+user_vector = { movie_1: 1.0, movie_5: -1.0, movie_12: 1.0, ... }
+```
+
+Matches users with similar rating patterns and recommends movies liked by those users.
+
+3. Pool-Based Recommendation (Party Voting)
+-------------------------------------------
+
+**Condition**: Party transitions from Picking → Voting phase.
+
+Constructs personalized voting ballots for each party member from the shared pool of picked movies.
+
+### Round 1: Initial Ballot
+
+```mermaid
+flowchart TD
+    subgraph "Inputs"
+        PP[Party Pool: All liked picks from all members]
+        OP[Own Pool: User's own liked picks]
+    end
+
+    PP -->|Recommend 3| REC1[Qdrant recommend_from_pool]
+    OP -->|Recommend 2| REC2[Qdrant recommend_from_pool]
+    REC1 --> MERGE[Merge + Deduplicate]
+    REC2 --> MERGE
+    MERGE --> SHUFFLE[Shuffle]
+    SHUFFLE --> PAD{< 5 movies?}
+    PAD -->|Yes| POP[Pad from Popular Movies]
+    PAD -->|No| BALLOT[Final 5-Movie Ballot]
+    POP --> BALLOT
+```
+
+- **3 from party pool**: Group favorites, ranked by personal preference.
+- **2 from own pool**: Personal favorites, for diversity.
+- Shuffled and padded to exactly 5 movies per ballot.
+
+### Round 2: Top-3 Refinement
+
+After Round 1 tallying, determining the top 3 movies. Each member receives a new ballot of 3 movies from this subset.
+
+Pipeline: Data Ingestion to Recommendation
+------------------------------------------
+
+```mermaid
+flowchart LR
+    subgraph "Offline (Importer CLI)"
+        CSV[MovieLens CSVs] --> PARSE[Parse & Clean]
+        PARSE --> EMB[Generate Embeddings via Ollama]
+        EMB --> UPLOAD[Upload to Qdrant: 4 vectors per movie]
+        PARSE --> PG_INS[Insert into Postgres: Movies, Genres, Cast]
+        
+        CSV --> SPARSE[Build sparse user vectors from ratings]
+        SPARSE --> QDRANT_RAT[Upload to Qdrant: 'ratings' collection]
+    end
+
+    subgraph "Online (Server)"
+        REQ2[API Request] --> STRAT[Strategy Selection]
+        STRAT --> QD2[(Qdrant)]
+        STRAT --> PG2[(PostgreSQL)]
+        STRAT --> RD2[(Redis Cache)]
+    end
+
+    UPLOAD --> QD2
+    PG_INS --> PG2
+    QDRANT_RAT --> QD2
+```
+
+### Importer Commands
+
+| Command | Description |
+|---------|-------------|
+| `update-all` | Runs `update-movies` + `update-ratings` |
+| `update-movies` | CSV → Ollama embeddings → Qdrant `movies` + Postgres |
+| `update-ratings` | CSV → Sparse vectors → Qdrant `ratings` collection |
+| `remove-all` | Wipe all Qdrant collections |

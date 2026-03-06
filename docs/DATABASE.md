@@ -1,103 +1,128 @@
-# Database
+Database Architecture
+=====================
 
-## Overview
+[← Back to main README](../README.md)
 
-CineMatch uses **PostgreSQL 15** as its primary data store, accessed via the **Diesel ORM** (Rust). The schema contains 28 tables organized into five domains: users, movies, parties, recommendations, and scheduling.
+Cinematch employs three distinct database systems to support its data architecture.
 
-## Entity-Relationship Diagram
+Overview
+--------
 
-```
-┌──────────┐     ┌──────────────────┐     ┌─────────┐
-│  users   │────┤  party_members   ├────│ parties │
-│          │     └──────────────────┘     │         │
-│ id (PK)  │     ┌──────────────────┐     │ id (PK) │
-│ username │────┤  user_ratings    │     │ state   │
-│ oneshot  │     └──────────────────┘     │ leader  │
-└────┬─────┘     ┌──────────────────┐     └────┬────┘
-     │          ┤  user_preferences │          │
-     │           └──────────────────┘     ┌────▼──────┐
-     │           ┌──────────────────┐     │party_codes│
-     └──────────┤  external_accts  │     │ code (4ch)│
-                 └──────────────────┘     └───────────┘
-                                          ┌───────────┐
-┌──────────┐     ┌──────────────────┐     │party_picks│
-│  movies  │────┤  movie_genres   ├────│ votes     │
-│          │     └──────────────────┘     └───────────┘
-│ movie_id │     ┌──────────────────┐
-│ title    │────┤  movie_cast     │
-│ runtime  │     └──────────────────┘
-│ rating   │     ┌──────────────────┐
-└──────────┘────┤  movie_keywords  │
-                 └──────────────────┘
+```mermaid
+graph LR
+    subgraph "cinematch-db crate"
+        PGC[conn::postgres]
+        RDC[conn::redis]
+        QDC[conn::qdrant]
+    end
+
+    PGC --> PG[(PostgreSQL 15)]
+    RDC --> RD[(Redis 7)]
+    QDC --> QD[(Qdrant)]
+
+    PG ---|"Relational data\n(Diesel ORM)"| D1[Users, Parties, Movies\nVotes, Ratings, Preferences]
+    RD ---|"Session store"| D2[User Sessions]
+    QD ---|"Vector similarity"| D3[4 Named Vectors per Movie\nRatings Sparse Vectors]
 ```
 
-## Tables by Domain
+1. PostgreSQL (Primary Store)
+-----------------------------
 
-### Users
+**ORM**: Diesel (async) with auto-migrations.
 
-| Table | Primary Key | Description |
-|-------|-------------|-------------|
-| `users` | `id` (UUID) | User accounts. `oneshot` = guest user |
-| `external_accounts` | `id` (UUID) | OAuth provider links (GitHub). FK → `users` |
-| `user_preferences` | `user_id` (UUID) | Year target, flexibility, TiTe flag. FK → `users` |
-| `user_ratings` | `rating_id` (UUID) | Movie taste data (liked/rating). FK → `users`, `movies` |
-| `prefs_include_genre` | `(user_id, genre_id)` | Genre whitelist. FK → `users`, `genres` |
-| `prefs_exclude_genre` | `(user_id, genre_id)` | Genre blacklist. FK → `users`, `genres` |
+### Schema: Core Tables
 
-### Parties
+| Table | Description |
+|-------|-------------|
+| `users` | User accounts (`id`, `username`, `oneshot` flag for guests). |
+| `external_accounts` | OAuth provider linkage. |
+| `movies` | Movie metadata (title, runtime, popularity, poster, overview, etc.). |
+| `genres`, `movie_genres` | Genre taxonomy and mapping. |
+| `cast_members`, `movie_cast` | Cast data. |
+| `directors`, `movie_directors` | Director data. |
+| `keywords`, `movie_keywords` | Keyword tagging. |
+| `trailers`, `movie_trailers` | Trailer video keys. |
+| `production_countries` | Country of origin. |
 
-| Table | Primary Key | Description |
-|-------|-------------|-------------|
-| `parties` | `id` (UUID) | Party state, leader, selected movie, voting round |
-| `party_codes` | `code` (CHAR(4)) | 4-char join code → party mapping |
-| `party_members` | `(user_id, party_id)` | Membership with `is_ready` flag |
-| `party_picks` | `taste_id` (UUID) | Member movie picks with like/dislike |
-| `votes` | `(party_id, user_id, movie_id)` | Individual votes (bool) |
-| `shown_movies` | `(party_id, user_id, movie_id)` | Tracks which movies were shown to whom |
+### Schema: Party System
 
-### Movies
+| Table | Description |
+|-------|-------------|
+| `parties` | Party state machine (`state`, `party_leader_id`, `selected_movie_id`, `voting_round`). |
+| `party_codes` | Ephemeral 4-character join codes. |
+| `party_members` | Membership tracking and readiness state. |
+| `party_picks` | Per-user movie swipes within a party (`liked: bool`). |
+| `shown_movies` | Voting ballots; movies displayed to users. |
+| `votes` | Binary votes on ballot movies. |
+| `schedules` | Timeout event scheduling for phase transitions. |
 
-| Table | Primary Key | Description |
-|-------|-------------|-------------|
-| `movies` | `movie_id` (INT8) | Core movie data (title, runtime, TMDB IDs, etc.) |
-| `genres` | `genre_id` (UUID) | Genre catalog |
-| `movie_genres` | `(movie_id, genre_id)` | Movie ↔ genre mapping |
-| `cast_members` | `cast_id` (UUID) | Actor catalog |
-| `movie_cast` | `(movie_id, cast_id)` | Movie ↔ actor mapping |
-| `directors` | `director_id` (UUID) | Director catalog |
-| `movie_directors` | `(movie_id, director_id)` | Movie ↔ director mapping |
-| `keywords` | `keyword_id` (UUID) | Keyword/tag catalog |
-| `movie_keywords` | `(movie_id, keyword_id)` | Movie ↔ keyword mapping |
-| `trailers` | `trailer_id` (UUID) | Trailer video keys |
-| `movie_trailers` | `(movie_id, trailer_id)` | Movie ↔ trailer mapping |
-| `production_countries` | `country_code` (CHAR(3)) | Country catalog |
-| `movie_production_countries` | `(movie_id, country_code)` | Movie ↔ country mapping |
+### Schema: User Data
 
-### Recommendations
+| Table | Description |
+|-------|-------------|
+| `user_ratings` | Global taste profile (liked/disliked/rated movies). |
+| `user_preferences` | User constraints: year, flexibility, `is_tite`. |
+| `prefs_include_genre` | Genre whitelist. |
+| `prefs_exclude_genre` | Genre blacklist. |
 
-| Table | Primary Key | Description |
-|-------|-------------|-------------|
-| `onboarding_movies` | `movie_id` (INT8) | High-info-gain movies for new user onboarding |
-| `onboarding_clusters` | `cluster_id` (INT2) | User taste clusters with centroids (JSONB) |
+2. Redis (Session Store)
+------------------------
 
-### Scheduling
+**Client**: `deadpool-redis` connection pool.
 
-| Table | Primary Key | Description |
-|-------|-------------|-------------|
-| `schedules` | `id` (UUID) | Timed events (voting start/end, watching end, ready timeouts) |
+### Key Schema
 
-## Custom Types (PostgreSQL ENUMs)
+| Key Pattern | TTL | Description |
+|-------------|-----|-------------|
+| `session:<id>` | 10 days | Actix session data (identity, CSRF). |
 
-| Type | Values | Used In |
-|------|--------|---------|
-| `auth_provider` | Provider identifiers | `external_accounts.provider` |
-| `party_state` | `Created`, `Picking`, `Voting`, `Watching`, `Review`, `Disbanded` | `parties.state` |
-| `timeout_type` | `VotingStarting`, `VotingEnding`, `WatchingEnding`, `ReadyTimeout` | `schedules.timeout_type` |
+### Caching Strategy
 
-## Key Relationships
+```mermaid
+graph TD
+    REQ[Request] --> L1{L1: RAM Cache}
+    L1 -->|Hit| RET[Return]
+    L1 -->|Miss| L2{L2: Redis}
+    L2 -->|Hit| POP1[Populate L1] --> RET
+    L2 -->|Miss| L3[L3: PostgreSQL]
+    L3 --> POP2[Populate L2 + L1] --> RET
+```
 
-- A **user** can be in multiple **parties** (via `party_members`)
-- Each **party** has exactly one **leader** (`party_leader_id` → `users`)
-- **Party codes** are recycled — only active parties hold codes
-- **Votes** are scoped to `(party, user, movie)` — one vote per movie per user per party
-- **User ratings** (`user_ratings`) persist across parties and feed the recommendation engine
+3. Qdrant (Vector Search)
+-------------------------
+
+**Client**: `qdrant-client` via gRPC.
+
+### Collections
+
+#### `movies` — Semantic Movie Embeddings
+
+Each movie constitutes a point with 4 named vectors, generated by Ollama.
+
+| Vector Name | Source Text | Description |
+|-------------|-------------|-------------|
+| `plot_vector` | Plot synopsis + overview | Content-based similarity. |
+| `cast_crew_vector` | Cast and crew names | Cast/crew similarity. |
+| `reviews_vector` | User review text | Sentiment/tone similarity. |
+| `combined_vector` | All text concatenated | General-purpose similarity. |
+
+**Payload**: `title`, `genres`, `year`, `runtime`, `popularity`, `country`, `director`, `cast`.
+
+#### `ratings` — Collaborative Filtering Vectors
+
+Sparse user-movie vectors for collaborative filtering. Points represent user rating patterns.
+
+### Recommendation Implementation
+
+```mermaid
+graph TD
+    A[User Taste Profile] --> B{Positive IDs}
+    A --> C{Negative IDs}
+    B --> D[RecommendPoints API]
+    C --> D
+    E[User Preferences] --> F[Filter: genres, year, excluded IDs]
+    F --> D
+    D --> G[Ranked Movie IDs]
+```
+
+The engine employs Qdrant's `RecommendPoints` with the `AverageVector` strategy. It averages liked movie vectors, subtracts disliked vectors, and identifies nearest neighbors in the filtered space.
