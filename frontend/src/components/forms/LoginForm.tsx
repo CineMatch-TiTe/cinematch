@@ -98,7 +98,7 @@ export function LoginForm() {
         {isGithubLoading ? (
           <>
             <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-            Connecting...
+            Logging in...
           </>
         ) : (
           <>
