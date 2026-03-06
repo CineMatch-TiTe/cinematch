@@ -64,6 +64,9 @@ export function PartyViewProvider({
         // Reset phase_entered_at so countdown components don't flash
         // the previous phase's time before PartyTimeoutUpdate arrives.
         phase_entered_at: new Date().toISOString(),
+        ...(payload.selected_movie_id !== undefined && {
+          selected_movie_id: payload.selected_movie_id ?? null,
+        }),
       }))
       // Immediately switch the active view to match the new phase
       if (payload.state === 'picking') setActiveView('picking')
@@ -128,6 +131,9 @@ export function PartyViewProvider({
                 : null,
         }
       })
+    } else if ('PartyCodeChanged' in msg) {
+      const newCode = msg.PartyCodeChanged
+      setParty((prev) => ({ ...prev, code: newCode }))
     } else if ('NameChanged' in msg) {
       const payload = msg.NameChanged
       setMembers((prev) =>
