@@ -29,7 +29,7 @@ interface PartyViewClientProps {
 export default function PartyViewClient({
     currentUser
 }: Readonly<PartyViewClientProps>) {
-    const { activeView, setActiveView, party, members, handleWsMessage } = usePartyView()
+    const { activeView, party, members, handleWsMessage } = usePartyView()
     const [mounted, setMounted] = useState(false)
     useEffect(() => { setMounted(true) }, [])
 
@@ -52,7 +52,7 @@ export default function PartyViewClient({
         handleKick,
         handlePromote,
         getAdvanceButtonText
-    } = usePartyViewLogic({ party, currentUser, setActiveView })
+    } = usePartyViewLogic({ party, currentUser })
 
     const currentMember = members.find(m => m.user_id === currentUser.user_id)
     const serverReady = currentMember?.is_ready ?? false
@@ -93,14 +93,13 @@ export default function PartyViewClient({
             {isPickingView && isLeader && getAdvanceButtonText() && (
                 <div className="fixed top-4 right-4 z-[60]">
                     <Button
-                        variant="ghost"
-                        size="icon"
+                        size="sm"
                         disabled={isManualPending}
-                        className="text-zinc-500 hover:text-white hover:bg-zinc-800 transition-colors"
+                        className="bg-red-600 hover:bg-red-700 text-white font-semibold shadow-lg shadow-red-600/25 transition-colors gap-1.5"
                         onClick={handleAdvanceClick}
-                        title={getAdvanceButtonText() ?? 'Advance Phase'}
                     >
-                        <SkipForward className="h-5 w-5" />
+                        <SkipForward className="h-4 w-4" />
+                        {getAdvanceButtonText()}
                     </Button>
                 </div>
             )}

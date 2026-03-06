@@ -60,6 +60,7 @@ impl VectorType {
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize, utoipa::ToSchema,
 )]
+#[serde(rename_all = "snake_case")]
 pub enum PartyState {
     Created,   // Initial state, people can join and start picking
     Picking, // people can pick movies (taste), people cant join anymore (code is freed, and party is identified by uuid)

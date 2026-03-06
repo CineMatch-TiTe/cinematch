@@ -61,7 +61,14 @@ export function PartyViewProvider({
         ...prev,
         state: payload.state,
         ready_deadline_at: payload.deadline_at ?? null,
+        // Reset phase_entered_at so countdown components don't flash
+        // the previous phase's time before PartyTimeoutUpdate arrives.
+        phase_entered_at: new Date().toISOString(),
       }))
+      // Immediately switch the active view to match the new phase
+      if (payload.state === 'picking') setActiveView('picking')
+      else if (payload.state === 'voting') setActiveView('voting')
+      else if (payload.state === 'watching') setActiveView('watching')
     } else if ('PartyMemberJoined' in msg) {
       const payload = msg.PartyMemberJoined
       setMembers((prev) => {
@@ -95,19 +102,32 @@ export function PartyViewProvider({
       )
     } else if ('PartyTimeoutUpdate' in msg) {
       const payload = msg.PartyTimeoutUpdate
-      setParty((prev) => ({
-        ...prev,
-        phase_entered_at: payload.phase_entered_at ?? prev.phase_entered_at,
-        // If deadline_at is present in the payload, use it.
-        // If absent but phase_entered_at is present, this is a phase-info update — keep existing deadline.
-        // If both absent (empty cancel signal), clear the deadline.
-        ready_deadline_at:
-          payload.deadline_at !== undefined
-            ? payload.deadline_at
-            : payload.phase_entered_at !== undefined
-              ? prev.ready_deadline_at
-              : null,
-      }))
+      setParty((prev) => {
+        // Map timeout_secs to the correct phase-specific field
+        const timeoutUpdates: Partial<PartyResponse> = {}
+        if (payload.timeout_secs != null) {
+          if (prev.state === 'voting') {
+            timeoutUpdates.voting_timeout_secs = payload.timeout_secs
+          } else if (prev.state === 'watching') {
+            timeoutUpdates.watching_timeout_secs = payload.timeout_secs
+          }
+        }
+
+        return {
+          ...prev,
+          ...timeoutUpdates,
+          phase_entered_at: payload.phase_entered_at ?? prev.phase_entered_at,
+          // If deadline_at is present in the payload, use it.
+          // If absent but phase_entered_at is present, this is a phase-info update — keep existing deadline.
+          // If both absent (empty cancel signal), clear the deadline.
+          ready_deadline_at:
+            payload.deadline_at !== undefined
+              ? payload.deadline_at
+              : payload.phase_entered_at !== undefined
+                ? prev.ready_deadline_at
+                : null,
+        }
+      })
     } else if ('NameChanged' in msg) {
       const payload = msg.NameChanged
       setMembers((prev) =>
