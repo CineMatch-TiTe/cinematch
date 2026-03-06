@@ -1,6 +1,7 @@
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import type { NextRequest } from 'next/server'
+import { getApiBaseUrl } from '@/lib/api-config'
 
 /**
  * GitHub OAuth callback route handler.
@@ -20,7 +21,7 @@ export async function GET(request: NextRequest) {
     redirect('/?error=missing_code')
   }
 
-  const baseUrl = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:8085'
+  const baseUrl = getApiBaseUrl()
 
   // Build the backend callback URL with the same query params
   const backendUrl = new URL(`${baseUrl}/api/auth/callback/github`)

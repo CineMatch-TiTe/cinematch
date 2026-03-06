@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { ServerMessage, ClientMessage } from '@/lib/ws-types'
 import { useAuth } from '@/lib/auth-context'
+import { getApiBaseUrl } from '@/lib/api-config'
 
 interface UsePartySocketOptions {
   partyId?: string
@@ -31,7 +32,7 @@ export function usePartySocket({ partyId, onMessage, onConnect, onDisconnect }: 
       return
     }
 
-    const baseUrl = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:8085'
+    const baseUrl = getApiBaseUrl()
     const wsBase = baseUrl.replace(/^http/, 'ws')
     
     // Add token as query param since websockets don't support custom headers in browser

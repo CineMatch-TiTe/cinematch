@@ -8,6 +8,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { User, Loader2, LogIn } from 'lucide-react'
 import { loginAction, type OnboardingActionResult } from '@/actions/onboarding'
 import { useAuth } from '@/lib/auth-context'
+import { getApiBaseUrl } from '@/lib/api-config'
 
 const initialState: OnboardingActionResult = {
   message: '',
@@ -27,7 +28,7 @@ export function LoginForm() {
   }, [state, setAuth, router])
 
   const handleGithubLogin = () => {
-    const baseUrl = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:8085'
+    const baseUrl = getApiBaseUrl()
     globalThis.location.href = `${baseUrl}/api/auth/login/github`
   }
 
