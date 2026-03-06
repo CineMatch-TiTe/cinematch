@@ -6,24 +6,19 @@ import { prefetchImages } from '@/lib/utils'
 import { usePartyView } from '@/components/party/PartyViewContext'
 
 export function useVoting(partyId: string, phaseEnteredAt: string) {
-  const storageKey = `voting-countdown-${partyId}`
-  const alreadyShown = () => {
-    try {
-      return sessionStorage.getItem(storageKey) === phaseEnteredAt
-    } catch {
-      return false
-    }
-  }
+  const { lastMessage, consumeLivePhaseTransition } = usePartyView()
+
+  // Show countdown only when voting phase was entered via a live WS message
+  const [showCountdown] = useState(() => consumeLivePhaseTransition() === 'voting')
 
   const [movies, setMovies] = useState<MovieResponse[]>([])
   const [votingRound, setVotingRound] = useState<number | null>(null)
   const [voteTotals, setVoteTotals] = useState<Record<number, { likes: number; dislikes: number }>>({})
   const [loading, setLoading] = useState(true)
-  const [countdown, setCountdown] = useState(() => (alreadyShown() ? 0 : 5))
-  const [showContent, setShowContent] = useState(() => alreadyShown())
+  const [countdown, setCountdown] = useState(() => (showCountdown ? 5 : 0))
+  const [showContent, setShowContent] = useState(() => !showCountdown)
   const [transitionData, setTransitionData] = useState<{ round: number; restart?: boolean } | null>(null)
   const [, startTransition] = useTransition()
-  const { lastMessage } = usePartyView()
 
   // Track displayed movie IDs to detect changes without dependencies
   const displayedMovieIds = useRef<number[]>([])
@@ -36,13 +31,10 @@ export function useVoting(partyId: string, phaseEnteredAt: string) {
     }
 
     if (countdown === 0) {
-      try {
-        sessionStorage.setItem(storageKey, phaseEnteredAt)
-      } catch {}
       const t = setTimeout(() => setShowContent(true), 0)
       return () => clearTimeout(t)
     }
-  }, [countdown, storageKey, phaseEnteredAt])
+  }, [countdown])
 
   // Helper to handle transition
   const handleBallotChange = useCallback(
