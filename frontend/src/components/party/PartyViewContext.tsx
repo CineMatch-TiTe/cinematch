@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useContext, useState, ReactNode, useMemo } from 'react'
+import { createContext, useContext, useState, ReactNode, useMemo, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { PartyResponse } from '@/model/partyResponse'
@@ -44,7 +44,7 @@ export function PartyViewProvider({
   const [members, setMembers] = useState<MemberInfo[]>(initialMembers)
   const [lastMessage, setLastMessage] = useState<ServerMessage | null>(null)
 
-  const handleWsMessage = (msg: ServerMessage) => {
+  const handleWsMessage = useCallback((msg: ServerMessage) => {
     setLastMessage(msg)
 
     if (typeof msg === 'string') {
@@ -116,7 +116,7 @@ export function PartyViewProvider({
         )
       )
     }
-  }
+  }, [router])
 
   const value = useMemo(
     () => ({
@@ -129,7 +129,7 @@ export function PartyViewProvider({
       handleWsMessage,
       lastMessage,
     }),
-    [activeView, party, members, currentUser, lastMessage]
+    [activeView, party, members, currentUser, handleWsMessage, lastMessage]
   )
 
   return <PartyViewContext.Provider value={value}>{children}</PartyViewContext.Provider>

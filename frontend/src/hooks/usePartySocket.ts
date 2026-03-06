@@ -18,14 +18,21 @@ export function usePartySocket({ partyId, onMessage, onConnect, onDisconnect }: 
   const [isConnected, setIsConnected] = useState(false)
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const reconnectAttemptsRef = useRef(0)
-  
-  // Track the latest message globally for simple consumers
-  const [lastMessage, setLastMessage] = useState<ServerMessage | null>(null)
+
   const connectRef = useRef<() => void>(() => {})
+
+  // Store callback props in refs so `connect` doesn't depend on their identity
+  const onMessageRef = useRef(onMessage)
+  const onConnectRef = useRef(onConnect)
+  const onDisconnectRef = useRef(onDisconnect)
+
+  useEffect(() => { onMessageRef.current = onMessage }, [onMessage])
+  useEffect(() => { onConnectRef.current = onConnect }, [onConnect])
+  useEffect(() => { onDisconnectRef.current = onDisconnect }, [onDisconnect])
 
   const connect = useCallback(() => {
     // If we're already connected or connecting, or have no token, don't connect
-    if (socketRef.current?.readyState === WebSocket.OPEN || 
+    if (socketRef.current?.readyState === WebSocket.OPEN ||
         socketRef.current?.readyState === WebSocket.CONNECTING ||
         !token) {
       return
@@ -33,10 +40,10 @@ export function usePartySocket({ partyId, onMessage, onConnect, onDisconnect }: 
 
     const baseUrl = process.env.NEXT_PUBLIC_API_BASE || 'https://api.cinematch.space'
     const wsBase = baseUrl.replace(/^http/, 'ws')
-    
+
     // Add token as query param since websockets don't support custom headers in browser
     const wsUrl = `${wsBase}/api/ws?token=${encodeURIComponent(token)}`
-    
+
     console.log('[WebSocket] Connecting...')
     const ws = new WebSocket(wsUrl)
     socketRef.current = ws
@@ -45,7 +52,7 @@ export function usePartySocket({ partyId, onMessage, onConnect, onDisconnect }: 
       console.log('[WebSocket] Connected')
       setIsConnected(true)
       reconnectAttemptsRef.current = 0 // Reset attempts on successful connection
-      onConnect?.()
+      onConnectRef.current?.()
     }
 
     ws.onmessage = async (event) => {
@@ -58,8 +65,7 @@ export function usePartySocket({ partyId, onMessage, onConnect, onDisconnect }: 
 
       try {
         const message: ServerMessage = JSON.parse(event.data)
-        setLastMessage(message)
-        onMessage?.(message)
+        onMessageRef.current?.(message)
       } catch (e) {
         console.error('[WebSocket] Failed to parse message', event.data, e)
       }
@@ -69,7 +75,7 @@ export function usePartySocket({ partyId, onMessage, onConnect, onDisconnect }: 
       console.log('[WebSocket] Disconnected', event.code, event.reason)
       setIsConnected(false)
       socketRef.current = null
-      onDisconnect?.()
+      onDisconnectRef.current?.()
 
       // Attempt reconnection with exponential backoff (max 8 seconds delay)
       const attempts = reconnectAttemptsRef.current
@@ -77,7 +83,7 @@ export function usePartySocket({ partyId, onMessage, onConnect, onDisconnect }: 
         reconnectAttemptsRef.current += 1
         const delay = Math.min(1000 * Math.pow(2, attempts), 8000)
         console.log(`[WebSocket] Reconnecting in ${delay}ms...`)
-        
+
         if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current)
         reconnectTimeoutRef.current = setTimeout(() => connectRef.current(), delay)
       }
@@ -87,7 +93,7 @@ export function usePartySocket({ partyId, onMessage, onConnect, onDisconnect }: 
       console.error('[WebSocket] Error', error)
       // Error will typically be followed by onclose where we handle reconnection
     }
-  }, [token, onConnect, onDisconnect, onMessage])
+  }, [token])
 
   // Keep connectRef fresh
   useEffect(() => {
@@ -126,7 +132,6 @@ export function usePartySocket({ partyId, onMessage, onConnect, onDisconnect }: 
 
   return {
     isConnected,
-    lastMessage,
     sendMessage,
     disconnect,
     reconnect: connect
