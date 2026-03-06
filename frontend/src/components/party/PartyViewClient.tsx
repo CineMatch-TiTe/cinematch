@@ -2,24 +2,18 @@
 
 import { useState, useEffect } from 'react'
 
-import Image from 'next/image'
-import { LogOut, SkipForward, Settings, CheckCircle2, XCircle } from 'lucide-react'
-
-import { Button } from '@/components/ui/button'
-import { ActionConfirmationDialog } from '@/components/common/ActionConfirmationDialog'
-import { PartyHeader } from '@/components/party/PartyHeader'
-import { PartyMemberList } from '@/components/party/PartyMemberList'
-import { PreferencesDialog } from '@/components/preferences/PreferencesDialog'
 import { PartyResponse } from '@/model/partyResponse'
 import { MemberInfo } from '@/model/memberInfo'
 import { CurrentUserResponse } from '@/model/currentUserResponse'
+
 import VotingFlow from './voting/VotingFlow'
 import PickingFlow from './picking/PickingFlow'
 import WatchingFlow from './watching/WatchingFlow'
+import { PartyRoom } from './PartyRoom'
+
 import { usePartyView } from './PartyViewContext'
 import { usePartyViewLogic } from '@/hooks/usePartyViewLogic'
 import { useDeadlineCountdown } from '@/hooks/useDeadlineCountdown'
-import PhaseCountdown from './PhaseCountdown'
 import { setReadyAction } from '@/actions/party-room'
 import { toast } from 'sonner'
 import { usePartySocket } from '@/hooks/usePartySocket'
@@ -86,7 +80,7 @@ export default function PartyViewClient({
 
     // Phase transition countdown for "All Ready"
     const transitionSecondsLeft = useDeadlineCountdown(party.ready_deadline_at)
-    const showAllReadyCountdown = party.ready_deadline_at && transitionSecondsLeft > 0
+    const showAllReadyCountdown = !!(party.ready_deadline_at && transitionSecondsLeft > 0)
 
     if (!mounted) {
         return <div className="min-h-screen bg-zinc-950" />
@@ -135,141 +129,31 @@ export default function PartyViewClient({
                     <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,var(--tw-gradient-stops))] from-zinc-800/20 via-zinc-950 to-zinc-950" />
                 </div>
 
-                <div className="w-full max-w-md p-4 flex-1 flex flex-col z-10 relative">
-                    <header className="flex flex-col items-center mb-6">
-                        <div className="flex flex-row items-center mb-2 gap-2 relative w-full justify-center">
-                            <Image src="/Logo.png" alt="Logo" width={32} height={32} />
-                            <h1 className="text-2xl font-bold tracking-tight text-white">Party Room</h1>
-
-                            {isLeader && getAdvanceButtonText() && (
-                                <div className="absolute right-0">
-                                    <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        disabled={isManualPending}
-                                        className="text-zinc-500 hover:text-white hover:bg-zinc-800 transition-colors"
-                                        onClick={handleAdvanceClick}
-                                        title={getAdvanceButtonText() ?? "Advance Phase"}
-                                    >
-                                        <SkipForward className="h-5 w-5" />
-                                    </Button>
-                                </div>
-                            )}
-                        </div>
-                        <div className="absolute top-4 left-4 z-50">
-                            <PreferencesDialog
-                                trigger={
-                                    <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        className="text-zinc-500 hover:text-white hover:bg-zinc-800"
-                                    >
-                                        <Settings className="h-5 w-5" />
-                                        <span className="sr-only">Settings</span>
-                                    </Button>
-                                }
-                            />
-                        </div>
-                        <PartyHeader partyCode={party.code} />
-                        <div className="mt-2 text-zinc-500 text-sm uppercase tracking-wider font-medium">
-                            {party.state} Phase
-                        </div>
-                    </header>
-
-                    <main className="flex-1 w-full relative space-y-6">
-                        <div>
-                            <h3 className="text-sm font-semibold text-zinc-500 mb-3 px-1 uppercase tracking-wider">
-                                Members ({members.length})
-                            </h3>
-                            <div
-                                className={isManualPending ? 'opacity-70 transition-opacity' : 'transition-opacity'}
-                            >
-                                <PartyMemberList
-                                    members={members}
-                                    loading={false}
-                                    currentUserId={currentUser.user_id}
-                                    isCurrentUserLeader={isLeader}
-                                    onKick={handleKick}
-                                    onPromote={handlePromote}
-                                />
-                            </div>
-                        </div>
-                    </main>
-
-                    <div className="w-full max-w-md p-4 mt-8 flex flex-col gap-3 z-20">
-                        {showReadyButton && (
-                            <>
-                                <div className="text-center text-sm text-zinc-500 font-medium">
-                                    {showAllReadyCountdown && (
-                                        <div className="flex flex-col items-center gap-1">
-                                            <span className="text-emerald-400 font-semibold">Everyone Ready!</span>
-                                            <div className="flex items-center gap-2 text-zinc-400">
-                                                <span>Starting in</span>
-                                                <div className="scale-75 origin-center">
-                                                    <PhaseCountdown
-                                                        phaseEnteredAt={new Date().toISOString()}
-                                                        timeoutSecs={transitionSecondsLeft}
-                                                    />
-                                                </div>
-                                            </div>
-                                        </div>
-                                    )}
-                                    {!showAllReadyCountdown && allReady && (
-                                        <span className="text-emerald-400 animate-pulse font-semibold">All Ready! Starting soon...</span>
-                                    )}
-                                    {!showAllReadyCountdown && !allReady && (
-                                        <span>{readyCount}/{members.length} ready</span>
-                                    )}
-                                </div>
-                                <Button
-                                    size="lg"
-                                    onClick={handleReadyToggle}
-                                    className={`w-full font-semibold text-lg py-6 shadow-lg transition-all ${optimisticReady
-                                        ? 'bg-red-600 hover:bg-red-700 text-white shadow-red-500/20'
-                                        : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-500/20'
-                                        }`}
-                                >
-                                    {optimisticReady ? (
-                                        <><XCircle className="mr-2 w-5 h-5" /> Unready</>
-                                    ) : (
-                                        <><CheckCircle2 className="mr-2 w-5 h-5" /> I&apos;m Ready</>
-                                    )}
-                                </Button>
-                            </>
-                        )}
-
-
-
-                        <Button
-                            variant="ghost"
-                            size="lg"
-                            disabled={isManualPending}
-                            className="w-full text-zinc-400 hover:text-red-500 hover:bg-red-500/10"
-                            onClick={handleLeaveClick}
-                        >
-                            <LogOut className="mr-2 w-4 h-4" /> Leave Party
-                        </Button>
-                    </div>
-
-                    <ActionConfirmationDialog
-                        open={leaveDialogOpen}
-                        onOpenChange={setLeaveDialogOpen}
-                        title="Leave Party?"
-                        description="Are you sure you want to leave this party? You will need to rejoin if you want to come back."
-                        confirmText="Leave"
-                        onConfirm={confirmLeave}
-                    />
-
-                    <ActionConfirmationDialog
-                        open={advanceDialogOpen}
-                        onOpenChange={setAdvanceDialogOpen}
-                        title="Advance Party Phase?"
-                        description={`Are you sure you want to advance the party state? This will move everyone to the next phase.`}
-                        confirmText="Advance"
-                        onConfirm={confirmAdvance}
-                    />
-                    <div className="h-32" />
-                </div>
+                <PartyRoom
+                    party={party}
+                    members={members}
+                    currentUser={currentUser}
+                    isLeader={isLeader}
+                    isManualPending={isManualPending}
+                    advanceButtonText={getAdvanceButtonText()}
+                    onAdvanceClick={handleAdvanceClick}
+                    onKick={handleKick}
+                    onPromote={handlePromote}
+                    showReadyButton={showReadyButton}
+                    showAllReadyCountdown={showAllReadyCountdown}
+                    allReady={allReady}
+                    readyCount={readyCount}
+                    transitionSecondsLeft={transitionSecondsLeft}
+                    optimisticReady={optimisticReady}
+                    onReadyToggle={handleReadyToggle}
+                    onLeaveClick={handleLeaveClick}
+                    leaveDialogOpen={leaveDialogOpen}
+                    setLeaveDialogOpen={setLeaveDialogOpen}
+                    confirmLeave={confirmLeave}
+                    advanceDialogOpen={advanceDialogOpen}
+                    setAdvanceDialogOpen={setAdvanceDialogOpen}
+                    confirmAdvance={confirmAdvance}
+                />
             </div>
         </>
     )
