@@ -1,6 +1,8 @@
 'use client'
 
 import { createContext, useContext, useState, ReactNode, useMemo } from 'react'
+import { useRouter } from 'next/navigation'
+import { toast } from 'sonner'
 import { PartyResponse } from '@/model/partyResponse'
 import { MemberInfo } from '@/model/memberInfo'
 import { CurrentUserResponse } from '@/model/currentUserResponse'
@@ -36,6 +38,7 @@ export function PartyViewProvider({
   initialMembers,
   currentUser
 }: Readonly<PartyViewProviderProps>) {
+  const router = useRouter()
   const [activeView, setActiveView] = useState<PartyViewType>(initialView)
   const [party, setParty] = useState<PartyResponse>(initialParty)
   const [members, setMembers] = useState<MemberInfo[]>(initialMembers)
@@ -46,7 +49,8 @@ export function PartyViewProvider({
 
     if (typeof msg === 'string') {
       if (msg === 'PartyDisbanded') {
-        // Handled upstream
+        toast.info('The party has been disbanded')
+        router.push('/dashboard')
       }
       return
     }
@@ -94,7 +98,15 @@ export function PartyViewProvider({
       setParty((prev) => ({
         ...prev,
         phase_entered_at: payload.phase_entered_at ?? prev.phase_entered_at,
-        ready_deadline_at: payload.deadline_at === undefined ? prev.ready_deadline_at : payload.deadline_at,
+        // If deadline_at is present in the payload, use it.
+        // If absent but phase_entered_at is present, this is a phase-info update — keep existing deadline.
+        // If both absent (empty cancel signal), clear the deadline.
+        ready_deadline_at:
+          payload.deadline_at !== undefined
+            ? payload.deadline_at
+            : payload.phase_entered_at !== undefined
+              ? prev.ready_deadline_at
+              : null,
       }))
     } else if ('NameChanged' in msg) {
       const payload = msg.NameChanged
@@ -104,7 +116,6 @@ export function PartyViewProvider({
         )
       )
     }
-    // "PartyDisbanded" is handled upstream to redirect the user
   }
 
   const value = useMemo(

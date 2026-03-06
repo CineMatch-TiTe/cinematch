@@ -8,10 +8,12 @@ import { ThumbsUp } from 'lucide-react'
 
 function VotingCard({
   movie,
-  onVote
+  onVote,
+  votes
 }: Readonly<{
   movie: MovieResponse
   onVote: (id: number, like: boolean) => void
+  votes?: { likes: number; dislikes: number }
 }>) {
   const [hasVoted, setHasVoted] = useState(false)
   const [isImageLoading, setIsImageLoading] = useState(true)
@@ -72,6 +74,11 @@ function VotingCard({
                 <ThumbsUp className="w-4 h-4 mr-2" /> Like
               </Button>
             </div>
+            {votes !== undefined && (
+              <span className="text-xs text-zinc-500">
+                {votes.likes} liked
+              </span>
+            )}
           </div>
         </div>
       </div>

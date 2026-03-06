@@ -1,6 +1,8 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { SkipForward } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 
 import { PartyResponse } from '@/model/partyResponse'
 import { MemberInfo } from '@/model/memberInfo'
@@ -88,6 +90,20 @@ export default function PartyViewClient({
 
     return (
         <>
+            {isPickingView && isLeader && getAdvanceButtonText() && (
+                <div className="fixed top-4 right-4 z-[60]">
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        disabled={isManualPending}
+                        className="text-zinc-500 hover:text-white hover:bg-zinc-800 transition-colors"
+                        onClick={handleAdvanceClick}
+                        title={getAdvanceButtonText() ?? 'Advance Phase'}
+                    >
+                        <SkipForward className="h-5 w-5" />
+                    </Button>
+                </div>
+            )}
             <div
                 style={{
                     display:

@@ -1,10 +1,11 @@
 'use client'
 
-import { useCallback } from 'react'
+import { useCallback, useEffect } from 'react'
 import MovieCard from '../MovieCard'
 import { PickingLoadingState, PickingEmptyState } from '.'
 import { useMoviePicker } from '@/hooks/useMoviePicker'
 import { getRecommendedMoviesAction, pickMovieAction } from '@/actions/party-room'
+import { usePartyView } from '@/components/party/PartyViewContext'
 
 export default function PickingFlow({ partyId }: Readonly<{ partyId: string }>) {
   const fetchNext = useCallback(async () => {
@@ -24,6 +25,8 @@ export default function PickingFlow({ partyId }: Readonly<{ partyId: string }>) 
     [partyId]
   )
 
+  const { lastMessage } = usePartyView()
+
   const {
     currentMovie,
     loading,
@@ -31,8 +34,15 @@ export default function PickingFlow({ partyId }: Readonly<{ partyId: string }>) 
     handleLike,
     handleDislike,
     handleSkip,
-    hasFinishedAllMovies
+    hasFinishedAllMovies,
+    refresh
   } = useMoviePicker({ key: `party-${partyId}`, fetchNext, submitAction })
+
+  useEffect(() => {
+    if (lastMessage && typeof lastMessage === 'object' && 'RecommendMovie' in lastMessage) {
+      refresh()
+    }
+  }, [lastMessage, refresh])
 
   if (loading) {
     return <PickingLoadingState />
