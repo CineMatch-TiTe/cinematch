@@ -15,7 +15,7 @@ interface VotingFlowProps {
 }
 
 export default function VotingFlow({ partyId, phaseEnteredAt, timeoutSecs, deadlineAt }: Readonly<VotingFlowProps>) {
-  const { movies, votingRound, loading, countdown, showContent, transitionData, handleVote, handleReady } =
+  const { movies, votingRound, voteTotals, loading, countdown, showContent, transitionData, handleVote, handleReady } =
     useVoting(partyId)
   const [isVotingReady, setIsVotingReady] = useState(false)
 
@@ -103,7 +103,7 @@ export default function VotingFlow({ partyId, phaseEnteredAt, timeoutSecs, deadl
         </div>
 
         {movies.map((movie) => {
-          return <VotingCard key={movie.movie_id} movie={movie} onVote={handleVote} />
+          return <VotingCard key={movie.movie_id} movie={movie} onVote={handleVote} votes={voteTotals[movie.movie_id]} />
         })}
       </div>
     </div>

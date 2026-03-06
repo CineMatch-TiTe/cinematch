@@ -1,6 +1,8 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { SkipForward } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 
 import { PartyResponse } from '@/model/partyResponse'
 import { MemberInfo } from '@/model/memberInfo'
@@ -27,7 +29,7 @@ interface PartyViewClientProps {
 export default function PartyViewClient({
     currentUser
 }: Readonly<PartyViewClientProps>) {
-    const { activeView, setActiveView, party, members, handleWsMessage } = usePartyView()
+    const { activeView, party, members, handleWsMessage } = usePartyView()
     const [mounted, setMounted] = useState(false)
     useEffect(() => { setMounted(true) }, [])
 
@@ -50,12 +52,12 @@ export default function PartyViewClient({
         handleKick,
         handlePromote,
         getAdvanceButtonText
-    } = usePartyViewLogic({ party, currentUser, setActiveView })
+    } = usePartyViewLogic({ party, currentUser })
 
     const currentMember = members.find(m => m.user_id === currentUser.user_id)
     const serverReady = currentMember?.is_ready ?? false
     const [optimisticReady, setOptimisticReady] = useState(serverReady)
-    const showReadyButton = party.state === 'created' || party.state === 'picking'
+    const showReadyButton = party.state === 'picking'
 
     // Sync optimistic state from server when it changes
     useEffect(() => { setOptimisticReady(serverReady) }, [serverReady])
@@ -88,16 +90,24 @@ export default function PartyViewClient({
 
     return (
         <>
-            <div
-                style={{
-                    display:
-                        isPickingView && party.state !== 'voting' && party.state !== 'watching'
-                            ? 'block'
-                            : 'none'
-                }}
-            >
-                <PickingFlow partyId={party.id} />
-            </div>
+            {isPickingView && isLeader && getAdvanceButtonText() && (
+                <div className="fixed top-4 right-4 z-[60]">
+                    <Button
+                        size="sm"
+                        disabled={isManualPending}
+                        className="bg-red-600 hover:bg-red-700 text-white font-semibold shadow-lg shadow-red-600/25 transition-colors gap-1.5"
+                        onClick={handleAdvanceClick}
+                    >
+                        <SkipForward className="h-4 w-4" />
+                        {getAdvanceButtonText()}
+                    </Button>
+                </div>
+            )}
+            {(party.state === 'created' || party.state === 'picking') && (
+                <div style={{ display: isPickingView ? 'block' : 'none' }}>
+                    <PickingFlow partyId={party.id} />
+                </div>
+            )}
 
             {party.state === 'voting' && (
                 <div style={{ display: isVotingView ? 'block' : 'none' }}>

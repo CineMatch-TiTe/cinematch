@@ -1,4 +1,4 @@
-import { useState, useEffect, useTransition, useRef } from 'react'
+import { useState, useTransition } from 'react'
 
 import { toast } from 'sonner'
 import {
@@ -13,27 +13,15 @@ import { CurrentUserResponse } from '@/model/currentUserResponse'
 interface UsePartyViewLogicProps {
   party: PartyResponse
   currentUser: CurrentUserResponse
-  setActiveView: (view: 'picking' | 'voting' | 'watching' | 'room') => void
 }
 
-export function usePartyViewLogic({ party, currentUser, setActiveView }: UsePartyViewLogicProps) {
+export function usePartyViewLogic({ party, currentUser }: UsePartyViewLogicProps) {
   const [isManualPending, startManualTransition] = useTransition()
   const [leaveDialogOpen, setLeaveDialogOpen] = useState(false)
   const [advanceDialogOpen, setAdvanceDialogOpen] = useState(false)
-  const prevPartyState = useRef(party.state)
 
-
-  // Effect to handle view switching based on party state
-  useEffect(() => {
-    if (prevPartyState.current !== party.state) {
-      if (party.state === 'voting') {
-        setActiveView('voting')
-      } else if (party.state === 'watching') {
-        setActiveView('watching')
-      }
-      prevPartyState.current = party.state
-    }
-  }, [party.state, setActiveView])
+  // View switching is handled directly in PartyViewContext.handleWsMessage
+  // for immediate reactivity when WebSocket state changes arrive.
 
   const isLeader = party.leader_id === currentUser.user_id
 

@@ -135,8 +135,8 @@ impl PartyStateMachine for Party {
 
         let new_state = match state {
             PartyState::Created => {
-                do_created_to_voting(ctx, self).await?;
-                Some(PartyState::Voting)
+                // Created phase: only the leader can advance manually.
+                None
             }
             PartyState::Picking => {
                 do_picking_to_voting(ctx, self).await?;
@@ -302,44 +302,6 @@ async fn do_created_to_picking(ctx: &impl AppContext, party: &Party) -> Result<(
             error!("Failed to advance phase: {}", e);
             DomainError::Internal(format!("Failed to advance phase: {}", e))
         })?;
-
-    Ok(())
-}
-
-/// Created → Voting: Release join code, build ballots, switch phase.
-async fn do_created_to_voting(ctx: &impl AppContext, party: &Party) -> Result<(), DomainError> {
-    party.release_code(ctx).await.map_err(|e| {
-        error!("Failed to release party code: {}", e);
-        DomainError::Internal(format!("Failed to release party code: {}", e))
-    })?;
-
-    // Switch to Voting (resets ready states)
-    party
-        .set_phase(ctx, PartyState::Voting)
-        .await
-        .map_err(|e| {
-            error!("Failed to advance phase: {}", e);
-            DomainError::Internal(format!("Failed to advance phase: {}", e))
-        })?;
-
-    // Generate ballots (pure-ish)
-    cinematch_recommendation_engine::build_voting_ballots_for_party(ctx, party)
-        .await
-        .map_err(|e| {
-            error!("Failed to build voting ballots (Qdrant): {}", e);
-            DomainError::Internal(format!("Failed to build voting ballots: {}", e))
-        })?;
-
-    // Enable voting state
-    party.enable_voting(ctx).await.map_err(|e| {
-        error!("Failed to enable voting: {}", e);
-        DomainError::Internal(format!("Failed to enable voting: {}", e))
-    })?;
-
-    party.set_voting_round(ctx, Some(1)).await.map_err(|e| {
-        error!("Failed to set voting round: {}", e);
-        DomainError::Internal(format!("Failed to set voting round: {}", e))
-    })?;
 
     Ok(())
 }

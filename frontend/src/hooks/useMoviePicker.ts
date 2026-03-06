@@ -21,6 +21,7 @@ export interface UseMoviePickerReturn {
   handleDislike: () => Promise<void>
   handleSkip: () => Promise<void>
   hasFinishedAllMovies: boolean
+  refresh: () => void
 }
 
 export function useMoviePicker({
@@ -131,6 +132,11 @@ export function useMoviePicker({
 
   const hasFinishedAllMovies = noNewMovies && movies.length === 0
 
+  const refresh = useCallback(() => {
+    setNoNewMovies(false)
+    fetchMore()
+  }, [fetchMore])
+
   return {
     currentMovie: movies[0],
     loading: loading && movies.length === 0,
@@ -139,6 +145,7 @@ export function useMoviePicker({
     handleLike: () => handleAction(true),
     handleDislike: () => handleAction(false),
     handleSkip: () => handleAction(null),
-    hasFinishedAllMovies
+    hasFinishedAllMovies,
+    refresh
   }
 }

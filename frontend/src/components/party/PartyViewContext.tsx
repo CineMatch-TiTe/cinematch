@@ -1,6 +1,8 @@
 'use client'
 
-import { createContext, useContext, useState, ReactNode, useMemo } from 'react'
+import { createContext, useContext, useState, ReactNode, useMemo, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
+import { toast } from 'sonner'
 import { PartyResponse } from '@/model/partyResponse'
 import { MemberInfo } from '@/model/memberInfo'
 import { CurrentUserResponse } from '@/model/currentUserResponse'
@@ -36,17 +38,19 @@ export function PartyViewProvider({
   initialMembers,
   currentUser
 }: Readonly<PartyViewProviderProps>) {
+  const router = useRouter()
   const [activeView, setActiveView] = useState<PartyViewType>(initialView)
   const [party, setParty] = useState<PartyResponse>(initialParty)
   const [members, setMembers] = useState<MemberInfo[]>(initialMembers)
   const [lastMessage, setLastMessage] = useState<ServerMessage | null>(null)
 
-  const handleWsMessage = (msg: ServerMessage) => {
+  const handleWsMessage = useCallback((msg: ServerMessage) => {
     setLastMessage(msg)
 
     if (typeof msg === 'string') {
       if (msg === 'PartyDisbanded') {
-        // Handled upstream
+        toast.info('The party has been disbanded')
+        router.push('/dashboard')
       }
       return
     }
@@ -57,7 +61,14 @@ export function PartyViewProvider({
         ...prev,
         state: payload.state,
         ready_deadline_at: payload.deadline_at ?? null,
+        // Reset phase_entered_at so countdown components don't flash
+        // the previous phase's time before PartyTimeoutUpdate arrives.
+        phase_entered_at: new Date().toISOString(),
       }))
+      // Immediately switch the active view to match the new phase
+      if (payload.state === 'picking') setActiveView('picking')
+      else if (payload.state === 'voting') setActiveView('voting')
+      else if (payload.state === 'watching') setActiveView('watching')
     } else if ('PartyMemberJoined' in msg) {
       const payload = msg.PartyMemberJoined
       setMembers((prev) => {
@@ -91,11 +102,32 @@ export function PartyViewProvider({
       )
     } else if ('PartyTimeoutUpdate' in msg) {
       const payload = msg.PartyTimeoutUpdate
-      setParty((prev) => ({
-        ...prev,
-        phase_entered_at: payload.phase_entered_at ?? prev.phase_entered_at,
-        ready_deadline_at: payload.deadline_at === undefined ? prev.ready_deadline_at : payload.deadline_at,
-      }))
+      setParty((prev) => {
+        // Map timeout_secs to the correct phase-specific field
+        const timeoutUpdates: Partial<PartyResponse> = {}
+        if (payload.timeout_secs != null) {
+          if (prev.state === 'voting') {
+            timeoutUpdates.voting_timeout_secs = payload.timeout_secs
+          } else if (prev.state === 'watching') {
+            timeoutUpdates.watching_timeout_secs = payload.timeout_secs
+          }
+        }
+
+        return {
+          ...prev,
+          ...timeoutUpdates,
+          phase_entered_at: payload.phase_entered_at ?? prev.phase_entered_at,
+          // If deadline_at is present in the payload, use it.
+          // If absent but phase_entered_at is present, this is a phase-info update — keep existing deadline.
+          // If both absent (empty cancel signal), clear the deadline.
+          ready_deadline_at:
+            payload.deadline_at !== undefined
+              ? payload.deadline_at
+              : payload.phase_entered_at !== undefined
+                ? prev.ready_deadline_at
+                : null,
+        }
+      })
     } else if ('NameChanged' in msg) {
       const payload = msg.NameChanged
       setMembers((prev) =>
@@ -104,8 +136,7 @@ export function PartyViewProvider({
         )
       )
     }
-    // "PartyDisbanded" is handled upstream to redirect the user
-  }
+  }, [router])
 
   const value = useMemo(
     () => ({
@@ -118,7 +149,7 @@ export function PartyViewProvider({
       handleWsMessage,
       lastMessage,
     }),
-    [activeView, party, members, currentUser, lastMessage]
+    [activeView, party, members, currentUser, handleWsMessage, lastMessage]
   )
 
   return <PartyViewContext.Provider value={value}>{children}</PartyViewContext.Provider>

@@ -8,6 +8,7 @@ import { usePartyView } from '@/components/party/PartyViewContext'
 export function useVoting(partyId: string) {
   const [movies, setMovies] = useState<MovieResponse[]>([])
   const [votingRound, setVotingRound] = useState<number | null>(null)
+  const [voteTotals, setVoteTotals] = useState<Record<number, { likes: number; dislikes: number }>>({})
   const [loading, setLoading] = useState(true)
   const [countdown, setCountdown] = useState(5)
   const [showContent, setShowContent] = useState(false)
@@ -120,8 +121,10 @@ export function useVoting(partyId: string) {
       if ('VotingRoundStarted' in lastMessage) {
         fetchVotes()
       } else if ('MovieVoteUpdate' in lastMessage) {
-        // We could track real-time vote totals here if desired,
-        // but currently we just wait for VotingRoundStarted or phase changes.
+        const { movie_id, likes, dislikes } = lastMessage.MovieVoteUpdate
+        startTransition(() => {
+          setVoteTotals((prev) => ({ ...prev, [movie_id]: { likes, dislikes } }))
+        })
       }
     }
   }, [lastMessage, fetchVotes])
@@ -158,6 +161,7 @@ export function useVoting(partyId: string) {
   return {
     movies,
     votingRound,
+    voteTotals,
     loading,
     countdown,
     showContent,

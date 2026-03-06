@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Badge } from '@/components/ui/badge'
@@ -6,6 +6,8 @@ import { Card, CardContent } from '@/components/ui/card'
 import { MovieResponse } from '@/model/movieResponse'
 import { ThumbsDown, ThumbsUp, SkipForward, Star, Calendar, Clock } from 'lucide-react'
 import Image from 'next/image'
+
+const SWIPE_THRESHOLD = 80
 
 interface MovieCardProps {
   movie: MovieResponse
@@ -24,15 +26,122 @@ export default function MovieCard({
 }: Readonly<MovieCardProps>) {
   const [isImageLoading, setIsImageLoading] = useState(true)
   const [prevPosterUrl, setPrevPosterUrl] = useState(movie.poster_url)
+  const [swipeOffset, setSwipeOffset] = useState({ x: 0, y: 0 })
+  const [isSwiping, setIsSwiping] = useState(false)
+  const touchStart = useRef<{ x: number; y: number } | null>(null)
+  const hasTriggered = useRef(false)
 
   if (movie.poster_url !== prevPosterUrl) {
     setPrevPosterUrl(movie.poster_url)
     setIsImageLoading(true)
   }
 
+  const handleTouchStart = useCallback(
+    (e: React.TouchEvent) => {
+      if (disabled) return
+      const touch = e.touches[0]
+      touchStart.current = { x: touch.clientX, y: touch.clientY }
+      hasTriggered.current = false
+      setIsSwiping(true)
+    },
+    [disabled]
+  )
+
+  const handleTouchMove = useCallback(
+    (e: React.TouchEvent) => {
+      if (!touchStart.current || disabled) return
+      const touch = e.touches[0]
+      const dx = touch.clientX - touchStart.current.x
+      const dy = touch.clientY - touchStart.current.y
+      setSwipeOffset({ x: dx, y: Math.max(0, dy) })
+    },
+    [disabled]
+  )
+
+  const handleTouchEnd = useCallback(() => {
+    if (!touchStart.current || hasTriggered.current || disabled) {
+      setSwipeOffset({ x: 0, y: 0 })
+      setIsSwiping(false)
+      touchStart.current = null
+      return
+    }
+
+    const { x, y } = swipeOffset
+    const absX = Math.abs(x)
+    const absY = Math.abs(y)
+
+    if (absX > SWIPE_THRESHOLD && absX > absY) {
+      hasTriggered.current = true
+      if (x > 0) {
+        onLike()
+      } else {
+        onDislike()
+      }
+    } else if (absY > SWIPE_THRESHOLD && absY > absX && y > 0) {
+      hasTriggered.current = true
+      onSkip()
+    }
+
+    setSwipeOffset({ x: 0, y: 0 })
+    setIsSwiping(false)
+    touchStart.current = null
+  }, [swipeOffset, onLike, onDislike, onSkip, disabled])
+
+  const swipeDirection =
+    isSwiping && (Math.abs(swipeOffset.x) > 20 || swipeOffset.y > 20)
+      ? Math.abs(swipeOffset.x) > swipeOffset.y
+        ? swipeOffset.x > 0
+          ? 'right'
+          : 'left'
+        : 'down'
+      : null
+
+  const swipeProgress = Math.min(
+    1,
+    Math.max(Math.abs(swipeOffset.x), swipeOffset.y) / SWIPE_THRESHOLD
+  )
+
+  const cardTransform = isSwiping
+    ? `translate(${swipeOffset.x * 0.5}px, ${swipeOffset.y * 0.3}px) rotate(${swipeOffset.x * 0.05}deg)`
+    : undefined
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
-      <Card className="w-full max-w-md h-[80vh] flex flex-col bg-zinc-900 border-zinc-800 overflow-hidden shadow-2xl relative">
+      <Card
+        className="w-full max-w-md h-[80vh] flex flex-col bg-zinc-900 border-zinc-800 overflow-hidden shadow-2xl relative touch-none select-none"
+        style={{
+          transform: cardTransform,
+          transition: isSwiping ? 'none' : 'transform 0.3s ease-out'
+        }}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+      >
+        {/* Swipe overlay indicators */}
+        {swipeDirection === 'right' && (
+          <div
+            className="absolute inset-0 z-30 pointer-events-none border-4 border-green-500 rounded-xl flex items-center justify-center"
+            style={{ opacity: swipeProgress * 0.8 }}
+          >
+            <ThumbsUp className="w-20 h-20 text-green-500 fill-current drop-shadow-lg" />
+          </div>
+        )}
+        {swipeDirection === 'left' && (
+          <div
+            className="absolute inset-0 z-30 pointer-events-none border-4 border-red-500 rounded-xl flex items-center justify-center"
+            style={{ opacity: swipeProgress * 0.8 }}
+          >
+            <ThumbsDown className="w-20 h-20 text-red-500 drop-shadow-lg" />
+          </div>
+        )}
+        {swipeDirection === 'down' && (
+          <div
+            className="absolute inset-0 z-30 pointer-events-none border-4 border-zinc-400 rounded-xl flex items-center justify-center"
+            style={{ opacity: swipeProgress * 0.8 }}
+          >
+            <SkipForward className="w-20 h-20 text-zinc-400 drop-shadow-lg" />
+          </div>
+        )}
         {/* Movie Poster Background */}
         <div className="absolute inset-0 z-0">
           <Image
