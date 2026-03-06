@@ -88,10 +88,16 @@ impl PartyStateMachine for Party {
 
         match &outcome {
             PartyAdvanceOutcome::PhaseChanged(s) => {
+                let selected_movie_id = if *s == PartyState::Watching {
+                    self.selected_movie_id(ctx).await.unwrap_or(None)
+                } else {
+                    None
+                };
                 let msg = PartyStateChanged {
                     state: (*s).into(),
                     deadline_at: None,
                     timeout_reason: None,
+                    selected_movie_id,
                 };
                 ctx.broadcast_party(self.id, &ServerMessage::PartyStateChanged(msg), None);
             }
@@ -110,10 +116,16 @@ impl PartyStateMachine for Party {
                 );
             }
             PartyAdvanceOutcome::VotingEnded(EndVotingTransition::PhaseChanged(s)) => {
+                let selected_movie_id = if *s == PartyState::Watching {
+                    self.selected_movie_id(ctx).await.unwrap_or(None)
+                } else {
+                    None
+                };
                 let msg = PartyStateChanged {
                     state: (*s).into(),
                     deadline_at: None,
                     timeout_reason: None,
+                    selected_movie_id,
                 };
                 ctx.broadcast_party(self.id, &ServerMessage::PartyStateChanged(msg), None);
             }
@@ -176,12 +188,6 @@ impl PartyStateMachine for Party {
 
         if let Some(s) = new_state {
             if state != PartyState::Voting || s != PartyState::Voting {
-                let msg = PartyStateChanged {
-                    state: s.into(),
-                    deadline_at: None,
-                    timeout_reason: None,
-                };
-                ctx.broadcast_party(self.id, &ServerMessage::PartyStateChanged(msg), None);
                 debug!("Party {} auto-advanced (all ready) -> {:?}", self.id, s);
             } else {
                 debug!("Party {} auto-advanced voting round (all ready)", self.id);
@@ -226,10 +232,16 @@ impl PartyStateMachine for Party {
                 );
             }
             EndVotingTransition::PhaseChanged(s) => {
+                let selected_movie_id = if *s == PartyState::Watching {
+                    self.selected_movie_id(ctx).await.unwrap_or(None)
+                } else {
+                    None
+                };
                 let msg = PartyStateChanged {
                     state: (*s).into(),
                     deadline_at: None,
                     timeout_reason: None,
+                    selected_movie_id,
                 };
                 ctx.broadcast_party(self.id, &ServerMessage::PartyStateChanged(msg), None);
             }
@@ -260,13 +272,8 @@ impl PartyStateMachine for Party {
                     None,
                 );
             }
-            EndVotingTransition::PhaseChanged(s) => {
-                let msg = PartyStateChanged {
-                    state: (*s).into(),
-                    deadline_at: None,
-                    timeout_reason: None,
-                };
-                ctx.broadcast_party(self.id, &ServerMessage::PartyStateChanged(msg), None);
+            EndVotingTransition::PhaseChanged(_s) => {
+                // Expected to be picked up by the executor, avoiding double broadcasts.
             }
         }
         Ok(t)
@@ -274,12 +281,6 @@ impl PartyStateMachine for Party {
 
     async fn do_watching_to_review(&self, ctx: &impl AppContext) -> Result<(), DomainError> {
         do_watching_to_review_internal(ctx, self).await?;
-        let msg = PartyStateChanged {
-            state: PartyState::Review.into(),
-            deadline_at: None,
-            timeout_reason: None,
-        };
-        ctx.broadcast_party(self.id, &ServerMessage::PartyStateChanged(msg), None);
         Ok(())
     }
 }
@@ -358,6 +359,22 @@ async fn do_review_to_created(ctx: &impl AppContext, party: &Party) -> Result<()
         DomainError::Internal(format!("Failed to start new round: {}", e))
     })?;
     debug!("Party {} started new round", party.id);
+
+    let code = match party.join_code(ctx).await.map_err(|e| {
+        error!("Failed to get party join code: {}", e);
+        DomainError::Internal(format!("Failed to get party join code: {}", e))
+    })? {
+        Some(code) => code,
+        None => {
+            error!("Party {} has no join code", party.id);
+            return Err(DomainError::Internal("Party has no join code".into()));
+        }
+    };
+
+    debug!("Party {} new join code: {}", party.id, code);
+
+    ctx.broadcast_party(party.id, &ServerMessage::PartyCodeChanged(code), None);
+
     Ok(())
 }
 

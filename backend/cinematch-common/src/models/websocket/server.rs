@@ -21,6 +21,9 @@ pub struct PartyStateChanged {
     pub deadline_at: Option<DateTime<Utc>>,
     /// Why the timeout was set
     pub timeout_reason: Option<TimeoutReason>,
+    /// The selected movie ID, relevant when state transitions to Watching
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub selected_movie_id: Option<i64>,
 }
 
 /// Message types sent from server to clients
@@ -42,6 +45,9 @@ pub enum ServerMessage {
 
     /// Timeout config for the current phase. Sent whenever phase changes (or round 2). Clients use for countdown.
     PartyTimeoutUpdate(PartyTimeoutUpdate),
+
+    /// Optional new code for the party
+    PartyCodeChanged(String),
 }
 
 /// Timeout info for the current phase.
