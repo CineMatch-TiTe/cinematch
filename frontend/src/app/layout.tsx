@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from 'next/font/google'
 import './globals.css'
 import { Toaster } from '@/components/ui/sonner'
 import { MoviePickerProvider } from '@/components/providers/MoviePickerProvider'
+import { AuthProvider } from '@/lib/auth-context'
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -27,11 +28,14 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen bg-zinc-950 text-zinc-100 font-sans selection:bg-red-500/30`}>
-        <MoviePickerProvider>
-          {children}
-          <Toaster />
-        </MoviePickerProvider>
+        <AuthProvider>
+          <MoviePickerProvider>
+            {children}
+            <Toaster />
+          </MoviePickerProvider>
+        </AuthProvider>
       </body>
     </html>
   )
 }
+

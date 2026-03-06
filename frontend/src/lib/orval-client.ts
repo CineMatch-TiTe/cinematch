@@ -1,3 +1,32 @@
+const JWT_COOKIE_NAME = 'jwt'
+
+/**
+ * Read the JWT from:
+ * 1. Module-level token (set by AuthProvider on the client)
+ * 2. Cookie (for server-side rendering / server actions)
+ */
+async function resolveToken(): Promise<string | null> {
+  // Client-side: read from cookie directly
+  if (typeof window !== 'undefined') {
+    const match = document.cookie.match(new RegExp(`(?:^|; )${JWT_COOKIE_NAME}=([^;]*)`))
+    return match ? decodeURIComponent(match[1]) : null
+  }
+
+  // Server-side: read from next/headers cookies
+  try {
+    // Use require to hide the import from Orval's static AST parser
+    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+    // @ts-ignore
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { cookies } = require('next/headers')
+    const cookieStore = await cookies()
+    const jwtCookie = cookieStore.get(JWT_COOKIE_NAME)
+    return jwtCookie?.value ?? null
+  } catch {
+    return null
+  }
+}
+
 export const customInstance = async <T>(
   url: string,
   options: RequestInit & { params?: Record<string, string> } = {}
@@ -19,37 +48,15 @@ export const customInstance = async <T>(
     ...(headers as Record<string, string>)
   }
 
-  // Server-side cookie forwarding
-  if (typeof window === 'undefined') {
-    try {
-      // Use require to hide the import from Orval's static AST parser
-      // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-      // @ts-ignore
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const { cookies } = require('next/headers')
-      const cookieStore = await cookies()
-      const allCookies = cookieStore
-        .getAll()
-        .map((c: { name: string; value: string }) => `${c.name}=${c.value}`)
-        .join('; ')
-
-      if (allCookies) {
-        const existingCookie = reqHeaders['Cookie'] as string | undefined
-        if (existingCookie) {
-          reqHeaders['Cookie'] = `${existingCookie}; ${allCookies}`
-        } else {
-          reqHeaders['Cookie'] = allCookies
-        }
-      }
-    } catch {
-      // Ignore errors during module resolution
-    }
+  // Add JWT Bearer token
+  const token = await resolveToken()
+  if (token) {
+    ;(reqHeaders)['Authorization'] = `Bearer ${token}`
   }
 
   const config: RequestInit = {
     ...rest,
     headers: reqHeaders,
-    credentials: 'include'
   }
 
   const response = await fetch(finalUrl, config)
@@ -67,7 +74,6 @@ export const customInstance = async <T>(
     // Attempt to handle text response if JSON fails or not indicated
     try {
       const text = await response.text()
-      // If generic T is expected to be object, this might fail typing at runtime if T is strictly object, but for Orval it usually maps well.
       data = text
     } catch {
       data = {}
