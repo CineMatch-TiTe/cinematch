@@ -10,6 +10,8 @@ export interface PartyReadyControlsProps {
     transitionSecondsLeft: number
     optimisticReady: boolean
     onReadyToggle: () => void
+    readyLabel?: string
+    unreadyLabel?: string
 }
 
 export function PartyReadyControls({
@@ -19,7 +21,9 @@ export function PartyReadyControls({
     memberCount,
     transitionSecondsLeft,
     optimisticReady,
-    onReadyToggle
+    onReadyToggle,
+    readyLabel = "I'm Ready",
+    unreadyLabel = 'Unready'
 }: Readonly<PartyReadyControlsProps>) {
     return (
         <>
@@ -55,9 +59,9 @@ export function PartyReadyControls({
                 }`}
             >
                 {optimisticReady ? (
-                    <><XCircle className="mr-2 w-5 h-5" /> Unready</>
+                    <><XCircle className="mr-2 w-5 h-5" /> {unreadyLabel}</>
                 ) : (
-                    <><CheckCircle2 className="mr-2 w-5 h-5" /> I&apos;m Ready</>
+                    <><CheckCircle2 className="mr-2 w-5 h-5" /> {readyLabel}</>
                 )}
             </Button>
         </>

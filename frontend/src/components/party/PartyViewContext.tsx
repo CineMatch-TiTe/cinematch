@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useContext, useState, ReactNode, useMemo, useCallback } from 'react'
+import { createContext, useContext, useState, useRef, ReactNode, useMemo, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { PartyResponse } from '@/model/partyResponse'
@@ -19,6 +19,7 @@ interface PartyViewContextType {
   currentUser: CurrentUserResponse
   handleWsMessage: (msg: ServerMessage) => void
   lastMessage: ServerMessage | null
+  consumeLivePhaseTransition: () => string | null
 }
 
 const PartyViewContext = createContext<PartyViewContextType | undefined>(undefined)
@@ -43,6 +44,13 @@ export function PartyViewProvider({
   const [party, setParty] = useState<PartyResponse>(initialParty)
   const [members, setMembers] = useState<MemberInfo[]>(initialMembers)
   const [lastMessage, setLastMessage] = useState<ServerMessage | null>(null)
+  const livePhaseTransitionRef = useRef<string | null>(null)
+
+  const consumeLivePhaseTransition = useCallback(() => {
+    const value = livePhaseTransitionRef.current
+    livePhaseTransitionRef.current = null
+    return value
+  }, [])
 
   const handleWsMessage = useCallback((msg: ServerMessage) => {
     setLastMessage(msg)
@@ -59,6 +67,7 @@ export function PartyViewProvider({
 
     if ('PartyStateChanged' in msg) {
       const payload = msg.PartyStateChanged
+      livePhaseTransitionRef.current = payload.state
       setParty((prev) => ({
         ...prev,
         state: payload.state,
@@ -156,8 +165,9 @@ export function PartyViewProvider({
       currentUser,
       handleWsMessage,
       lastMessage,
+      consumeLivePhaseTransition,
     }),
-    [activeView, party, members, currentUser, handleWsMessage, lastMessage]
+    [activeView, party, members, currentUser, handleWsMessage, lastMessage, consumeLivePhaseTransition]
   )
 
   return <PartyViewContext.Provider value={value}>{children}</PartyViewContext.Provider>

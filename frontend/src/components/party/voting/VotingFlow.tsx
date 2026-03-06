@@ -1,10 +1,9 @@
 'use client'
 
-import { Button } from '@/components/ui/button'
-import { CheckCircle2, XCircle } from 'lucide-react'
 import { useVoting } from '@/hooks/useVoting'
 import VotingCard from './VotingCard'
 import PhaseCountdown from '../PhaseCountdown'
+import { PartyReadyControls } from '@/components/party/PartyReadyControls'
 import { useEffect, useState } from 'react'
 import { usePartyView } from '@/components/party/PartyViewContext'
 
@@ -17,12 +16,21 @@ interface VotingFlowProps {
 
 export default function VotingFlow({ partyId, phaseEnteredAt, timeoutSecs, deadlineAt }: Readonly<VotingFlowProps>) {
   const { movies, votingRound, voteTotals, loading, countdown, showContent, transitionData, handleVote, handleReady } =
-    useVoting(partyId)
+    useVoting(partyId, phaseEnteredAt)
   const { members, currentUser } = usePartyView()
   const serverReady = members.find((m) => m.user_id === currentUser.user_id)?.is_ready ?? false
-  const [isVotingReady, setIsVotingReady] = useState(serverReady)
+  const [optimisticReady, setOptimisticReady] = useState(serverReady)
 
-  useEffect(() => { setIsVotingReady(serverReady) }, [serverReady])
+  useEffect(() => { setOptimisticReady(serverReady) }, [serverReady])
+
+  const readyCount = members.filter(m => m.user_id === currentUser.user_id ? optimisticReady : m.is_ready).length
+  const allReady = members.length > 0 && readyCount === members.length
+
+  const handleReadyToggle = () => {
+    const next = !optimisticReady
+    setOptimisticReady(next)
+    handleReady(next)
+  }
 
   if (loading || !showContent) {
     return (
@@ -86,29 +94,23 @@ export default function VotingFlow({ partyId, phaseEnteredAt, timeoutSecs, deadl
           <div className="text-zinc-400 text-sm font-medium">
             (Pick your Top {votingRound === 1 ? '5' : '3'})
           </div>
-          {votingRound === 1 && (
-            <Button
-              onClick={() => {
-                const next = !isVotingReady
-                setIsVotingReady(next)
-                handleReady(next)
-              }}
-              className={`mt-4 font-semibold rounded-full px-6 py-2 transition-all flex items-center gap-2 ${isVotingReady
-                ? 'bg-red-600 hover:bg-red-700 text-white shadow-[0_0_15px_rgba(239,68,68,0.3)] hover:shadow-[0_0_25px_rgba(239,68,68,0.5)]'
-                : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-[0_0_15px_rgba(16,185,129,0.3)] hover:shadow-[0_0_25px_rgba(16,185,129,0.5)]'
-                }`}
-            >
-              {isVotingReady ? (
-                <><XCircle className="w-5 h-5" /> Undo Ready</>
-              ) : (
-                <><CheckCircle2 className="w-5 h-5" /> I&apos;m Finished Voting</>
-              )}
-            </Button>
-          )}
+          <div className="max-w-xs w-full mt-4">
+            <PartyReadyControls
+              showAllReadyCountdown={false}
+              allReady={allReady}
+              readyCount={readyCount}
+              memberCount={members.length}
+              transitionSecondsLeft={0}
+              optimisticReady={optimisticReady}
+              onReadyToggle={handleReadyToggle}
+              readyLabel="I'm Finished Voting"
+              unreadyLabel="Undo Ready"
+            />
+          </div>
         </div>
 
         {movies.map((movie) => {
-          return <VotingCard key={movie.movie_id} movie={movie} onVote={handleVote} votes={voteTotals[movie.movie_id]} />
+          return <VotingCard key={`${movie.movie_id}-${votingRound}`} movie={movie} onVote={handleVote} votes={voteTotals[movie.movie_id]} />
         })}
       </div>
     </div>
