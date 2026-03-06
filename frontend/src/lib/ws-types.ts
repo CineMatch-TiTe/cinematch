@@ -8,6 +8,7 @@ export interface PartyStateChangedPayload {
   state: PartyStateDto
   deadline_at?: string | null
   timeout_reason?: TimeoutReason | null
+  selected_movie_id?: number | null
 }
 
 // Timeout info for the current phase
@@ -71,6 +72,7 @@ export type ServerMessage =
   | { MovieVoteUpdate: MovieVotesPayload }
   | { VotingRoundStarted: VotingRoundStartedPayload }
   | { PartyTimeoutUpdate: PartyTimeoutUpdatePayload }
+  | { PartyCodeChanged: string }
 
 // Types for messages sent to the server
 export interface VoteMovieClientPayload {
