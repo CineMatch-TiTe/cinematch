@@ -122,7 +122,9 @@ export function useVoting(partyId: string) {
         fetchVotes()
       } else if ('MovieVoteUpdate' in lastMessage) {
         const { movie_id, likes, dislikes } = lastMessage.MovieVoteUpdate
-        setVoteTotals((prev) => ({ ...prev, [movie_id]: { likes, dislikes } }))
+        startTransition(() => {
+          setVoteTotals((prev) => ({ ...prev, [movie_id]: { likes, dislikes } }))
+        })
       }
     }
   }, [lastMessage, fetchVotes])
