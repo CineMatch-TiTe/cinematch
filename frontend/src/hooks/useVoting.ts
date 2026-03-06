@@ -3,6 +3,7 @@ import { toast } from 'sonner'
 import { getMoviesByIdsAction, getPartyVotesAction, voteMovieAction, setReadyAction } from '@/actions/party-room'
 import { MovieResponse } from '@/model'
 import { prefetchImages } from '@/lib/utils'
+import { usePartyView } from '@/components/party/PartyViewContext'
 
 export function useVoting(partyId: string) {
   const [movies, setMovies] = useState<MovieResponse[]>([])
@@ -12,6 +13,7 @@ export function useVoting(partyId: string) {
   const [showContent, setShowContent] = useState(false)
   const [transitionData, setTransitionData] = useState<{ round: number; restart?: boolean } | null>(null)
   const [, startTransition] = useTransition()
+  const { lastMessage } = usePartyView()
 
   // Track displayed movie IDs to detect changes without dependencies
   const displayedMovieIds = useRef<number[]>([])
@@ -114,9 +116,15 @@ export function useVoting(partyId: string) {
   }, [partyId, transitionData, votingRound, handleBallotChange])
 
   useEffect(() => {
-    const interval = setInterval(fetchVotes, 5000)
-    return () => clearInterval(interval)
-  }, [fetchVotes])
+    if (lastMessage && typeof lastMessage === 'object') {
+      if ('VotingRoundStarted' in lastMessage) {
+        fetchVotes()
+      } else if ('MovieVoteUpdate' in lastMessage) {
+        // We could track real-time vote totals here if desired,
+        // but currently we just wait for VotingRoundStarted or phase changes.
+      }
+    }
+  }, [lastMessage, fetchVotes])
 
   const handleVote = async (movieId: number, like: boolean) => {
     const result = await voteMovieAction(partyId, movieId, like)

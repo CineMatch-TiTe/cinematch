@@ -1,5 +1,5 @@
 import { useState, useEffect, useTransition, useRef } from 'react'
-import { useRouter } from 'next/navigation'
+
 import { toast } from 'sonner'
 import {
   kickMemberAction,
@@ -17,23 +17,11 @@ interface UsePartyViewLogicProps {
 }
 
 export function usePartyViewLogic({ party, currentUser, setActiveView }: UsePartyViewLogicProps) {
-  const router = useRouter()
   const [isManualPending, startManualTransition] = useTransition()
-  const [, startPollingTransition] = useTransition()
   const [leaveDialogOpen, setLeaveDialogOpen] = useState(false)
   const [advanceDialogOpen, setAdvanceDialogOpen] = useState(false)
   const prevPartyState = useRef(party.state)
 
-  // Polling for party updates
-  useEffect(() => {
-    const interval = setInterval(() => {
-      startPollingTransition(() => {
-        router.refresh()
-      })
-    }, 5000)
-
-    return () => clearInterval(interval)
-  }, [router])
 
   // Effect to handle view switching based on party state
   useEffect(() => {

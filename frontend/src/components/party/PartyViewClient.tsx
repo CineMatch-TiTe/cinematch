@@ -22,6 +22,7 @@ import { useDeadlineCountdown } from '@/hooks/useDeadlineCountdown'
 import PhaseCountdown from './PhaseCountdown'
 import { setReadyAction } from '@/actions/party-room'
 import { toast } from 'sonner'
+import { usePartySocket } from '@/hooks/usePartySocket'
 
 interface PartyViewClientProps {
     party: PartyResponse
@@ -30,13 +31,16 @@ interface PartyViewClientProps {
 }
 
 export default function PartyViewClient({
-    party,
-    members,
     currentUser
 }: Readonly<PartyViewClientProps>) {
-    const { activeView, setActiveView } = usePartyView()
+    const { activeView, setActiveView, party, members, handleWsMessage } = usePartyView()
     const [mounted, setMounted] = useState(false)
     useEffect(() => { setMounted(true) }, [])
+
+    usePartySocket({
+        partyId: party.id,
+        onMessage: handleWsMessage
+    })
 
     const {
         isManualPending,
@@ -196,7 +200,7 @@ export default function PartyViewClient({
                         {showReadyButton && (
                             <>
                                 <div className="text-center text-sm text-zinc-500 font-medium">
-                                    {showAllReadyCountdown ? (
+                                    {showAllReadyCountdown && (
                                         <div className="flex flex-col items-center gap-1">
                                             <span className="text-emerald-400 font-semibold">Everyone Ready!</span>
                                             <div className="flex items-center gap-2 text-zinc-400">
@@ -209,9 +213,11 @@ export default function PartyViewClient({
                                                 </div>
                                             </div>
                                         </div>
-                                    ) : allReady ? (
+                                    )}
+                                    {!showAllReadyCountdown && allReady && (
                                         <span className="text-emerald-400 animate-pulse font-semibold">All Ready! Starting soon...</span>
-                                    ) : (
+                                    )}
+                                    {!showAllReadyCountdown && !allReady && (
                                         <span>{readyCount}/{members.length} ready</span>
                                     )}
                                 </div>
