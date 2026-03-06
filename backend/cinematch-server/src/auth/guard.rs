@@ -93,7 +93,8 @@ impl FromRequest for JwtAuth {
                 if let Ok(query) = web::Query::<TokenQuery>::from_query(req.query_string()) {
                     Some(query.into_inner().token)
                 } else {
-                    None
+                    // Fallback to jwt cookie (forwarded by Next.js server actions)
+                    req.cookie("jwt").map(|c| c.value().to_string())
                 }
             }
         };

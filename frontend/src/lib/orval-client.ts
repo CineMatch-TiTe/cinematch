@@ -1,18 +1,20 @@
 const JWT_COOKIE_NAME = 'jwt'
 
 /**
- * Read the JWT from:
- * 1. Module-level token (set by AuthProvider on the client)
- * 2. Cookie (for server-side rendering / server actions)
+ * Resolve auth headers for the request:
+ * - Server-side: forward all cookies so the backend can read the `jwt` cookie directly.
+ * - Client-side: read the JWT from document.cookie and send as Authorization header
+ *   (browsers forbid setting the Cookie header on fetch).
  */
-async function resolveToken(): Promise<string | null> {
-  // Client-side: read from cookie directly
+async function resolveAuthHeaders(): Promise<Record<string, string>> {
+  // Client-side: send JWT as Bearer token
   if (globalThis.window !== undefined) {
     const match = document.cookie.match(new RegExp(`(?:^|; )${JWT_COOKIE_NAME}=([^;]*)`))
-    return match ? decodeURIComponent(match[1]) : null
+    const token = match ? decodeURIComponent(match[1]) : null
+    return token ? { Authorization: `Bearer ${token}` } : {}
   }
 
-  // Server-side: read from next/headers cookies
+  // Server-side: forward all cookies from the incoming request
   try {
     // Use require to hide the import from Orval's static AST parser
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
@@ -20,10 +22,14 @@ async function resolveToken(): Promise<string | null> {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { cookies } = require('next/headers')
     const cookieStore = await cookies()
-    const jwtCookie = cookieStore.get(JWT_COOKIE_NAME)
-    return jwtCookie?.value ?? null
+    const allCookies = cookieStore.getAll() as { name: string; value: string }[]
+    if (allCookies.length > 0) {
+      const cookieHeader = allCookies.map((c) => `${c.name}=${c.value}`).join('; ')
+      return { Cookie: cookieHeader }
+    }
+    return {}
   } catch {
-    return null
+    return {}
   }
 }
 
@@ -43,15 +49,12 @@ export const customInstance = async <T>(
   const queryString = searchParams.toString()
   const finalUrl = absoluteUrl + (queryString ? '?' + queryString : '')
 
+  // Auth headers come before caller headers so explicit Authorization (e.g. onboarding) wins
+  const authHeaders = await resolveAuthHeaders()
   const reqHeaders: HeadersInit = {
     'Content-Type': 'application/json',
-    ...(headers as Record<string, string>)
-  }
-
-  // Add JWT Bearer token
-  const token = await resolveToken()
-  if (token) {
-    ;(reqHeaders)['Authorization'] = `Bearer ${token}`
+    ...authHeaders,
+    ...(headers as Record<string, string>),
   }
 
   const config: RequestInit = {
