@@ -36,6 +36,7 @@ pub enum ServerMessage {
     PartyMemberLeft(Uuid),
     PartyStateChanged(PartyStateChanged),
     UpdateReadyState(ReadyStateUpdate),
+    ResetReadiness,
     PartyDisbanded,
 
     // Voting phase
