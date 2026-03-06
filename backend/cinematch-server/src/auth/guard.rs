@@ -99,15 +99,13 @@ impl FromRequest for JwtAuth {
         };
 
         match token {
-            Some(t) => {
-                match jwt::decode_claims(&t) {
-                    Ok((uid, exp)) => ready(Ok(JwtAuth {
-                        user_id: uid,
-                        expires_at: exp,
-                    })),
-                    Err(e) => ready(Err(actix_web::error::ErrorUnauthorized(e.to_string()))),
-                }
-            }
+            Some(t) => match jwt::decode_claims(&t) {
+                Ok((uid, exp)) => ready(Ok(JwtAuth {
+                    user_id: uid,
+                    expires_at: exp,
+                })),
+                Err(e) => ready(Err(actix_web::error::ErrorUnauthorized(e.to_string()))),
+            },
             None => ready(Err(actix_web::error::ErrorUnauthorized(
                 "Bearer token or token query param required".to_string(),
             ))),
