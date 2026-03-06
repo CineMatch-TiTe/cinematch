@@ -6,9 +6,10 @@
 
 use actix_identity::Identity;
 use actix_web::dev::Payload;
-use actix_web::{Error, FromRequest, HttpRequest};
+use actix_web::{Error, FromRequest, HttpRequest, web};
 use actix_web_httpauth::extractors::bearer::BearerAuth;
 use futures::future::{Ready, ready};
+use serde::Deserialize;
 use uuid::Uuid;
 
 use crate::api_error::ApiError;
@@ -75,29 +76,38 @@ impl Auth {
     }
 }
 
+#[derive(Deserialize)]
+struct TokenQuery {
+    token: String,
+}
+
 impl FromRequest for JwtAuth {
     type Error = Error;
     type Future = Ready<Result<Self, Self::Error>>;
 
     fn from_request(req: &HttpRequest, payload: &mut Payload) -> Self::Future {
-        // We can synchronously look at the header and verify the token.
-        // The actix-httpauth extractor returns an error if header is missing
-        // or malformed; but we treat absence as a non-error (JwtAuth is
-        // optional in our routes).
-        match BearerAuth::from_request(req, payload).into_inner() {
-            Ok(bearer) => {
-                // we need the expiration claim, so decode instead of using
-                // the simple verify helper.
-                match jwt::decode_claims(bearer.token()) {
-                    Ok((uid, exp)) => ready(Ok(JwtAuth {
-                        user_id: uid,
-                        expires_at: exp,
-                    })),
-                    Err(e) => ready(Err(actix_web::error::ErrorUnauthorized(e.to_string()))),
+        let token = match BearerAuth::from_request(req, payload).into_inner() {
+            Ok(bearer) => Some(bearer.token().to_string()),
+            Err(_) => {
+                // Fallback to query parameter for WebSockets
+                if let Ok(query) = web::Query::<TokenQuery>::from_query(req.query_string()) {
+                    Some(query.into_inner().token)
+                } else {
+                    None
                 }
             }
-            Err(_) => ready(Err(actix_web::error::ErrorUnauthorized(
-                "Bearer token required".to_string(),
+        };
+
+        match token {
+            Some(t) => match jwt::decode_claims(&t) {
+                Ok((uid, exp)) => ready(Ok(JwtAuth {
+                    user_id: uid,
+                    expires_at: exp,
+                })),
+                Err(e) => ready(Err(actix_web::error::ErrorUnauthorized(e.to_string()))),
+            },
+            None => ready(Err(actix_web::error::ErrorUnauthorized(
+                "Bearer token or token query param required".to_string(),
             ))),
         }
     }

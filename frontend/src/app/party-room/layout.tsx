@@ -16,14 +16,27 @@ export default async function PartyRoomLayout({
     return <>{children}</> // Should be caught by page redirect
   }
 
-  // Parallel fetch of user prefs and party status
-  const { getUserPreferences } = await import('@/server/user/user')
+  // Parallel fetch of user prefs, party status, members, and currentUser
+  const { getUserPreferences, getCurrentUser } = await import('@/server/user/user')
   const { getParty } = await import('@/server/party/party')
+  const { getPartyMembers } = await import('@/server/member-ops/member-ops')
 
-  const [prefsRes, partyRes] = await Promise.all([getUserPreferences(), getParty({ party_id: partyId })])
+  const [prefsRes, partyRes, membersRes, userRes] = await Promise.all([
+    getUserPreferences(), 
+    getParty({ party_id: partyId }),
+    getPartyMembers({ party_id: partyId }),
+    getCurrentUser()
+  ])
 
   let initialView: PartyViewType = 'room'
-  const partyState = partyRes.status === 200 ? partyRes.data.state : 'created'
+  const party = partyRes.status === 200 ? partyRes.data : null
+  const partyState = party ? party.state : 'created'
+  const members = membersRes.status === 200 ? membersRes.data.members : []
+  const currentUser = userRes.status === 200 ? userRes.data : null
+
+  if (!party || !currentUser) {
+      return <>{children}</> // let page.tsx handle redirecting
+  }
 
   if (partyState === 'voting') {
     initialView = 'voting'
@@ -38,7 +51,12 @@ export default async function PartyRoomLayout({
   }
 
   return (
-    <PartyViewProvider initialView={initialView} partyState={partyState}>
+    <PartyViewProvider 
+      initialView={initialView} 
+      initialParty={party}
+      initialMembers={members}
+      currentUser={currentUser}
+    >
       <div className="relative">
         {children}
         <PartyFooterNavigation />

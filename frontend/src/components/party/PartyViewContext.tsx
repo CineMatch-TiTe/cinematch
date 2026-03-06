@@ -1,6 +1,10 @@
 'use client'
 
 import { createContext, useContext, useState, ReactNode, useMemo } from 'react'
+import { PartyResponse } from '@/model/partyResponse'
+import { MemberInfo } from '@/model/memberInfo'
+import { CurrentUserResponse } from '@/model/currentUserResponse'
+import { ServerMessage } from '@/lib/ws-types'
 
 export type PartyViewType = 'room' | 'picking' | 'voting' | 'watching'
 
@@ -8,6 +12,11 @@ interface PartyViewContextType {
   activeView: PartyViewType
   setActiveView: (view: PartyViewType) => void
   partyState: string
+  party: PartyResponse
+  members: MemberInfo[]
+  currentUser: CurrentUserResponse
+  handleWsMessage: (msg: ServerMessage) => void
+  lastMessage: ServerMessage | null
 }
 
 const PartyViewContext = createContext<PartyViewContextType | undefined>(undefined)
@@ -15,17 +24,102 @@ const PartyViewContext = createContext<PartyViewContextType | undefined>(undefin
 interface PartyViewProviderProps {
   children: ReactNode
   initialView?: PartyViewType
-  partyState?: string
+  initialParty: PartyResponse
+  initialMembers: MemberInfo[]
+  currentUser: CurrentUserResponse
 }
 
 export function PartyViewProvider({
   children,
   initialView = 'room',
-  partyState = 'created'
+  initialParty,
+  initialMembers,
+  currentUser
 }: Readonly<PartyViewProviderProps>) {
   const [activeView, setActiveView] = useState<PartyViewType>(initialView)
+  const [party, setParty] = useState<PartyResponse>(initialParty)
+  const [members, setMembers] = useState<MemberInfo[]>(initialMembers)
+  const [lastMessage, setLastMessage] = useState<ServerMessage | null>(null)
 
-  const value = useMemo(() => ({ activeView, setActiveView, partyState }), [activeView, partyState])
+  const handleWsMessage = (msg: ServerMessage) => {
+    setLastMessage(msg)
+
+    if (typeof msg === 'string') {
+      if (msg === 'PartyDisbanded') {
+        // Handled upstream
+      }
+      return
+    }
+
+    if ('PartyStateChanged' in msg) {
+      const payload = msg.PartyStateChanged
+      setParty((prev) => ({
+        ...prev,
+        state: payload.state,
+        ready_deadline_at: payload.deadline_at ?? null,
+      }))
+    } else if ('PartyMemberJoined' in msg) {
+      const payload = msg.PartyMemberJoined
+      setMembers((prev) => {
+        if (prev.some((m) => m.user_id === payload.user_id)) return prev
+        return [
+          ...prev,
+          {
+            user_id: payload.user_id,
+            username: payload.username,
+            is_leader: false,
+            is_ready: false,
+            joined_at: new Date().toISOString(),
+          },
+        ]
+      })
+    } else if ('PartyMemberLeft' in msg) {
+      const userId = msg.PartyMemberLeft
+      setMembers((prev) => prev.filter((m) => m.user_id !== userId))
+    } else if ('PartyLeaderChanged' in msg) {
+      const newLeaderId = msg.PartyLeaderChanged
+      setParty((prev) => ({ ...prev, leader_id: newLeaderId }))
+      setMembers((prev) =>
+        prev.map((m) => ({ ...m, is_leader: m.user_id === newLeaderId }))
+      )
+    } else if ('UpdateReadyState' in msg) {
+      const payload = msg.UpdateReadyState
+      setMembers((prev) =>
+        prev.map((m) =>
+          m.user_id === payload.user_id ? { ...m, is_ready: payload.ready } : m
+        )
+      )
+    } else if ('PartyTimeoutUpdate' in msg) {
+      const payload = msg.PartyTimeoutUpdate
+      setParty((prev) => ({
+        ...prev,
+        phase_entered_at: payload.phase_entered_at ?? prev.phase_entered_at,
+        ready_deadline_at: payload.deadline_at === undefined ? prev.ready_deadline_at : payload.deadline_at,
+      }))
+    } else if ('NameChanged' in msg) {
+      const payload = msg.NameChanged
+      setMembers((prev) =>
+        prev.map((m) =>
+          m.user_id === payload.user_id ? { ...m, username: payload.new_name } : m
+        )
+      )
+    }
+    // "PartyDisbanded" is handled upstream to redirect the user
+  }
+
+  const value = useMemo(
+    () => ({
+      activeView,
+      setActiveView,
+      partyState: party.state,
+      party,
+      members,
+      currentUser,
+      handleWsMessage,
+      lastMessage,
+    }),
+    [activeView, party, members, currentUser, lastMessage]
+  )
 
   return <PartyViewContext.Provider value={value}>{children}</PartyViewContext.Provider>
 }

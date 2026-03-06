@@ -1,19 +1,30 @@
 'use client'
 
-import { useActionState } from 'react'
+import { useActionState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { User, Lock, Loader2 } from 'lucide-react'
-import { guestLoginAction } from '@/actions/onboarding'
+import { guestLoginAction, type OnboardingActionResult } from '@/actions/onboarding'
+import { useAuth } from '@/lib/auth-context'
 
-const initialState = {
+const initialState: OnboardingActionResult = {
   message: '',
   errors: null
 }
 
 export function GuestLoginForm({ initialJoinCode }: Readonly<{ initialJoinCode?: string }>) {
   const [state, formAction, isPending] = useActionState(guestLoginAction, initialState)
+  const { setAuth } = useAuth()
+  const router = useRouter()
+
+  useEffect(() => {
+    if (state?.auth && state?.redirectTo) {
+      setAuth(state.auth.jwt, state.auth.expiresAt)
+      router.push(state.redirectTo)
+    }
+  }, [state, setAuth, router])
 
   return (
     <form action={formAction} className="space-y-4">

@@ -1,7 +1,5 @@
 'use server'
 
-import { cookies } from 'next/headers'
-import { redirect } from 'next/navigation'
 import { z } from 'zod'
 import { loginGuest } from '@/server/auth/auth'
 import { createParty } from '@/server/party/party'
@@ -37,8 +35,8 @@ const loginFormSchema = z.object({
 
 type LoginResult = {
   success: boolean
-  cookieName?: string
-  cookieValue?: string
+  jwt?: string
+  expiresAt?: number
   status?: number
 }
 
@@ -46,31 +44,32 @@ async function performGuestLogin(username: string): Promise<LoginResult> {
   const response = await loginGuest({ username })
 
   if (response.status === 201) {
-    const setCookieHeader = response.headers.get('set-cookie')
-    if (setCookieHeader) {
-      const [cookiePart] = setCookieHeader.split(';')
-      const [name, value] = cookiePart.split('=')
-      if (name && value) {
-        return { success: true, cookieName: name.trim(), cookieValue: value.trim() }
+    const data = response.data
+    if (data.jwt && data.token_expires_at) {
+      return {
+        success: true,
+        jwt: data.jwt,
+        expiresAt: data.token_expires_at,
       }
     }
-    console.error('[GuestLogin] No Set-Cookie header or invalid format')
+    console.error('[GuestLogin] No JWT in response')
     return { success: false, status: response.status }
   }
 
   return { success: false, status: response.status }
 }
 
-async function setSessionCookie(name: string, value: string) {
-  const cookieStore = await cookies()
-  cookieStore.set(name, value, {
-    httpOnly: true,
-    sameSite: 'lax',
-    path: '/'
-  })
+export type OnboardingActionResult = {
+  errors?: Record<string, string[] | undefined> | null
+  message?: string
+  auth?: {
+    jwt: string
+    expiresAt: number
+  }
+  redirectTo?: string
 }
 
-export async function guestLoginAction(prevState: unknown, formData: FormData) {
+export async function guestLoginAction(prevState: unknown, formData: FormData): Promise<OnboardingActionResult> {
   const username = formData.get('username') as string
   const joinCode = formData.get('joinCode') as string
 
@@ -91,7 +90,7 @@ export async function guestLoginAction(prevState: unknown, formData: FormData) {
   try {
     const loginResult = await performGuestLogin(result.data.username)
 
-    if (!loginResult.success || !loginResult.cookieName || !loginResult.cookieValue) {
+    if (!loginResult.success || !loginResult.jwt || !loginResult.expiresAt) {
       console.error('[GuestLogin] Login failed', loginResult.status)
       if (loginResult.status === 409) {
         return {
@@ -108,16 +107,19 @@ export async function guestLoginAction(prevState: unknown, formData: FormData) {
       }
     }
 
-    const { cookieName, cookieValue } = loginResult
-    const cookieString = `${cookieName}=${cookieValue}`
+    const { jwt, expiresAt } = loginResult
 
+    // Use the JWT to join the party
     const joinResponse = await joinParty(
       { code: result.data.joinCode },
-      { headers: { Cookie: cookieString } }
+      { headers: { Authorization: `Bearer ${jwt}` } }
     )
 
     if (joinResponse.status === 200) {
-      await setSessionCookie(cookieName, cookieValue)
+      return {
+        auth: { jwt, expiresAt },
+        redirectTo: `/preferences?joinCode=${encodeURIComponent(result.data.joinCode)}`,
+      }
     } else {
       console.error('[GuestLogin] Join failed', joinResponse.status)
       return {
@@ -132,11 +134,9 @@ export async function guestLoginAction(prevState: unknown, formData: FormData) {
       errors: null
     }
   }
-
-  redirect(`/preferences?joinCode=${encodeURIComponent(result.data.joinCode)}`)
 }
 
-export async function createPartyAction(prevState: unknown, formData: FormData) {
+export async function createPartyAction(prevState: unknown, formData: FormData): Promise<OnboardingActionResult> {
   const username = formData.get('username') as string
 
   const result = createPartyFormSchema.safeParse({ username })
@@ -151,12 +151,10 @@ export async function createPartyAction(prevState: unknown, formData: FormData) 
     }
   }
 
-  let joinCode = ''
-
   try {
     const loginResult = await performGuestLogin(result.data.username)
 
-    if (!loginResult.success || !loginResult.cookieName || !loginResult.cookieValue) {
+    if (!loginResult.success || !loginResult.jwt || !loginResult.expiresAt) {
       if (loginResult.status === 409) {
         return {
           message: 'Validation failed',
@@ -171,16 +169,18 @@ export async function createPartyAction(prevState: unknown, formData: FormData) 
       }
     }
 
-    const { cookieName, cookieValue } = loginResult
-    const cookieString = `${cookieName}=${cookieValue}`
+    const { jwt, expiresAt } = loginResult
 
     const createResponse = await createParty({
-      headers: { Cookie: cookieString }
+      headers: { Authorization: `Bearer ${jwt}` }
     })
 
     if (createResponse.status === 201) {
-      await setSessionCookie(cookieName, cookieValue)
-      joinCode = createResponse.data.code
+      const joinCode = createResponse.data.code
+      return {
+        auth: { jwt, expiresAt },
+        redirectTo: `/preferences?joinCode=${encodeURIComponent(joinCode)}`,
+      }
     } else {
       return {
         message: 'Login successful, but failed to create party.',
@@ -194,18 +194,9 @@ export async function createPartyAction(prevState: unknown, formData: FormData) 
       errors: null
     }
   }
-
-  if (joinCode) {
-    redirect(`/preferences?joinCode=${encodeURIComponent(joinCode)}`)
-  } else {
-    return {
-      message: 'Failed to create party (Code missing)',
-      errors: null
-    }
-  }
 }
 
-export async function loginAction(prevState: unknown, formData: FormData) {
+export async function loginAction(prevState: unknown, formData: FormData): Promise<OnboardingActionResult> {
   const username = formData.get('username') as string
 
   const result = loginFormSchema.safeParse({ username })
@@ -223,7 +214,7 @@ export async function loginAction(prevState: unknown, formData: FormData) {
   try {
     const loginResult = await performGuestLogin(result.data.username)
 
-    if (!loginResult.success || !loginResult.cookieName || !loginResult.cookieValue) {
+    if (!loginResult.success || !loginResult.jwt || !loginResult.expiresAt) {
       if (loginResult.status === 409) {
         return {
           message: 'Validation failed',
@@ -238,8 +229,10 @@ export async function loginAction(prevState: unknown, formData: FormData) {
       }
     }
 
-    const { cookieName, cookieValue } = loginResult
-    await setSessionCookie(cookieName, cookieValue)
+    return {
+      auth: { jwt: loginResult.jwt, expiresAt: loginResult.expiresAt },
+      redirectTo: '/preferences',
+    }
   } catch (error) {
     console.error('[Login] Error', error)
     return {
@@ -247,6 +240,4 @@ export async function loginAction(prevState: unknown, formData: FormData) {
       errors: null
     }
   }
-
-  redirect('/preferences')
 }
