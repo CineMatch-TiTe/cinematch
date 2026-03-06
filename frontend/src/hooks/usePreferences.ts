@@ -31,28 +31,18 @@ export const usePreferences = ({ initialPrefs, onComplete }: UsePreferencesProps
     if (initialPrefs) {
       return {
         genres: initialPrefs.include_genres || [],
-        decades: [], // Decades logic needs to be derived if possible, or kept empty
         isStudying: initialPrefs.target_release_year ? true : null
       }
     }
     return {
       genres: [],
-      decades: [],
       isStudying: null
     }
   })
 
-  // Initialize selected decade from initialPrefs if available (for wizard flow mostly)
-  const [selectedDecade, setSelectedDecade] = useState<string | null>(() => {
-    if (initialPrefs?.target_release_year) {
-      const year = initialPrefs.target_release_year
-      if (year) {
-        const decadeYear = Math.floor(year / 10) * 10
-        return `${decadeYear}s`
-      }
-    }
-    return null
-  })
+  const [selectedYear, setSelectedYear] = useState<number | null>(
+    initialPrefs?.target_release_year ?? null
+  )
 
 
   const handleToggleGenre = useCallback((genre: string) => {
@@ -65,8 +55,8 @@ export const usePreferences = ({ initialPrefs, onComplete }: UsePreferencesProps
     })
   }, [])
 
-  const handleSelectDecade = useCallback((decade: string) => {
-    setSelectedDecade((prev) => prev === decade ? null : decade)
+  const handleChangeYear = useCallback((year: number | null) => {
+    setSelectedYear(year)
   }, [])
 
   const handleSelectStatus = useCallback((isStudying: boolean) => {
@@ -97,9 +87,8 @@ export const usePreferences = ({ initialPrefs, onComplete }: UsePreferencesProps
       let target_release_year: number | null = null
       let release_year_flex: number | null = 9
 
-      if (selectedDecade) {
-        const startYear = Number.parseInt(selectedDecade, 10)
-        target_release_year = startYear + 5
+      if (selectedYear !== null) {
+        target_release_year = selectedYear
         release_year_flex = 5
       }
 
@@ -160,13 +149,13 @@ export const usePreferences = ({ initialPrefs, onComplete }: UsePreferencesProps
   return {
     step,
     preferences,
-    selectedDecade,
+    selectedYear,
     isSubmitting,
     availableGenres,
     isGenresLoading,
     hasChanges,
     handleToggleGenre,
-    handleSelectDecade,
+    handleChangeYear,
     handleSelectStatus,
     nextStep,
     prevStep,

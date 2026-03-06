@@ -74,7 +74,7 @@ const StudyStatusSelection: React.FC<StudyStatusSelectionProps> = ({
             disabled={isStudying === null || isSubmitting}
             className="bg-red-600 hover:bg-red-700 text-white"
           >
-            {isSubmitting ? 'Submitting...' : 'Complete & Join Party'}
+            {isSubmitting ? 'Submitting...' : 'Complete'}
           </Button>
         </div>
       </CardContent>

@@ -6,7 +6,7 @@ import { UserPreferencesResponse } from '@/model/userPreferencesResponse'
 import React from 'react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import GenreSelection from './GenreSelection'
-import DecadeSelection from './DecadeSelection'
+import YearSelection from './YearSelection'
 import StudyStatusSelection from './StudyStatusSelection'
 import { usePreferences } from '@/hooks/usePreferences'
 
@@ -21,13 +21,13 @@ const Preferences: React.FC<PreferencesProps> = ({ mode, initialPrefs, onComplet
   const {
     step,
     preferences,
-    selectedDecade,
+    selectedYear,
     isSubmitting,
     availableGenres,
     isGenresLoading,
     hasChanges,
     handleToggleGenre,
-    handleSelectDecade,
+    handleChangeYear,
     handleSelectStatus,
     nextStep,
     prevStep,
@@ -63,9 +63,9 @@ const Preferences: React.FC<PreferencesProps> = ({ mode, initialPrefs, onComplet
           )}
 
           {step === 2 && (
-            <DecadeSelection
-              selectedDecade={selectedDecade}
-              onToggleDecade={handleSelectDecade}
+            <YearSelection
+              selectedYear={selectedYear}
+              onChangeYear={handleChangeYear}
               onNext={nextStep}
               onBack={prevStep}
             />
