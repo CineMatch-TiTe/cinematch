@@ -111,6 +111,7 @@ async fn main() -> std::io::Result<()> {
                 app.wrap(
                     Cors::default()
                         .allowed_origin("http://localhost:3000") // Your frontend URL (e.g., React/Vite dev server)
+                        .allowed_origin("https://cinematch.space") // prod url
                         .allowed_methods(vec!["GET", "POST", "PUT", "DELETE", "PATCH"])
                         .allowed_headers(vec![
                             http::header::AUTHORIZATION,
