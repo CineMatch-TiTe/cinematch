@@ -172,8 +172,7 @@ async fn execute_voting_timeout<C: AppContext + Clone + 'static>(
             if matches!(
                 transition,
                 EndVotingTransition::Round1Started | EndVotingTransition::Round2Started
-            )
-                && let Ok(Some(round)) = party.voting_round(&ctx).await
+            ) && let Ok(Some(round)) = party.voting_round(&ctx).await
             {
                 ctx.broadcast_party(
                     party_id,
