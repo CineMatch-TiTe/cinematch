@@ -172,15 +172,35 @@ impl PartyStateMachine for Party {
                             &ServerMessage::VotingRoundStarted(VotingRoundStarted { round: 1 }),
                             None,
                         );
+                        ctx.broadcast_party(
+                            self.id,
+                            &ServerMessage::PartyStateChanged(PartyStateChanged {
+                                state: PartyState::Voting.into(),
+                                deadline_at: None,
+                                timeout_reason: None,
+                                selected_movie_id: None,
+                            }),
+                            None,
+                        );
                         Some(PartyState::Voting)
                     }
                     EndVotingTransition::Round2Started => {
+                        ctx.broadcast_party(self.id, &ServerMessage::ResetReadiness, None);
                         ctx.broadcast_party(
                             self.id,
                             &ServerMessage::VotingRoundStarted(VotingRoundStarted { round: 2 }),
                             None,
                         );
-                        ctx.broadcast_party(self.id, &ServerMessage::ResetReadiness, None);
+                        ctx.broadcast_party(
+                            self.id,
+                            &ServerMessage::PartyStateChanged(PartyStateChanged {
+                                state: PartyState::Voting.into(),
+                                deadline_at: None,
+                                timeout_reason: None,
+                                selected_movie_id: None,
+                            }),
+                            None,
+                        );
                         Some(PartyState::Voting) // Still in Voting state, just round 2
                     }
                     EndVotingTransition::PhaseChanged(s) => {
@@ -275,12 +295,32 @@ impl PartyStateMachine for Party {
                     &ServerMessage::VotingRoundStarted(VotingRoundStarted { round: 1 }),
                     None,
                 );
+                ctx.broadcast_party(
+                    self.id,
+                    &ServerMessage::PartyStateChanged(PartyStateChanged {
+                        state: PartyState::Voting.into(),
+                        deadline_at: None,
+                        timeout_reason: None,
+                        selected_movie_id: None,
+                    }),
+                    None,
+                );
             }
             EndVotingTransition::Round2Started => {
                 ctx.broadcast_party(self.id, &ServerMessage::ResetReadiness, None);
                 ctx.broadcast_party(
                     self.id,
                     &ServerMessage::VotingRoundStarted(VotingRoundStarted { round: 2 }),
+                    None,
+                );
+                ctx.broadcast_party(
+                    self.id,
+                    &ServerMessage::PartyStateChanged(PartyStateChanged {
+                        state: PartyState::Voting.into(),
+                        deadline_at: None,
+                        timeout_reason: None,
+                        selected_movie_id: None,
+                    }),
                     None,
                 );
             }
