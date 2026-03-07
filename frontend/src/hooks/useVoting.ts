@@ -5,7 +5,7 @@ import { MovieResponse } from '@/model'
 import { prefetchImages } from '@/lib/utils'
 import { usePartyView } from '@/components/party/PartyViewContext'
 
-export function useVoting(partyId: string, phaseEnteredAt: string) {
+export function useVoting(partyId: string) {
   const { lastMessage, consumeLivePhaseTransition } = usePartyView()
 
   // Show countdown only when voting phase was entered via a live WS message

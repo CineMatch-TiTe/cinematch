@@ -44,6 +44,12 @@ export interface ReadyStateUpdatePayload {
   ready: boolean
 }
 
+export interface PartyMemberRatedPayload {
+  user_id: string
+  rating: number
+  party_average: number
+}
+
 // MovieData based on backend MovieData struct
 export interface MovieDataPayload {
   id: number
@@ -74,6 +80,7 @@ export type ServerMessage =
   | { VotingRoundStarted: VotingRoundStartedPayload }
   | { PartyTimeoutUpdate: PartyTimeoutUpdatePayload }
   | { PartyCodeChanged: string }
+  | { PartyMemberRated: PartyMemberRatedPayload }
 
 // Types for messages sent to the server
 export interface VoteMovieClientPayload {

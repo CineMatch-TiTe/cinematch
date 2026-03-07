@@ -109,12 +109,32 @@ impl PartyStateMachine for Party {
                     &ServerMessage::VotingRoundStarted(VotingRoundStarted { round: 1 }),
                     None,
                 );
+                ctx.broadcast_party(
+                    self.id,
+                    &ServerMessage::PartyStateChanged(PartyStateChanged {
+                        state: PartyState::Voting.into(),
+                        deadline_at: None,
+                        timeout_reason: None,
+                        selected_movie_id: None,
+                    }),
+                    None,
+                );
             }
             PartyAdvanceOutcome::VotingEnded(EndVotingTransition::Round2Started) => {
                 ctx.broadcast_party(self.id, &ServerMessage::ResetReadiness, None);
                 ctx.broadcast_party(
                     self.id,
                     &ServerMessage::VotingRoundStarted(VotingRoundStarted { round: 2 }),
+                    None,
+                );
+                ctx.broadcast_party(
+                    self.id,
+                    &ServerMessage::PartyStateChanged(PartyStateChanged {
+                        state: PartyState::Voting.into(),
+                        deadline_at: None,
+                        timeout_reason: None,
+                        selected_movie_id: None,
+                    }),
                     None,
                 );
             }
@@ -142,12 +162,12 @@ impl PartyStateMachine for Party {
         &self,
         ctx: &impl AppContext,
     ) -> Result<Option<PartyState>, DomainError> {
+        let state = self.state(ctx).await.map_err(DomainError::from)?;
         let all_ready = self.are_all_ready(ctx).await.map_err(DomainError::from)?;
-        if !all_ready {
+
+        if state != PartyState::Review && !all_ready {
             return Ok(None);
         }
-
-        let state = self.state(ctx).await.map_err(DomainError::from)?;
 
         let new_state = match state {
             PartyState::Created => {
@@ -159,8 +179,8 @@ impl PartyStateMachine for Party {
                 Some(PartyState::Voting)
             }
             PartyState::Review => {
-                // Review phase: only the leader can advance manually.
-                None
+                // Return to lobby after cooldown
+                Some(PartyState::Created)
             }
             PartyState::Voting => {
                 let t = run_end_voting_internal(ctx, self, false).await?;
@@ -251,12 +271,32 @@ impl PartyStateMachine for Party {
                     &ServerMessage::VotingRoundStarted(VotingRoundStarted { round: 1 }),
                     None,
                 );
+                ctx.broadcast_party(
+                    self.id,
+                    &ServerMessage::PartyStateChanged(PartyStateChanged {
+                        state: PartyState::Voting.into(),
+                        deadline_at: None,
+                        timeout_reason: None,
+                        selected_movie_id: None,
+                    }),
+                    None,
+                );
             }
             EndVotingTransition::Round2Started => {
                 ctx.broadcast_party(self.id, &ServerMessage::ResetReadiness, None);
                 ctx.broadcast_party(
                     self.id,
                     &ServerMessage::VotingRoundStarted(VotingRoundStarted { round: 2 }),
+                    None,
+                );
+                ctx.broadcast_party(
+                    self.id,
+                    &ServerMessage::PartyStateChanged(PartyStateChanged {
+                        state: PartyState::Voting.into(),
+                        deadline_at: None,
+                        timeout_reason: None,
+                        selected_movie_id: None,
+                    }),
                     None,
                 );
             }

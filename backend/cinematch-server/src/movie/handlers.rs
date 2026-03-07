@@ -145,8 +145,10 @@ pub async fn rate_movie(
         {
             let mut total_rating = 0;
             let mut rating_count = 0;
+            let mut party_size = 0;
 
             if let Ok(members) = party.members(&ctx).await {
+                party_size = members.len();
                 for member in members {
                     let member_user = cinematch_db::domain::User::new(member.user_id);
                     if let Ok(Some((_, Some(r), _))) =
@@ -176,6 +178,30 @@ pub async fn rate_movie(
                 ),
                 None,
             );
+
+            // If everyone has rated, trigger auto-advance countdown (15s cooldown)
+            if state == PartyState::Review && party_size > 0 && rating_count == party_size {
+                let delay = chrono::Duration::seconds(15);
+                ctx.scheduler
+                    .schedule_custom_countdown(party.id, delay, ctx.clone())
+                    .await;
+
+                let deadline = chrono::Utc::now() + delay;
+                ctx.broadcast_party(
+                    party.id,
+                    &cinematch_common::models::websocket::ServerMessage::PartyStateChanged(
+                        cinematch_common::models::websocket::PartyStateChanged {
+                            state: PartyState::Review.into(),
+                            deadline_at: Some(deadline),
+                            timeout_reason: Some(
+                                cinematch_common::models::websocket::TimeoutReason::PhaseTimeout,
+                            ),
+                            selected_movie_id: Some(selected_id),
+                        },
+                    ),
+                    None,
+                );
+            }
         }
     }
 

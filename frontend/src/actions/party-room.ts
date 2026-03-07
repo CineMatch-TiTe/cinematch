@@ -97,7 +97,12 @@ export async function getMyPartyIdAction() {
       return { id: response.data.id }
     }
     return { error: 'Failed to fetch party' }
-  } catch (error) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  } catch (error: any) {
+    // 404 means the user is legitimately not in a party
+    if (error?.status === 404) {
+      return { error: 'not_in_party' }
+    }
     console.error('Get My Party Error', error)
     return { error: 'Failed to fetch party' }
   }
