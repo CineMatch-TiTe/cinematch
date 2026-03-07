@@ -11,7 +11,7 @@ use cinematch_db::domain::{Party, User};
 use super::super::DomainError;
 use super::{EndVotingTransition, PartyAdvanceOutcome, PartyValidation};
 use async_trait::async_trait;
-use cinematch_common::models::websocket::{PartyStateChanged, ServerMessage, VotingRoundStarted};
+use cinematch_common::models::websocket::{PartyStateChanged, ServerMessage};
 
 /// State machine operations for Party.
 /// State machine operations for Party.
@@ -88,16 +88,31 @@ impl PartyStateMachine for Party {
 
         match &outcome {
             PartyAdvanceOutcome::PhaseChanged(s) => {
-                let selected_movie_id = if *s == PartyState::Watching {
+                let selected_movie_id = if *s == PartyState::Watching || *s == PartyState::Review {
                     self.selected_movie_id(ctx).await.unwrap_or(None)
                 } else {
                     None
                 };
+                let review_ratings =
+                    if let (PartyState::Review, Some(mid)) = (*s, selected_movie_id) {
+                        ctx.db()
+                            .get_ratings_for_party_members(self.id, mid)
+                            .await
+                            .ok()
+                    } else {
+                        None
+                    };
                 let msg = PartyStateChanged {
                     state: (*s).into(),
                     deadline_at: None,
                     timeout_reason: None,
                     selected_movie_id,
+                    review_ratings,
+                    voting_round: self
+                        .voting_round(ctx)
+                        .await
+                        .unwrap_or(None)
+                        .map(|r| r as u16),
                 };
                 ctx.broadcast_party(self.id, &ServerMessage::ResetReadiness, None);
                 ctx.broadcast_party(self.id, &ServerMessage::PartyStateChanged(msg), None);
@@ -106,7 +121,21 @@ impl PartyStateMachine for Party {
                 ctx.broadcast_party(self.id, &ServerMessage::ResetReadiness, None);
                 ctx.broadcast_party(
                     self.id,
-                    &ServerMessage::VotingRoundStarted(VotingRoundStarted { round: 1 }),
+                    &ServerMessage::PartyStateChanged(PartyStateChanged {
+                        state: PartyState::Voting.into(),
+                        deadline_at: None,
+                        timeout_reason: None,
+                        selected_movie_id: None,
+                        voting_round: Some(1),
+                        review_ratings: None,
+                    }),
+                    None,
+                );
+                ctx.broadcast_party(
+                    self.id,
+                    &ServerMessage::VotingRoundStarted(
+                        cinematch_common::models::websocket::VotingRoundStarted { round: 1 },
+                    ),
                     None,
                 );
             }
@@ -114,21 +143,50 @@ impl PartyStateMachine for Party {
                 ctx.broadcast_party(self.id, &ServerMessage::ResetReadiness, None);
                 ctx.broadcast_party(
                     self.id,
-                    &ServerMessage::VotingRoundStarted(VotingRoundStarted { round: 2 }),
+                    &ServerMessage::PartyStateChanged(PartyStateChanged {
+                        state: PartyState::Voting.into(),
+                        deadline_at: None,
+                        timeout_reason: None,
+                        selected_movie_id: None,
+                        voting_round: Some(2),
+                        review_ratings: None,
+                    }),
+                    None,
+                );
+                ctx.broadcast_party(
+                    self.id,
+                    &ServerMessage::VotingRoundStarted(
+                        cinematch_common::models::websocket::VotingRoundStarted { round: 2 },
+                    ),
                     None,
                 );
             }
             PartyAdvanceOutcome::VotingEnded(EndVotingTransition::PhaseChanged(s)) => {
-                let selected_movie_id = if *s == PartyState::Watching {
+                let selected_movie_id = if *s == PartyState::Watching || *s == PartyState::Review {
                     self.selected_movie_id(ctx).await.unwrap_or(None)
                 } else {
                     None
                 };
+                let review_ratings =
+                    if let (PartyState::Review, Some(mid)) = (*s, selected_movie_id) {
+                        ctx.db()
+                            .get_ratings_for_party_members(self.id, mid)
+                            .await
+                            .ok()
+                    } else {
+                        None
+                    };
                 let msg = PartyStateChanged {
                     state: (*s).into(),
                     deadline_at: None,
                     timeout_reason: None,
                     selected_movie_id,
+                    review_ratings,
+                    voting_round: self
+                        .voting_round(ctx)
+                        .await
+                        .unwrap_or(None)
+                        .map(|r| r as u16),
                 };
                 ctx.broadcast_party(self.id, &ServerMessage::ResetReadiness, None);
                 ctx.broadcast_party(self.id, &ServerMessage::PartyStateChanged(msg), None);
@@ -142,12 +200,12 @@ impl PartyStateMachine for Party {
         &self,
         ctx: &impl AppContext,
     ) -> Result<Option<PartyState>, DomainError> {
+        let state = self.state(ctx).await.map_err(DomainError::from)?;
         let all_ready = self.are_all_ready(ctx).await.map_err(DomainError::from)?;
-        if !all_ready {
+
+        if state != PartyState::Review && !all_ready {
             return Ok(None);
         }
-
-        let state = self.state(ctx).await.map_err(DomainError::from)?;
 
         let new_state = match state {
             PartyState::Created => {
@@ -159,55 +217,22 @@ impl PartyStateMachine for Party {
                 Some(PartyState::Voting)
             }
             PartyState::Review => {
+                // Return to lobby after cooldown
                 do_review_to_created(ctx, self).await?;
                 Some(PartyState::Created)
             }
             PartyState::Voting => {
                 let t = run_end_voting_internal(ctx, self, false).await?;
                 match &t {
-                    EndVotingTransition::Round1Started => {
+                    EndVotingTransition::Round1Started
+                    | EndVotingTransition::Round2Started
+                    | EndVotingTransition::PhaseChanged(_) => {
                         ctx.broadcast_party(self.id, &ServerMessage::ResetReadiness, None);
-                        ctx.broadcast_party(
-                            self.id,
-                            &ServerMessage::VotingRoundStarted(VotingRoundStarted { round: 1 }),
-                            None,
-                        );
-                        ctx.broadcast_party(
-                            self.id,
-                            &ServerMessage::PartyStateChanged(PartyStateChanged {
-                                state: PartyState::Voting.into(),
-                                deadline_at: None,
-                                timeout_reason: None,
-                                selected_movie_id: None,
-                            }),
-                            None,
-                        );
-                        Some(PartyState::Voting)
                     }
-                    EndVotingTransition::Round2Started => {
-                        ctx.broadcast_party(self.id, &ServerMessage::ResetReadiness, None);
-                        ctx.broadcast_party(
-                            self.id,
-                            &ServerMessage::VotingRoundStarted(VotingRoundStarted { round: 2 }),
-                            None,
-                        );
-                        ctx.broadcast_party(
-                            self.id,
-                            &ServerMessage::PartyStateChanged(PartyStateChanged {
-                                state: PartyState::Voting.into(),
-                                deadline_at: None,
-                                timeout_reason: None,
-                                selected_movie_id: None,
-                            }),
-                            None,
-                        );
-                        Some(PartyState::Voting) // Still in Voting state, just round 2
-                    }
-                    EndVotingTransition::PhaseChanged(s) => {
-                        ctx.broadcast_party(self.id, &ServerMessage::ResetReadiness, None);
-                        // Let the catch-all below broadcast the PhaseChanged event
-                        Some(*s)
-                    }
+                }
+                match t {
+                    EndVotingTransition::PhaseChanged(s) => Some(s),
+                    _ => Some(PartyState::Voting),
                 }
             }
             _ => None,
@@ -248,7 +273,14 @@ impl PartyStateMachine for Party {
                 ctx.broadcast_party(self.id, &ServerMessage::ResetReadiness, None);
                 ctx.broadcast_party(
                     self.id,
-                    &ServerMessage::VotingRoundStarted(VotingRoundStarted { round: 1 }),
+                    &ServerMessage::PartyStateChanged(PartyStateChanged {
+                        state: PartyState::Voting.into(),
+                        deadline_at: None,
+                        timeout_reason: None,
+                        selected_movie_id: None,
+                        voting_round: Some(1),
+                        review_ratings: None,
+                    }),
                     None,
                 );
             }
@@ -256,7 +288,14 @@ impl PartyStateMachine for Party {
                 ctx.broadcast_party(self.id, &ServerMessage::ResetReadiness, None);
                 ctx.broadcast_party(
                     self.id,
-                    &ServerMessage::VotingRoundStarted(VotingRoundStarted { round: 2 }),
+                    &ServerMessage::PartyStateChanged(PartyStateChanged {
+                        state: PartyState::Voting.into(),
+                        deadline_at: None,
+                        timeout_reason: None,
+                        selected_movie_id: None,
+                        voting_round: Some(2),
+                        review_ratings: None,
+                    }),
                     None,
                 );
             }
@@ -271,6 +310,12 @@ impl PartyStateMachine for Party {
                     deadline_at: None,
                     timeout_reason: None,
                     selected_movie_id,
+                    review_ratings: None,
+                    voting_round: self
+                        .voting_round(ctx)
+                        .await
+                        .unwrap_or(None)
+                        .map(|r| r as u16),
                 };
                 ctx.broadcast_party(self.id, &ServerMessage::ResetReadiness, None);
                 ctx.broadcast_party(self.id, &ServerMessage::PartyStateChanged(msg), None);
@@ -285,50 +330,7 @@ impl PartyStateMachine for Party {
         &self,
         ctx: &impl AppContext,
     ) -> Result<EndVotingTransition, DomainError> {
-        let t = run_end_voting_internal(ctx, self, true).await?;
-
-        match &t {
-            EndVotingTransition::Round1Started => {
-                ctx.broadcast_party(self.id, &ServerMessage::ResetReadiness, None);
-                ctx.broadcast_party(
-                    self.id,
-                    &ServerMessage::VotingRoundStarted(VotingRoundStarted { round: 1 }),
-                    None,
-                );
-                ctx.broadcast_party(
-                    self.id,
-                    &ServerMessage::PartyStateChanged(PartyStateChanged {
-                        state: PartyState::Voting.into(),
-                        deadline_at: None,
-                        timeout_reason: None,
-                        selected_movie_id: None,
-                    }),
-                    None,
-                );
-            }
-            EndVotingTransition::Round2Started => {
-                ctx.broadcast_party(self.id, &ServerMessage::ResetReadiness, None);
-                ctx.broadcast_party(
-                    self.id,
-                    &ServerMessage::VotingRoundStarted(VotingRoundStarted { round: 2 }),
-                    None,
-                );
-                ctx.broadcast_party(
-                    self.id,
-                    &ServerMessage::PartyStateChanged(PartyStateChanged {
-                        state: PartyState::Voting.into(),
-                        deadline_at: None,
-                        timeout_reason: None,
-                        selected_movie_id: None,
-                    }),
-                    None,
-                );
-            }
-            EndVotingTransition::PhaseChanged(_s) => {
-                // Expected to be picked up by the executor, avoiding double broadcasts.
-            }
-        }
-        Ok(t)
+        run_end_voting_internal(ctx, self, true).await
     }
 
     async fn do_watching_to_review(&self, ctx: &impl AppContext) -> Result<(), DomainError> {
@@ -487,6 +489,20 @@ async fn handle_round1_end(
     });
     let top3: Vec<i64> = by_score.into_iter().take(3).map(|(m, _, _)| m).collect();
 
+    // Majority check: if top movie has likes from >50% of members, it wins R1
+    let member_count = party.member_count(ctx).await.unwrap_or(1);
+    if member_count > 0 {
+        let top_movie_id = top3[0];
+        let (top_likes, _) = vote_map.get(&top_movie_id).copied().unwrap_or((0, 0));
+        if top_likes > (member_count as u32) / 2 {
+            debug!(
+                "Round 1: movie {} has majority ({}/{} members), selecting as winner",
+                top_movie_id, top_likes, member_count
+            );
+            return select_winner(ctx, party, top_movie_id).await;
+        }
+    }
+
     cinematch_recommendation_engine::build_round2_ballots_for_party(ctx, party, &top3)
         .await
         .map_err(|e| {
@@ -537,10 +553,9 @@ async fn handle_round2_end(
         .map(|(&mid, &(likes, _))| (mid, likes))
         .unwrap();
 
-    let total_likes: u32 = vote_map.values().map(|(l, _)| *l).sum();
-    let fifty_pct = total_likes / 2;
-    // Strict majority required to win (> 50%)
-    let has_majority = total_likes > 0 && winner_likes > fifty_pct;
+    // Compare against member count (actual majority of voters)
+    let member_count = party.member_count(ctx).await.unwrap_or(1) as u32;
+    let has_majority = member_count > 0 && winner_likes > member_count / 2;
 
     if has_majority {
         return select_winner(ctx, party, winner_id).await;

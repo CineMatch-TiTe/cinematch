@@ -182,4 +182,35 @@ impl Database {
         .map_err(DbError::from)?;
         Ok(())
     }
+
+    /// Fetch ratings for all party members for a specific movie.
+    pub async fn get_ratings_for_party_members(
+        &self,
+        party_id: Uuid,
+        movie_id: i64,
+    ) -> DbResult<std::collections::HashMap<Uuid, i32>> {
+        use crate::schema::party_members::dsl as pm;
+        use crate::schema::user_ratings::dsl as ur;
+        use diesel::prelude::*;
+        use diesel_async::RunQueryDsl;
+        use std::collections::HashMap;
+
+        let mut conn = self.conn().await?;
+
+        let results = ur::user_ratings
+            .inner_join(pm::party_members.on(pm::user_id.eq(ur::user_id)))
+            .filter(pm::party_id.eq(party_id))
+            .filter(ur::movie_id.eq(movie_id))
+            .select((ur::user_id, ur::rating))
+            .load::<(Uuid, Option<i32>)>(&mut conn)
+            .await?;
+
+        let mut map = HashMap::new();
+        for (uid, r_opt) in results {
+            if let Some(r) = r_opt {
+                map.insert(uid, r);
+            }
+        }
+        Ok(map)
+    }
 }

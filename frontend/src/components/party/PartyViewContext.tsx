@@ -6,9 +6,10 @@ import { toast } from 'sonner'
 import { PartyResponse } from '@/model/partyResponse'
 import { MemberInfo } from '@/model/memberInfo'
 import { CurrentUserResponse } from '@/model/currentUserResponse'
+import { PartyResponseReviewRatings } from '@/model/partyResponseReviewRatings'
 import { ServerMessage } from '@/lib/ws-types'
 
-export type PartyViewType = 'room' | 'picking' | 'voting' | 'watching'
+export type PartyViewType = 'room' | 'picking' | 'voting' | 'watching' | 'review'
 
 interface PartyViewContextType {
   activeView: PartyViewType
@@ -20,6 +21,7 @@ interface PartyViewContextType {
   handleWsMessage: (msg: ServerMessage) => void
   lastMessage: ServerMessage | null
   consumeLivePhaseTransition: () => string | null
+  reviewAverage: number | null
 }
 
 const PartyViewContext = createContext<PartyViewContextType | undefined>(undefined)
@@ -44,6 +46,7 @@ export function PartyViewProvider({
   const [party, setParty] = useState<PartyResponse>(initialParty)
   const [members, setMembers] = useState<MemberInfo[]>(initialMembers)
   const [lastMessage, setLastMessage] = useState<ServerMessage | null>(null)
+  const [reviewAverage, setReviewAverage] = useState<number | null>(null)
   const livePhaseTransitionRef = useRef<string | null>(null)
 
   const consumeLivePhaseTransition = useCallback(() => {
@@ -78,11 +81,24 @@ export function PartyViewProvider({
         ...(payload.selected_movie_id !== undefined && {
           selected_movie_id: payload.selected_movie_id ?? null,
         }),
+        ...(payload.review_ratings !== undefined && {
+          review_ratings: (payload.review_ratings as PartyResponseReviewRatings) ?? null,
+        }),
+        // batch voting_round if present
+        ...(payload.voting_round !== undefined && {
+          voting_round: payload.voting_round,
+        }),
+        // invalidate party code if not in created phase
+        ...(payload.state !== 'created' && {
+          code: null,
+        }),
       }))
       // Immediately switch the active view to match the new phase
       if (payload.state === 'picking') setActiveView('picking')
       else if (payload.state === 'voting') setActiveView('voting')
       else if (payload.state === 'watching') setActiveView('watching')
+      else if (payload.state === 'review') setActiveView('review')
+      else if (payload.state === 'created') setActiveView('room')
     } else if ('PartyMemberJoined' in msg) {
       const payload = msg.PartyMemberJoined
       setMembers((prev) => {
@@ -152,6 +168,16 @@ export function PartyViewProvider({
           m.user_id === payload.user_id ? { ...m, username: payload.new_name } : m
         )
       )
+    } else if ('PartyMemberRated' in msg) {
+      const payload = msg.PartyMemberRated
+      setParty((prev) => ({
+        ...prev,
+        review_ratings: {
+          ...(prev.review_ratings || {}),
+          [payload.user_id]: payload.rating,
+        },
+      }))
+      setReviewAverage(payload.party_average)
     }
   }, [router])
 
@@ -166,8 +192,9 @@ export function PartyViewProvider({
       handleWsMessage,
       lastMessage,
       consumeLivePhaseTransition,
+      reviewAverage,
     }),
-    [activeView, party, members, currentUser, handleWsMessage, lastMessage, consumeLivePhaseTransition]
+    [activeView, party, members, currentUser, handleWsMessage, lastMessage, consumeLivePhaseTransition, reviewAverage]
   )
 
   return <PartyViewContext.Provider value={value}>{children}</PartyViewContext.Provider>

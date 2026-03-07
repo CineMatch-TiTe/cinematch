@@ -1,6 +1,6 @@
 'use client'
 
-import { Users, Clapperboard, ThumbsUp, Film } from 'lucide-react'
+import { Users, Clapperboard, ThumbsUp, Film, Star } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
 import { usePartyView, PartyViewType } from './PartyViewContext'
@@ -22,6 +22,10 @@ export function PartyFooterNavigation() {
 
   if (partyState === 'watching') {
     navItems.push({ id: 'watching', label: 'Current movie', icon: Film })
+  }
+
+  if (partyState === 'review') {
+    navItems.push({ id: 'review', label: 'Review', icon: Star })
   }
 
   return (

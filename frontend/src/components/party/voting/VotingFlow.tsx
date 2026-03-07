@@ -16,7 +16,7 @@ interface VotingFlowProps {
 
 export default function VotingFlow({ partyId, phaseEnteredAt, timeoutSecs, deadlineAt }: Readonly<VotingFlowProps>) {
   const { movies, votingRound, voteTotals, loading, countdown, showContent, transitionData, handleVote, handleReady } =
-    useVoting(partyId, phaseEnteredAt)
+    useVoting(partyId)
   const { members, currentUser } = usePartyView()
   const serverReady = members.find((m) => m.user_id === currentUser.user_id)?.is_ready ?? false
   const [optimisticReady, setOptimisticReady] = useState(serverReady)

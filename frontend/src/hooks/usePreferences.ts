@@ -108,9 +108,8 @@ export const usePreferences = ({ initialPrefs, onComplete }: UsePreferencesProps
       const partyResult = await getMyPartyIdAction()
 
       // We always redirect to the party UUID, even if they used a join code.
-
       if (partyResult.error || !partyResult.id) {
-        console.error('Failed to get party ID for redirection')
+        // Not in a party, which is completely normal for new users
         router.push('/dashboard')
         return
       }

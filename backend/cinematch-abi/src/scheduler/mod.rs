@@ -113,6 +113,74 @@ impl Scheduler {
             .insert(party_id, (handle.abort_handle(), deadline_at));
     }
 
+    /// Schedule custom countdown.
+    /// Cancels any existing timeout for this party first.
+    pub async fn schedule_custom_countdown<C: AppContext + Clone + 'static>(
+        self: &Arc<Self>,
+        party_id: Uuid,
+        delay: chrono::Duration,
+        ctx: C,
+    ) {
+        {
+            let tasks = self.tasks.read().await;
+            if tasks.contains_key(&party_id) {
+                debug!(
+                    "[Scheduler] Custom countdown already scheduled for party {}, skipping",
+                    party_id
+                );
+                return;
+            }
+        }
+
+        self.cancel(party_id).await;
+
+        let deadline_at = Utc::now() + delay;
+
+        debug!(
+            "[Scheduler] Request to schedule custom countdown for party {}",
+            party_id
+        );
+
+        info!(
+            "[Scheduler] Scheduling custom countdown for party {} | fires at: {} | in {:.1}s",
+            party_id,
+            deadline_at.format("%H:%M:%S UTC"),
+            delay.num_seconds()
+        );
+
+        let timeout_registry = Arc::clone(self);
+        let ctx_clone = ctx.clone();
+
+        let handle = rt::spawn(async move {
+            debug!(
+                "[Scheduler] Sleeping {:.1}s for custom countdown (party {})",
+                delay.num_seconds(),
+                party_id
+            );
+            tokio::time::sleep(delay.to_std().unwrap_or(std::time::Duration::from_secs(1))).await;
+            info!(
+                "[Scheduler] ⏰ Custom countdown FIRED for party {}",
+                party_id
+            );
+            executor::execute_custom_countdown(&timeout_registry, party_id, ctx_clone).await;
+        });
+
+        // Broadcast countdown start
+        let msg = ServerMessage::PartyTimeoutUpdate(PartyTimeoutUpdate {
+            phase_entered_at: None,
+            timeout_secs: None,
+            deadline_at: Some(deadline_at),
+            reason: Some(TimeoutReason::AllReady),
+        });
+
+        ctx.broadcast_party(party_id, &msg, None);
+
+        self.tasks
+            .write()
+            .await
+            .insert(party_id, (handle.abort_handle(), deadline_at));
+    }
+
     /// Schedule ready countdown.
     /// Cancels any existing timeout for this party first.
     pub async fn schedule_ready_countdown<C: AppContext + Clone + 'static>(

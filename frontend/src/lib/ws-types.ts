@@ -9,6 +9,8 @@ export interface PartyStateChangedPayload {
   deadline_at?: string | null
   timeout_reason?: TimeoutReason | null
   selected_movie_id?: number | null
+  review_ratings?: Record<string, number> | null
+  voting_round?: number | null
 }
 
 // Timeout info for the current phase
@@ -44,6 +46,12 @@ export interface ReadyStateUpdatePayload {
   ready: boolean
 }
 
+export interface PartyMemberRatedPayload {
+  user_id: string
+  rating: number
+  party_average: number
+}
+
 // MovieData based on backend MovieData struct
 export interface MovieDataPayload {
   id: number
@@ -74,6 +82,7 @@ export type ServerMessage =
   | { VotingRoundStarted: VotingRoundStartedPayload }
   | { PartyTimeoutUpdate: PartyTimeoutUpdatePayload }
   | { PartyCodeChanged: string }
+  | { PartyMemberRated: PartyMemberRatedPayload }
 
 // Types for messages sent to the server
 export interface VoteMovieClientPayload {

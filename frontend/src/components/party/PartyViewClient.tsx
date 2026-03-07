@@ -11,6 +11,7 @@ import { CurrentUserResponse } from '@/model/currentUserResponse'
 import VotingFlow from './voting/VotingFlow'
 import PickingFlow from './picking/PickingFlow'
 import WatchingFlow from './watching/WatchingFlow'
+import ReviewFlow from './review/ReviewFlow'
 import { PartyRoom } from './PartyRoom'
 
 import { usePartyView } from './PartyViewContext'
@@ -78,6 +79,7 @@ export default function PartyViewClient({
     const isPickingView = activeView === 'picking'
     const isVotingView = activeView === 'voting'
     const isWatchingView = activeView === 'watching'
+    const isReviewView = activeView === 'review'
     const isPartyView = activeView === 'room'
 
     // Phase transition countdown for "All Ready"
@@ -90,12 +92,12 @@ export default function PartyViewClient({
 
     return (
         <>
-            {isPickingView && isLeader && getAdvanceButtonText() && (
-                <div className="fixed top-4 right-4 z-[60]">
+            {(isPickingView || isVotingView || isWatchingView || isReviewView) && isLeader && getAdvanceButtonText() && (
+                <div className="fixed top-4 right-4 z-[60] animate-in fade-in slide-in-from-right-4 duration-500">
                     <Button
                         size="sm"
                         disabled={isManualPending}
-                        className="bg-red-600 hover:bg-red-700 text-white font-semibold shadow-lg shadow-red-600/25 transition-colors gap-1.5"
+                        className="bg-red-600/90 hover:bg-red-600 text-white font-semibold shadow-lg shadow-red-600/20 backdrop-blur-md border border-white/10 transition-all active:scale-95 gap-1.5 px-4"
                         onClick={handleAdvanceClick}
                     >
                         <SkipForward className="h-4 w-4" />
@@ -128,6 +130,12 @@ export default function PartyViewClient({
                         timeoutSecs={party.watching_timeout_secs}
                         deadlineAt={party.ready_deadline_at}
                     />
+                </div>
+            )}
+
+            {party.state === 'review' && party.selected_movie_id && (
+                <div style={{ display: isReviewView ? 'block' : 'none' }}>
+                    <ReviewFlow movieId={party.selected_movie_id} />
                 </div>
             )}
 

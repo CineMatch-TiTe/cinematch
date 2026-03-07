@@ -21,9 +21,15 @@ pub struct PartyStateChanged {
     pub deadline_at: Option<DateTime<Utc>>,
     /// Why the timeout was set
     pub timeout_reason: Option<TimeoutReason>,
-    /// The selected movie ID, relevant when state transitions to Watching
+    /// The selected movie ID, relevant when state transitions to Watching or Review
     #[serde(skip_serializing_if = "Option::is_none")]
     pub selected_movie_id: Option<i64>,
+    /// Ratings for the selected movie, relevant for Review state
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub review_ratings: Option<std::collections::HashMap<Uuid, i32>>,
+    /// The current voting round (1 or 2), relevant for Voting state
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub voting_round: Option<u16>,
 }
 
 /// Message types sent from server to clients
@@ -38,6 +44,7 @@ pub enum ServerMessage {
     UpdateReadyState(ReadyStateUpdate),
     ResetReadiness,
     PartyDisbanded,
+    PartyMemberRated(PartyMemberRated),
 
     // Voting phase
     MovieVoteUpdate(MovieVotes),
@@ -98,4 +105,11 @@ pub struct MemberJoined {
 pub struct ReadyStateUpdate {
     pub user_id: Uuid,
     pub ready: bool,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, ToSchema)]
+pub struct PartyMemberRated {
+    pub user_id: Uuid,
+    pub rating: i32,
+    pub party_average: f32,
 }
