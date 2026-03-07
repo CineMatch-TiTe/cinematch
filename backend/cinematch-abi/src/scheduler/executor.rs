@@ -160,6 +160,11 @@ async fn execute_voting_timeout<C: AppContext + Clone + 'static>(
                     timeout_reason: reason,
                     selected_movie_id,
                     review_ratings,
+                    voting_round: party
+                        .voting_round(&ctx)
+                        .await
+                        .unwrap_or(None)
+                        .map(|r| r as u16),
                 }),
                 None,
             );
@@ -214,6 +219,11 @@ async fn execute_watching_timeout<C: AppContext>(party: &Party, party_id: Uuid, 
             timeout_reason: None,
             selected_movie_id,
             review_ratings,
+            voting_round: party
+                .voting_round(&ctx)
+                .await
+                .unwrap_or(None)
+                .map(|r| r as u16),
         }),
         None,
     );
@@ -243,6 +253,11 @@ async fn execute_review_timeout<C: AppContext>(party: &Party, party_id: Uuid, ct
             timeout_reason: None,
             selected_movie_id: None,
             review_ratings: None,
+            voting_round: party
+                .voting_round(&ctx)
+                .await
+                .unwrap_or(None)
+                .map(|r| r as u16),
         }),
         None,
     );
@@ -366,6 +381,11 @@ pub async fn execute_ready_countdown<C: AppContext + Clone + 'static>(
                     timeout_reason: reason,
                     selected_movie_id,
                     review_ratings,
+                    voting_round: party
+                        .voting_round(&ctx)
+                        .await
+                        .unwrap_or(None)
+                        .map(|r| r as u16),
                 }),
                 None,
             );
@@ -493,6 +513,11 @@ pub async fn execute_custom_countdown<C: AppContext + Clone + 'static>(
                     timeout_reason: reason,
                     selected_movie_id,
                     review_ratings,
+                    voting_round: party
+                        .voting_round(&ctx)
+                        .await
+                        .unwrap_or(None)
+                        .map(|r| r as u16),
                 }),
                 None,
             );

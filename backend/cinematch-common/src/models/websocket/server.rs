@@ -27,6 +27,9 @@ pub struct PartyStateChanged {
     /// Ratings for the selected movie, relevant for Review state
     #[serde(skip_serializing_if = "Option::is_none")]
     pub review_ratings: Option<std::collections::HashMap<Uuid, i32>>,
+    /// The current voting round (1 or 2), relevant for Voting state
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub voting_round: Option<u16>,
 }
 
 /// Message types sent from server to clients

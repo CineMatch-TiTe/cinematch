@@ -11,7 +11,7 @@ use cinematch_db::domain::{Party, User};
 use super::super::DomainError;
 use super::{EndVotingTransition, PartyAdvanceOutcome, PartyValidation};
 use async_trait::async_trait;
-use cinematch_common::models::websocket::{PartyStateChanged, ServerMessage, VotingRoundStarted};
+use cinematch_common::models::websocket::{PartyStateChanged, ServerMessage};
 
 /// State machine operations for Party.
 /// State machine operations for Party.
@@ -108,6 +108,11 @@ impl PartyStateMachine for Party {
                     timeout_reason: None,
                     selected_movie_id,
                     review_ratings,
+                    voting_round: self
+                        .voting_round(ctx)
+                        .await
+                        .unwrap_or(None)
+                        .map(|r| r as u16),
                 };
                 ctx.broadcast_party(self.id, &ServerMessage::ResetReadiness, None);
                 ctx.broadcast_party(self.id, &ServerMessage::PartyStateChanged(msg), None);
@@ -116,16 +121,12 @@ impl PartyStateMachine for Party {
                 ctx.broadcast_party(self.id, &ServerMessage::ResetReadiness, None);
                 ctx.broadcast_party(
                     self.id,
-                    &ServerMessage::VotingRoundStarted(VotingRoundStarted { round: 1 }),
-                    None,
-                );
-                ctx.broadcast_party(
-                    self.id,
                     &ServerMessage::PartyStateChanged(PartyStateChanged {
                         state: PartyState::Voting.into(),
                         deadline_at: None,
                         timeout_reason: None,
                         selected_movie_id: None,
+                        voting_round: Some(1),
                         review_ratings: None,
                     }),
                     None,
@@ -135,16 +136,12 @@ impl PartyStateMachine for Party {
                 ctx.broadcast_party(self.id, &ServerMessage::ResetReadiness, None);
                 ctx.broadcast_party(
                     self.id,
-                    &ServerMessage::VotingRoundStarted(VotingRoundStarted { round: 2 }),
-                    None,
-                );
-                ctx.broadcast_party(
-                    self.id,
                     &ServerMessage::PartyStateChanged(PartyStateChanged {
                         state: PartyState::Voting.into(),
                         deadline_at: None,
                         timeout_reason: None,
                         selected_movie_id: None,
+                        voting_round: Some(2),
                         review_ratings: None,
                     }),
                     None,
@@ -171,6 +168,11 @@ impl PartyStateMachine for Party {
                     timeout_reason: None,
                     selected_movie_id,
                     review_ratings,
+                    voting_round: self
+                        .voting_round(ctx)
+                        .await
+                        .unwrap_or(None)
+                        .map(|r| r as u16),
                 };
                 ctx.broadcast_party(self.id, &ServerMessage::ResetReadiness, None);
                 ctx.broadcast_party(self.id, &ServerMessage::PartyStateChanged(msg), None);
@@ -212,16 +214,12 @@ impl PartyStateMachine for Party {
                         ctx.broadcast_party(self.id, &ServerMessage::ResetReadiness, None);
                         ctx.broadcast_party(
                             self.id,
-                            &ServerMessage::VotingRoundStarted(VotingRoundStarted { round: 1 }),
-                            None,
-                        );
-                        ctx.broadcast_party(
-                            self.id,
                             &ServerMessage::PartyStateChanged(PartyStateChanged {
                                 state: PartyState::Voting.into(),
                                 deadline_at: None,
                                 timeout_reason: None,
                                 selected_movie_id: None,
+                                voting_round: Some(1),
                                 review_ratings: None,
                             }),
                             None,
@@ -232,16 +230,12 @@ impl PartyStateMachine for Party {
                         ctx.broadcast_party(self.id, &ServerMessage::ResetReadiness, None);
                         ctx.broadcast_party(
                             self.id,
-                            &ServerMessage::VotingRoundStarted(VotingRoundStarted { round: 2 }),
-                            None,
-                        );
-                        ctx.broadcast_party(
-                            self.id,
                             &ServerMessage::PartyStateChanged(PartyStateChanged {
                                 state: PartyState::Voting.into(),
                                 deadline_at: None,
                                 timeout_reason: None,
                                 selected_movie_id: None,
+                                voting_round: Some(2),
                                 review_ratings: None,
                             }),
                             None,
@@ -293,16 +287,12 @@ impl PartyStateMachine for Party {
                 ctx.broadcast_party(self.id, &ServerMessage::ResetReadiness, None);
                 ctx.broadcast_party(
                     self.id,
-                    &ServerMessage::VotingRoundStarted(VotingRoundStarted { round: 1 }),
-                    None,
-                );
-                ctx.broadcast_party(
-                    self.id,
                     &ServerMessage::PartyStateChanged(PartyStateChanged {
                         state: PartyState::Voting.into(),
                         deadline_at: None,
                         timeout_reason: None,
                         selected_movie_id: None,
+                        voting_round: Some(1),
                         review_ratings: None,
                     }),
                     None,
@@ -312,16 +302,12 @@ impl PartyStateMachine for Party {
                 ctx.broadcast_party(self.id, &ServerMessage::ResetReadiness, None);
                 ctx.broadcast_party(
                     self.id,
-                    &ServerMessage::VotingRoundStarted(VotingRoundStarted { round: 2 }),
-                    None,
-                );
-                ctx.broadcast_party(
-                    self.id,
                     &ServerMessage::PartyStateChanged(PartyStateChanged {
                         state: PartyState::Voting.into(),
                         deadline_at: None,
                         timeout_reason: None,
                         selected_movie_id: None,
+                        voting_round: Some(2),
                         review_ratings: None,
                     }),
                     None,
@@ -339,6 +325,11 @@ impl PartyStateMachine for Party {
                     timeout_reason: None,
                     selected_movie_id,
                     review_ratings: None,
+                    voting_round: self
+                        .voting_round(ctx)
+                        .await
+                        .unwrap_or(None)
+                        .map(|r| r as u16),
                 };
                 ctx.broadcast_party(self.id, &ServerMessage::ResetReadiness, None);
                 ctx.broadcast_party(self.id, &ServerMessage::PartyStateChanged(msg), None);
@@ -360,16 +351,12 @@ impl PartyStateMachine for Party {
                 ctx.broadcast_party(self.id, &ServerMessage::ResetReadiness, None);
                 ctx.broadcast_party(
                     self.id,
-                    &ServerMessage::VotingRoundStarted(VotingRoundStarted { round: 1 }),
-                    None,
-                );
-                ctx.broadcast_party(
-                    self.id,
                     &ServerMessage::PartyStateChanged(PartyStateChanged {
                         state: PartyState::Voting.into(),
                         deadline_at: None,
                         timeout_reason: None,
                         selected_movie_id: None,
+                        voting_round: Some(1),
                         review_ratings: None,
                     }),
                     None,
@@ -379,16 +366,12 @@ impl PartyStateMachine for Party {
                 ctx.broadcast_party(self.id, &ServerMessage::ResetReadiness, None);
                 ctx.broadcast_party(
                     self.id,
-                    &ServerMessage::VotingRoundStarted(VotingRoundStarted { round: 2 }),
-                    None,
-                );
-                ctx.broadcast_party(
-                    self.id,
                     &ServerMessage::PartyStateChanged(PartyStateChanged {
                         state: PartyState::Voting.into(),
                         deadline_at: None,
                         timeout_reason: None,
                         selected_movie_id: None,
+                        voting_round: Some(2),
                         review_ratings: None,
                     }),
                     None,

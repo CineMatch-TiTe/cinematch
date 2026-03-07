@@ -8,7 +8,6 @@ import { Star } from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import JSConfetti from 'js-confetti'
 import PhaseCountdown from '../PhaseCountdown'
-import { cn } from '@/lib/utils'
 
 interface ReviewFlowProps {
     movieId: number
@@ -119,52 +118,84 @@ export default function ReviewFlow({ movieId }: ReviewFlowProps) {
                 </div>
             )}
 
-            {/* 5 Star Rating Input */}
-            <div className="flex items-center gap-1.5 bg-white/5 backdrop-blur-xl p-6 rounded-[2rem] border border-white/10 shadow-2xl shadow-black/40">
-                {[...Array(10)].map((_, i) => {
-                    const value = i + 1
-                    const isRightHalf = i % 2 === 1
-                    const displayRating = hoverRating !== null ? hoverRating : (myRating || 0)
+            {/* 5 Star Rating Input - Premium Redesign */}
+            <div className="flex flex-col items-center gap-6 w-full">
+                <div className="relative group perspective-1000">
+                    <div className="flex items-center gap-1.5 p-4 rounded-3xl bg-white/5 backdrop-blur-2xl border border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.5)] transition-all duration-500 hover:shadow-[0_25px_60px_rgba(0,0,0,0.6)] hover:border-white/20">
+                        {[...Array(5)].map((_, starIndex) => {
+                            const starValue = starIndex + 1
+                            const displayRating = hoverRating !== null ? hoverRating : (myRating || 0)
 
-                    return (
-                        <div
-                            key={i}
-                            className={cn(
-                                "relative w-6 h-12 cursor-pointer transition-transform duration-200 active:scale-90",
-                                !isRightHalf && "mr-[-1px]", // overlap half-stars slightly
-                            )}
-                            onPointerEnter={() => setHoverRating(value)}
-                            onPointerLeave={() => setHoverRating(null)}
-                            onClick={() => {
-                                handleRate(value)
-                                if ('vibrate' in navigator) navigator.vibrate(10)
-                            }}
-                        >
-                            <div className={cn(
-                                "absolute inset-0 overflow-hidden",
-                                isRightHalf ? "left-[-100%]" : "right-[-100%]"
-                            )}>
-                                <div className="w-12 h-12 flex items-center justify-center">
-                                    <Star className={cn(
-                                        "w-10 h-10 transition-colors duration-200",
-                                        displayRating >= value
-                                            ? "text-amber-400 fill-amber-400 drop-shadow-[0_0_8px_rgba(251,191,36,0.4)]"
-                                            : "text-zinc-800 fill-zinc-900/50"
-                                    )} />
+                            // Determine fill percentage for this star (0, 50, or 100)
+                            let fillPercent = 0
+                            if (displayRating >= starValue * 2) {
+                                fillPercent = 100
+                            } else if (displayRating >= starValue * 2 - 1) {
+                                fillPercent = 50
+                            }
+
+                            return (
+                                <div
+                                    key={starIndex}
+                                    className="relative flex items-center justify-center p-1 group/star transition-transform duration-300 hover:scale-110 active:scale-95"
+                                    onPointerMove={(e) => {
+                                        const rect = e.currentTarget.getBoundingClientRect()
+                                        const x = e.clientX - rect.left
+                                        const isHalf = x < rect.width / 2
+                                        setHoverRating(isHalf ? starValue * 2 - 1 : starValue * 2)
+                                    }}
+                                    onPointerLeave={() => setHoverRating(null)}
+                                    onClick={() => handleRate(hoverRating || displayRating)}
+                                >
+                                    {/* Background Star (Gray) */}
+                                    <Star className="w-10 h-10 text-white/10 fill-white/5 transition-colors duration-300 group-hover/star:text-white/20" />
+
+                                    {/* Foreground Star (Gold) - Clipped */}
+                                    <div
+                                        className="absolute inset-0 flex items-center justify-center pointer-events-none transition-all duration-300 ease-out"
+                                        style={{
+                                            clipPath: `inset(0 ${100 - fillPercent}% 0 0)`,
+                                            filter: fillPercent > 0 ? 'drop-shadow(0 0 12px rgba(251,191,36,0.6))' : 'none'
+                                        }}
+                                    >
+                                        <Star className="w-10 h-10 text-amber-400 fill-amber-400" />
+                                    </div>
+
+                                    {/* Hover Highlight Glow */}
+                                    {hoverRating !== null && (fillPercent > 0) && (
+                                        <div className="absolute inset-0 bg-amber-400/20 rounded-full blur-xl opacity-0 group-hover/star:opacity-100 transition-opacity duration-300" />
+                                    )}
                                 </div>
-                            </div>
-                        </div>
-                    )
-                })}
-            </div>
+                            )
+                        })}
+                    </div>
+                </div>
 
-            {/* Display active selection text */}
-            <div className="h-6">
-                {(hoverRating !== null || myRating) && (
-                    <p className="text-amber-400/80 font-medium animate-in fade-in zoom-in duration-200">
-                        {hoverRating !== null ? (hoverRating / 2).toFixed(1) : (myRating && (myRating / 2).toFixed(1))} Stars
-                    </p>
-                )}
+                {/* Dynamic Status Text */}
+                <div className="flex flex-col items-center gap-1 min-h-[3rem]">
+                    {(hoverRating !== null || myRating) && (
+                        <>
+                            <p className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-amber-400 to-amber-500 animate-in fade-in zoom-in slide-in-from-bottom-2 duration-300 tracking-tight">
+                                {hoverRating !== null ? (hoverRating / 2).toFixed(1) : (myRating && (myRating / 2).toFixed(1))}
+                            </p>
+                            <p className="text-sm font-bold uppercase tracking-[0.2em] text-amber-500/60 animate-in fade-in slide-in-from-top-1 duration-500 delay-100">
+                                {(() => {
+                                    const r = hoverRating !== null ? hoverRating : (myRating || 0)
+                                    if (r === 0) return ""
+                                    if (r <= 2) return "Garbage"
+                                    if (r <= 3) return "Terrible"
+                                    if (r <= 4) return "Poor"
+                                    if (r <= 5) return "Mediocre"
+                                    if (r <= 6) return "Average"
+                                    if (r <= 7) return "Good"
+                                    if (r <= 8) return "Great"
+                                    if (r <= 9) return "Amazing"
+                                    return "Masterpiece"
+                                })()}
+                            </p>
+                        </>
+                    )}
+                </div>
             </div>
 
             {/* Party Members Ratings */}

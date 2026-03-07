@@ -121,10 +121,6 @@ impl Scheduler {
         delay: chrono::Duration,
         ctx: C,
     ) {
-        self.cancel(party_id).await;
-
-        let deadline_at = Utc::now() + delay;
-
         {
             let tasks = self.tasks.read().await;
             if tasks.contains_key(&party_id) {
@@ -135,6 +131,10 @@ impl Scheduler {
                 return;
             }
         }
+
+        self.cancel(party_id).await;
+
+        let deadline_at = Utc::now() + delay;
 
         debug!(
             "[Scheduler] Request to schedule custom countdown for party {}",

@@ -203,6 +203,7 @@ pub async fn rate_movie(
                             ),
                             selected_movie_id: Some(selected_id),
                             review_ratings,
+                            voting_round: None,
                         },
                     ),
                     None,

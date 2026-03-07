@@ -57,4 +57,9 @@ export interface PartyResponse {
    * @minimum 0
    */
   watching_timeout_secs: number;
+  /**
+   * Current voting round (1 or 2)
+   * @nullable
+   */
+  voting_round?: number | null;
 }

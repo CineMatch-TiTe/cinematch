@@ -10,6 +10,7 @@ export interface PartyStateChangedPayload {
   timeout_reason?: TimeoutReason | null
   selected_movie_id?: number | null
   review_ratings?: Record<string, number> | null
+  voting_round?: number | null
 }
 
 // Timeout info for the current phase

@@ -84,6 +84,14 @@ export function PartyViewProvider({
         ...(payload.review_ratings !== undefined && {
           review_ratings: (payload.review_ratings as PartyResponseReviewRatings) ?? null,
         }),
+        // batch voting_round if present
+        ...(payload.voting_round !== undefined && {
+          voting_round: payload.voting_round,
+        }),
+        // invalidate party code if not in created phase
+        ...(payload.state !== 'created' && {
+          code: null,
+        }),
       }))
       // Immediately switch the active view to match the new phase
       if (payload.state === 'picking') setActiveView('picking')
