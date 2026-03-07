@@ -8,102 +8,10 @@ import type {
   ErrorResponse,
   GuestLoginResponse,
   GuestUserRequest,
-  OAuthCallbackResponse,
   RenewJwtResponse
 } from '../../model';
 
 import { customInstance } from '../../lib/orval-client';
-
-/**
- * Exchanges the code for a token and handles user login or account linking.
-
-**Auth**: None (or session user to link account).
- * @summary GitHub OAuth callback handler.
- */
-export type callbackGithubResponse200 = {
-  data: OAuthCallbackResponse
-  status: 200
-}
-
-export type callbackGithubResponse400 = {
-  data: ErrorResponse
-  status: 400
-}
-
-export type callbackGithubResponse409 = {
-  data: ErrorResponse
-  status: 409
-}
-
-export type callbackGithubResponse500 = {
-  data: ErrorResponse
-  status: 500
-}
-    
-export type callbackGithubResponseSuccess = (callbackGithubResponse200) & {
-  headers: Headers;
-};
-export type callbackGithubResponseError = (callbackGithubResponse400 | callbackGithubResponse409 | callbackGithubResponse500) & {
-  headers: Headers;
-};
-
-export type callbackGithubResponse = (callbackGithubResponseSuccess | callbackGithubResponseError)
-
-export const getCallbackGithubUrl = () => {
-
-
-  
-
-  return `/api/auth/callback/github`
-}
-
-export const callbackGithub = async ( options?: RequestInit): Promise<callbackGithubResponse> => {
-  
-  return customInstance<callbackGithubResponse>(getCallbackGithubUrl(),
-  {      
-    ...options,
-    method: 'GET'
-    
-    
-  }
-);}
-
-
-/**
- * **Auth**: None (or session user to link account).
- * @summary Redirect to GitHub OAuth login page.
- */
-export type loginGithubResponse302 = {
-  data: void
-  status: 302
-}
-    
-;
-export type loginGithubResponseError = (loginGithubResponse302) & {
-  headers: Headers;
-};
-
-export type loginGithubResponse = (loginGithubResponseError)
-
-export const getLoginGithubUrl = () => {
-
-
-  
-
-  return `/api/auth/login/github`
-}
-
-export const loginGithub = async ( options?: RequestInit): Promise<loginGithubResponse> => {
-  
-  return customInstance<loginGithubResponse>(getLoginGithubUrl(),
-  {      
-    ...options,
-    method: 'GET'
-    
-    
-  }
-);}
-
 
 /**
  * Creates a temporary (oneshot) user. Optionally provide a username (3–32 chars);

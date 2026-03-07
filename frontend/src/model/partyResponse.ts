@@ -4,6 +4,7 @@
  * cinematch-server
  * OpenAPI spec version: 0.1.0
  */
+import type { PartyResponseReviewRatings } from './partyResponseReviewRatings';
 import type { PartyResponseVoteStatus } from './partyResponseVoteStatus';
 import type { PartyStateDto } from './partyStateDto';
 
@@ -29,6 +30,11 @@ export interface PartyResponse {
    * @nullable
    */
   ready_deadline_at?: string | null;
+  /**
+   * Ratings for the selected movie in the Review phase: user_id → rating
+   * @nullable
+   */
+  review_ratings?: PartyResponseReviewRatings;
   /**
    * Selected winner movie ID (set when voting ends with a majority; in Watching/Review).
    * @nullable

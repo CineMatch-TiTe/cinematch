@@ -9,6 +9,7 @@ import type {
   GenreResponse,
   MovieGetInfoParams,
   MovieResponse,
+  RateMovieRequest,
   SearchFilter,
   SearchMoviesParams,
   SearchResponse
@@ -117,6 +118,51 @@ export const getGenres = async ( options?: RequestInit): Promise<getGenresRespon
     method: 'GET'
     
     
+  }
+);}
+
+
+export type rateMovieResponse200 = {
+  data: void
+  status: 200
+}
+
+export type rateMovieResponse401 = {
+  data: ErrorResponse
+  status: 401
+}
+
+export type rateMovieResponse500 = {
+  data: ErrorResponse
+  status: 500
+}
+    
+export type rateMovieResponseSuccess = (rateMovieResponse200) & {
+  headers: Headers;
+};
+export type rateMovieResponseError = (rateMovieResponse401 | rateMovieResponse500) & {
+  headers: Headers;
+};
+
+export type rateMovieResponse = (rateMovieResponseSuccess | rateMovieResponseError)
+
+export const getRateMovieUrl = () => {
+
+
+  
+
+  return `/api/movie/rate`
+}
+
+export const rateMovie = async (rateMovieRequest: RateMovieRequest, options?: RequestInit): Promise<rateMovieResponse> => {
+  
+  return customInstance<rateMovieResponse>(getRateMovieUrl(),
+  {      
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      rateMovieRequest,)
   }
 );}
 

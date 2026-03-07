@@ -128,25 +128,6 @@ diesel::table! {
 }
 
 diesel::table! {
-    onboarding_clusters (cluster_id) {
-        cluster_id -> Int2,
-        centroid -> Jsonb,
-        user_count -> Int4,
-        created_at -> Timestamptz,
-    }
-}
-
-diesel::table! {
-    onboarding_movies (movie_id) {
-        movie_id -> Int8,
-        info_gain -> Float4,
-        rating_dist -> Jsonb,
-        rating_count -> Int4,
-        genre_ids -> Array<Nullable<Uuid>>,
-    }
-}
-
-diesel::table! {
     use diesel::sql_types::*;
     use super::sql_types::PartyState;
 
@@ -301,7 +282,6 @@ diesel::joinable!(movie_production_countries -> movies (movie_id));
 diesel::joinable!(movie_production_countries -> production_countries (country_code));
 diesel::joinable!(movie_trailers -> movies (movie_id));
 diesel::joinable!(movie_trailers -> trailers (trailer_id));
-diesel::joinable!(onboarding_movies -> movies (movie_id));
 diesel::joinable!(parties -> movies (selected_movie_id));
 diesel::joinable!(parties -> users (party_leader_id));
 diesel::joinable!(party_codes -> parties (party_id));
@@ -333,8 +313,6 @@ diesel::allow_tables_to_appear_in_same_query!(
     movie_production_countries,
     movie_trailers,
     movies,
-    onboarding_clusters,
-    onboarding_movies,
     parties,
     party_codes,
     party_members,
