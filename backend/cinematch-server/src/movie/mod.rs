@@ -95,3 +95,10 @@ pub struct SearchQuery {
     #[param(default = 1)]
     pub page: Option<i64>,
 }
+
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+pub struct RateMovieRequest {
+    pub movie_id: i64,
+    pub liked: Option<bool>,
+    pub rating: Option<i32>,
+}

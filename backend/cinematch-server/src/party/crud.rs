@@ -104,6 +104,23 @@ pub async fn get_party(
     } else {
         None
     };
+
+    let review_ratings = if state == cinematch_db::PartyState::Review {
+        if let Some(m_id) = party_obj.selected_movie_id(&ctx).await? {
+            let mut ratings = std::collections::HashMap::new();
+            for member in party_obj.members(&ctx).await? {
+                let user_handle = cinematch_db::domain::User::new(member.user_id);
+                if let Ok(Some((_, Some(r), _))) = user_handle.get_movie_rating(&ctx, m_id).await {
+                    ratings.insert(member.user_id, r);
+                }
+            }
+            Some(ratings)
+        } else {
+            None
+        }
+    } else {
+        None
+    };
     let timeouts = &cinematch_common::Config::get().timeouts;
     let watching_timeout_secs = timeouts.watching_timeout_secs;
     let mut voting_timeout_secs =
@@ -129,6 +146,7 @@ pub async fn get_party(
         voting_timeout_secs,
         watching_timeout_secs,
         ready_deadline_at: ctx.scheduler.get_deadline(party_id).await,
+        review_ratings,
     };
     Ok(web::Json(response))
 }

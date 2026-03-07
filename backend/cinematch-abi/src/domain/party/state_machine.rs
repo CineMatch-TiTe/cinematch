@@ -159,8 +159,8 @@ impl PartyStateMachine for Party {
                 Some(PartyState::Voting)
             }
             PartyState::Review => {
-                do_review_to_created(ctx, self).await?;
-                Some(PartyState::Created)
+                // Review phase: only the leader can advance manually.
+                None
             }
             PartyState::Voting => {
                 let t = run_end_voting_internal(ctx, self, false).await?;

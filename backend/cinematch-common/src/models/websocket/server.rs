@@ -38,6 +38,7 @@ pub enum ServerMessage {
     UpdateReadyState(ReadyStateUpdate),
     ResetReadiness,
     PartyDisbanded,
+    PartyMemberRated(PartyMemberRated),
 
     // Voting phase
     MovieVoteUpdate(MovieVotes),
@@ -98,4 +99,11 @@ pub struct MemberJoined {
 pub struct ReadyStateUpdate {
     pub user_id: Uuid,
     pub ready: bool,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, ToSchema)]
+pub struct PartyMemberRated {
+    pub user_id: Uuid,
+    pub rating: i32,
+    pub party_average: f32,
 }

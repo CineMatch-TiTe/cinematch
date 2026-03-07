@@ -54,6 +54,8 @@ pub struct PartyResponse {
     pub watching_timeout_secs: u32,
     /// Deadline for current transition (e.g. All Ready countdown).
     pub ready_deadline_at: Option<DateTime<Utc>>,
+    /// Ratings for the selected movie in the Review phase: user_id → rating
+    pub review_ratings: Option<HashMap<Uuid, i32>>,
 }
 
 /// Party state for API responses
