@@ -169,6 +169,23 @@ async fn execute_voting_timeout<C: AppContext + Clone + 'static>(
                 None,
             );
 
+            if matches!(
+                transition,
+                EndVotingTransition::Round1Started | EndVotingTransition::Round2Started
+            )
+                && let Ok(Some(round)) = party.voting_round(&ctx).await
+            {
+                ctx.broadcast_party(
+                    party_id,
+                    &ServerMessage::VotingRoundStarted(
+                        cinematch_common::models::websocket::VotingRoundStarted {
+                            round: round as u16,
+                        },
+                    ),
+                    None,
+                );
+            }
+
             // Schedule timeout for the new phase if applicable
             if let Some(deadline) = deadline_at {
                 registry
@@ -390,6 +407,20 @@ pub async fn execute_ready_countdown<C: AppContext + Clone + 'static>(
                 None,
             );
 
+            if new_phase == PartyState::Voting
+                && let Ok(Some(round)) = party.voting_round(&ctx).await
+            {
+                ctx.broadcast_party(
+                    party_id,
+                    &ServerMessage::VotingRoundStarted(
+                        cinematch_common::models::websocket::VotingRoundStarted {
+                            round: round as u16,
+                        },
+                    ),
+                    None,
+                );
+            }
+
             // Schedule the timeout in the scheduler
             if let Some(deadline) = deadline_at {
                 registry
@@ -521,6 +552,20 @@ pub async fn execute_custom_countdown<C: AppContext + Clone + 'static>(
                 }),
                 None,
             );
+
+            if new_phase == PartyState::Voting
+                && let Ok(Some(round)) = party.voting_round(&ctx).await
+            {
+                ctx.broadcast_party(
+                    party_id,
+                    &ServerMessage::VotingRoundStarted(
+                        cinematch_common::models::websocket::VotingRoundStarted {
+                            round: round as u16,
+                        },
+                    ),
+                    None,
+                );
+            }
 
             // Schedule the timeout in the scheduler
             if let Some(deadline) = deadline_at {

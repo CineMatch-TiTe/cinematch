@@ -141,9 +141,17 @@ export function useVoting(partyId: string) {
         startTransition(() => {
           setVoteTotals((prev) => ({ ...prev, [movie_id]: { likes, dislikes } }))
         })
+      } else if ('PartyStateChanged' in lastMessage && lastMessage.PartyStateChanged.state === 'voting') {
+        const newRound = lastMessage.PartyStateChanged.voting_round
+        if (newRound && newRound !== votingRound) {
+          startTransition(() => {
+            setVotingRound(newRound)
+          })
+          fetchVotes()
+        }
       }
     }
-  }, [lastMessage, fetchVotes])
+  }, [lastMessage, fetchVotes, votingRound])
 
   const handleVote = async (movieId: number, like: boolean) => {
     const result = await voteMovieAction(partyId, movieId, like)
