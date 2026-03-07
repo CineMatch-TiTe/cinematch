@@ -1,6 +1,6 @@
 import { useState, useTransition, useEffect, useRef, useCallback } from 'react'
 import { toast } from 'sonner'
-import { getMoviesByIdsAction, getPartyVotesAction, voteMovieAction, setReadyAction } from '@/actions/party-room'
+import { getMoviesByIdsAction, getPartyVotesAction, voteMovieAction } from '@/actions/party-room'
 import { MovieResponse, GetVoteResponseVoteTotals } from '@/model'
 import { prefetchImages } from '@/lib/utils'
 import { usePartyView } from '@/components/party/PartyViewContext'
@@ -175,13 +175,6 @@ export function useVoting(partyId: string) {
     }
   }
 
-  const handleReady = async (isReady: boolean) => {
-    const result = await setReadyAction(partyId, isReady)
-    if (result.error) {
-      toast.error(result.error)
-    }
-  }
-
   return {
     movies,
     votingRound,
@@ -190,7 +183,6 @@ export function useVoting(partyId: string) {
     countdown,
     showContent,
     transitionData,
-    handleVote,
-    handleReady
+    handleVote
   }
 }

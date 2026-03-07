@@ -16,7 +16,7 @@ export default function StarRatingInput({ currentRating, onRate }: Readonly<Star
     return (
         <div className="flex flex-col items-center gap-6 w-full">
             <div className="relative group perspective-1000">
-                <div className="flex items-center gap-1.5 p-4 rounded-3xl bg-white/5 backdrop-blur-2xl border border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.5)] transition-all duration-500 hover:shadow-[0_25px_60px_rgba(0,0,0,0.6)] hover:border-white/20">
+                <div className="flex items-center gap-1.5 p-4 rounded-3xl bg-white/5 backdrop-blur-2xl border border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.5)] transition-all duration-500 hover:shadow-[0_25px_60px_rgba(0,0,0,0.6)] hover:border-white/20 touch-none">
                     {[...Array(5)].map((_, starIndex) => {
                         const starValue = starIndex + 1
 
@@ -32,14 +32,29 @@ export default function StarRatingInput({ currentRating, onRate }: Readonly<Star
                             <div
                                 key={starIndex}
                                 className="relative flex items-center justify-center p-1 group/star transition-transform duration-300 hover:scale-110 active:scale-95"
+                                onPointerDown={(e) => {
+                                    const rect = e.currentTarget.getBoundingClientRect()
+                                    const x = e.clientX - rect.left
+                                    const isHalf = x < rect.width / 2
+                                    const value = isHalf ? starValue * 2 - 1 : starValue * 2
+                                    setHoverRating(value)
+                                    if (e.pointerType === 'touch') {
+                                        onRate(value)
+                                    }
+                                }}
                                 onPointerMove={(e) => {
+                                    if (e.pointerType === 'touch') return
                                     const rect = e.currentTarget.getBoundingClientRect()
                                     const x = e.clientX - rect.left
                                     const isHalf = x < rect.width / 2
                                     setHoverRating(isHalf ? starValue * 2 - 1 : starValue * 2)
                                 }}
                                 onPointerLeave={() => setHoverRating(null)}
-                                onClick={() => onRate(hoverRating || displayRatingValue)}
+                                onClick={() => {
+                                    if (hoverRating !== null) {
+                                        onRate(hoverRating)
+                                    }
+                                }}
                             >
                                 {/* Background Star (Gray) */}
                                 <Star className="w-10 h-10 text-white/10 fill-white/5 transition-colors duration-300 group-hover/star:text-white/20" />
