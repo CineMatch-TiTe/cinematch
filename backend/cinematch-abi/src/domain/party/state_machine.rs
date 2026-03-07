@@ -421,7 +421,7 @@ async fn handle_round1_end(
     ctx: &impl AppContext,
     party: &Party,
     vote_map: &HashMap<i64, (u32, u32)>,
-    force_timeout: bool,
+    _force_timeout: bool,
 ) -> Result<EndVotingTransition, DomainError> {
     if vote_map.is_empty() {
         debug!("Round 1 finished with zero votes, falling back to Picking phase");
@@ -482,7 +482,7 @@ async fn handle_round2_end(
     ctx: &impl AppContext,
     party: &Party,
     vote_map: &HashMap<i64, (u32, u32)>,
-    force_timeout: bool,
+    _force_timeout: bool,
 ) -> Result<EndVotingTransition, DomainError> {
     if vote_map.is_empty() {
         // Round 2 finished with zero votes, fallback to Round 1 ballots
