@@ -103,6 +103,7 @@ impl PartyStateMachine for Party {
                 ctx.broadcast_party(self.id, &ServerMessage::PartyStateChanged(msg), None);
             }
             PartyAdvanceOutcome::VotingEnded(EndVotingTransition::Round1Started) => {
+                ctx.broadcast_party(self.id, &ServerMessage::ResetReadiness, None);
                 ctx.broadcast_party(
                     self.id,
                     &ServerMessage::VotingRoundStarted(VotingRoundStarted { round: 1 }),
@@ -110,6 +111,7 @@ impl PartyStateMachine for Party {
                 );
             }
             PartyAdvanceOutcome::VotingEnded(EndVotingTransition::Round2Started) => {
+                ctx.broadcast_party(self.id, &ServerMessage::ResetReadiness, None);
                 ctx.broadcast_party(
                     self.id,
                     &ServerMessage::VotingRoundStarted(VotingRoundStarted { round: 2 }),
@@ -164,6 +166,7 @@ impl PartyStateMachine for Party {
                 let t = run_end_voting_internal(ctx, self, false).await?;
                 match &t {
                     EndVotingTransition::Round1Started => {
+                        ctx.broadcast_party(self.id, &ServerMessage::ResetReadiness, None);
                         ctx.broadcast_party(
                             self.id,
                             &ServerMessage::VotingRoundStarted(VotingRoundStarted { round: 1 }),
@@ -222,6 +225,7 @@ impl PartyStateMachine for Party {
 
         match &t {
             EndVotingTransition::Round1Started => {
+                ctx.broadcast_party(self.id, &ServerMessage::ResetReadiness, None);
                 ctx.broadcast_party(
                     self.id,
                     &ServerMessage::VotingRoundStarted(VotingRoundStarted { round: 1 }),
@@ -229,6 +233,7 @@ impl PartyStateMachine for Party {
                 );
             }
             EndVotingTransition::Round2Started => {
+                ctx.broadcast_party(self.id, &ServerMessage::ResetReadiness, None);
                 ctx.broadcast_party(
                     self.id,
                     &ServerMessage::VotingRoundStarted(VotingRoundStarted { round: 2 }),
@@ -264,6 +269,7 @@ impl PartyStateMachine for Party {
 
         match &t {
             EndVotingTransition::Round1Started => {
+                ctx.broadcast_party(self.id, &ServerMessage::ResetReadiness, None);
                 ctx.broadcast_party(
                     self.id,
                     &ServerMessage::VotingRoundStarted(VotingRoundStarted { round: 1 }),
@@ -271,6 +277,7 @@ impl PartyStateMachine for Party {
                 );
             }
             EndVotingTransition::Round2Started => {
+                ctx.broadcast_party(self.id, &ServerMessage::ResetReadiness, None);
                 ctx.broadcast_party(
                     self.id,
                     &ServerMessage::VotingRoundStarted(VotingRoundStarted { round: 2 }),
@@ -417,16 +424,15 @@ async fn handle_round1_end(
     force_timeout: bool,
 ) -> Result<EndVotingTransition, DomainError> {
     if vote_map.is_empty() {
-        if force_timeout {
-            // Restart Voting Phase 1 instead of rolling back to Picking
-            debug!("Round 1 timeout with zero votes, restarting phase 1 ballots");
-            do_picking_to_voting(ctx, party).await?;
-            return Ok(EndVotingTransition::Round1Started);
-        }
-        let _ = party.enable_voting(ctx).await;
-        return Err(DomainError::BadRequest(
-            "No votes cast; cannot start round 2".into(),
-        ));
+        debug!("Round 1 finished with zero votes, falling back to Picking phase");
+        party
+            .set_phase(ctx, PartyState::Picking)
+            .await
+            .map_err(|e| {
+                error!("Failed to fallback to Picking: {}", e);
+                DomainError::Internal("Failed to fallback to Picking".into())
+            })?;
+        return Ok(EndVotingTransition::PhaseChanged(PartyState::Picking));
     }
 
     // Sort by score (likes - dislikes)
@@ -479,16 +485,10 @@ async fn handle_round2_end(
     force_timeout: bool,
 ) -> Result<EndVotingTransition, DomainError> {
     if vote_map.is_empty() {
-        if force_timeout {
-            // Restart Voting Phase 1 instead of rolling back to Picking
-            debug!("Round 2 timeout with zero votes, restarting phase 1 ballots");
-            do_picking_to_voting(ctx, party).await?;
-            return Ok(EndVotingTransition::Round1Started);
-        }
-        let _ = party.set_voting_round(ctx, None).await;
-        return Err(DomainError::BadRequest(
-            "No votes in round 2; cannot select winner".into(),
-        ));
+        // Round 2 finished with zero votes, fallback to Round 1 ballots
+        debug!("Round 2 finished with zero votes, restarting phase 1 ballots");
+        do_picking_to_voting(ctx, party).await?;
+        return Ok(EndVotingTransition::Round1Started);
     }
 
     let (winner_id, winner_likes) = vote_map
