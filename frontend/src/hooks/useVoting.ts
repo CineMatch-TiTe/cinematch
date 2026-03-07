@@ -132,6 +132,9 @@ export function useVoting(partyId: string) {
   useEffect(() => {
     if (lastMessage && typeof lastMessage === 'object') {
       if ('VotingRoundStarted' in lastMessage) {
+        startTransition(() => {
+          setVotingRound(lastMessage.VotingRoundStarted.round)
+        })
         fetchVotes()
       } else if ('MovieVoteUpdate' in lastMessage) {
         const { movie_id, likes, dislikes } = lastMessage.MovieVoteUpdate

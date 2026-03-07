@@ -125,6 +125,17 @@ impl Scheduler {
 
         let deadline_at = Utc::now() + delay;
 
+        {
+            let tasks = self.tasks.read().await;
+            if tasks.contains_key(&party_id) {
+                debug!(
+                    "[Scheduler] Custom countdown already scheduled for party {}, skipping",
+                    party_id
+                );
+                return;
+            }
+        }
+
         debug!(
             "[Scheduler] Request to schedule custom countdown for party {}",
             party_id

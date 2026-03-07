@@ -62,7 +62,8 @@ export function usePartyViewLogic({ party, currentUser }: UsePartyViewLogicProps
     if (party.state === 'created') return 'Start Picking'
     if (party.state === 'picking') return 'Start Voting'
     if (party.state === 'voting') return 'Skip Phase'
-    if (party.state === 'review' || party.state === 'watching') return 'New Round'
+    if (party.state === 'watching') return 'Skip to Review'
+    if (party.state === 'review') return 'New Round'
     return null
   }
 

@@ -90,6 +90,7 @@ export function PartyViewProvider({
       else if (payload.state === 'voting') setActiveView('voting')
       else if (payload.state === 'watching') setActiveView('watching')
       else if (payload.state === 'review') setActiveView('review')
+      else if (payload.state === 'created') setActiveView('room')
     } else if ('PartyMemberJoined' in msg) {
       const payload = msg.PartyMemberJoined
       setMembers((prev) => {
