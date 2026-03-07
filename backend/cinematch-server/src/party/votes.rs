@@ -3,7 +3,7 @@ use crate::api_error::ApiError;
 use crate::auth::guard::Auth;
 
 use actix_web::{HttpResponse, get, post, web};
-use cinematch_abi::domain::{PartyCrud, PartyValidation};
+use cinematch_abi::domain::{PartyCrud, PartyStateMachine, PartyValidation};
 use cinematch_common::models::ErrorResponse;
 use cinematch_db::PartyState;
 use cinematch_db::domain::{Party, User};
@@ -139,6 +139,11 @@ pub async fn vote_movie(
         ctx.scheduler
             .trigger_voting_timeout(party_id, ctx.clone())
             .await;
+    }
+
+    // Auto-end voting if all members have cast at least one vote
+    if party_obj.try_auto_end_voting(&ctx).await?.is_some() {
+        ctx.scheduler.cancel(party_id).await;
     }
 
     Ok(HttpResponse::Ok().json(VoteMovieResponse { likes, dislikes }))
