@@ -187,6 +187,11 @@ pub async fn rate_movie(
                     .await;
 
                 let deadline = chrono::Utc::now() + delay;
+                let review_ratings = ctx
+                    .db()
+                    .get_ratings_for_party_members(party.id, selected_id)
+                    .await
+                    .ok();
                 ctx.broadcast_party(
                     party.id,
                     &cinematch_common::models::websocket::ServerMessage::PartyStateChanged(
@@ -197,6 +202,7 @@ pub async fn rate_movie(
                                 cinematch_common::models::websocket::TimeoutReason::PhaseTimeout,
                             ),
                             selected_movie_id: Some(selected_id),
+                            review_ratings,
                         },
                     ),
                     None,

@@ -9,6 +9,7 @@ export interface PartyStateChangedPayload {
   deadline_at?: string | null
   timeout_reason?: TimeoutReason | null
   selected_movie_id?: number | null
+  review_ratings?: Record<string, number> | null
 }
 
 // Timeout info for the current phase

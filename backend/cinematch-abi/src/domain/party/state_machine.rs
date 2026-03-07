@@ -88,16 +88,26 @@ impl PartyStateMachine for Party {
 
         match &outcome {
             PartyAdvanceOutcome::PhaseChanged(s) => {
-                let selected_movie_id = if *s == PartyState::Watching {
+                let selected_movie_id = if *s == PartyState::Watching || *s == PartyState::Review {
                     self.selected_movie_id(ctx).await.unwrap_or(None)
                 } else {
                     None
                 };
+                let review_ratings =
+                    if let (PartyState::Review, Some(mid)) = (*s, selected_movie_id) {
+                        ctx.db()
+                            .get_ratings_for_party_members(self.id, mid)
+                            .await
+                            .ok()
+                    } else {
+                        None
+                    };
                 let msg = PartyStateChanged {
                     state: (*s).into(),
                     deadline_at: None,
                     timeout_reason: None,
                     selected_movie_id,
+                    review_ratings,
                 };
                 ctx.broadcast_party(self.id, &ServerMessage::ResetReadiness, None);
                 ctx.broadcast_party(self.id, &ServerMessage::PartyStateChanged(msg), None);
@@ -116,6 +126,7 @@ impl PartyStateMachine for Party {
                         deadline_at: None,
                         timeout_reason: None,
                         selected_movie_id: None,
+                        review_ratings: None,
                     }),
                     None,
                 );
@@ -134,21 +145,32 @@ impl PartyStateMachine for Party {
                         deadline_at: None,
                         timeout_reason: None,
                         selected_movie_id: None,
+                        review_ratings: None,
                     }),
                     None,
                 );
             }
             PartyAdvanceOutcome::VotingEnded(EndVotingTransition::PhaseChanged(s)) => {
-                let selected_movie_id = if *s == PartyState::Watching {
+                let selected_movie_id = if *s == PartyState::Watching || *s == PartyState::Review {
                     self.selected_movie_id(ctx).await.unwrap_or(None)
                 } else {
                     None
                 };
+                let review_ratings =
+                    if let (PartyState::Review, Some(mid)) = (*s, selected_movie_id) {
+                        ctx.db()
+                            .get_ratings_for_party_members(self.id, mid)
+                            .await
+                            .ok()
+                    } else {
+                        None
+                    };
                 let msg = PartyStateChanged {
                     state: (*s).into(),
                     deadline_at: None,
                     timeout_reason: None,
                     selected_movie_id,
+                    review_ratings,
                 };
                 ctx.broadcast_party(self.id, &ServerMessage::ResetReadiness, None);
                 ctx.broadcast_party(self.id, &ServerMessage::PartyStateChanged(msg), None);
@@ -180,6 +202,7 @@ impl PartyStateMachine for Party {
             }
             PartyState::Review => {
                 // Return to lobby after cooldown
+                do_review_to_created(ctx, self).await?;
                 Some(PartyState::Created)
             }
             PartyState::Voting => {
@@ -199,6 +222,7 @@ impl PartyStateMachine for Party {
                                 deadline_at: None,
                                 timeout_reason: None,
                                 selected_movie_id: None,
+                                review_ratings: None,
                             }),
                             None,
                         );
@@ -218,6 +242,7 @@ impl PartyStateMachine for Party {
                                 deadline_at: None,
                                 timeout_reason: None,
                                 selected_movie_id: None,
+                                review_ratings: None,
                             }),
                             None,
                         );
@@ -278,6 +303,7 @@ impl PartyStateMachine for Party {
                         deadline_at: None,
                         timeout_reason: None,
                         selected_movie_id: None,
+                        review_ratings: None,
                     }),
                     None,
                 );
@@ -296,6 +322,7 @@ impl PartyStateMachine for Party {
                         deadline_at: None,
                         timeout_reason: None,
                         selected_movie_id: None,
+                        review_ratings: None,
                     }),
                     None,
                 );
@@ -311,6 +338,7 @@ impl PartyStateMachine for Party {
                     deadline_at: None,
                     timeout_reason: None,
                     selected_movie_id,
+                    review_ratings: None,
                 };
                 ctx.broadcast_party(self.id, &ServerMessage::ResetReadiness, None);
                 ctx.broadcast_party(self.id, &ServerMessage::PartyStateChanged(msg), None);
@@ -342,6 +370,7 @@ impl PartyStateMachine for Party {
                         deadline_at: None,
                         timeout_reason: None,
                         selected_movie_id: None,
+                        review_ratings: None,
                     }),
                     None,
                 );
@@ -360,6 +389,7 @@ impl PartyStateMachine for Party {
                         deadline_at: None,
                         timeout_reason: None,
                         selected_movie_id: None,
+                        review_ratings: None,
                     }),
                     None,
                 );

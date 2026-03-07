@@ -120,42 +120,57 @@ export default function ReviewFlow({ movieId }: ReviewFlowProps) {
             {/* 5 Star Rating Input */}
             <div
                 ref={containerRef}
-                className="flex items-center gap-2 bg-zinc-900/50 p-4 rounded-3xl border border-zinc-800 touch-none cursor-pointer"
+                className="flex items-center gap-2 bg-white/5 backdrop-blur-xl p-6 rounded-[2rem] border border-white/10 touch-none cursor-pointer group active:bg-white/10 transition-all duration-300 shadow-2xl shadow-black/40"
                 onPointerDown={(e) => {
                     setIsDragging(true)
                     e.currentTarget.setPointerCapture(e.pointerId)
                     const calculateRating = (clientX: number) => {
                         if (!containerRef.current) return 1
                         const rect = containerRef.current.getBoundingClientRect()
-                        const x = clientX - rect.left
-                        const percentage = Math.max(0, Math.min(1, x / rect.width))
+                        const padding = 24 // p-6 is 24px
+                        const x = clientX - (rect.left + padding)
+                        const width = rect.width - (padding * 2)
+                        const percentage = Math.max(0, Math.min(1, x / width))
                         return Math.max(1, Math.ceil(percentage * 10))
                     }
-                    setHoverRating(calculateRating(e.clientX))
+                    const newRating = calculateRating(e.clientX)
+                    setHoverRating(newRating)
+                    if ('vibrate' in navigator) navigator.vibrate(5)
                 }}
                 onPointerMove={(e) => {
                     if (!containerRef.current) return
                     const calculateRating = (clientX: number) => {
                         const rect = containerRef.current!.getBoundingClientRect()
-                        const x = clientX - rect.left
-                        const percentage = Math.max(0, Math.min(1, x / rect.width))
+                        const padding = 24
+                        const x = clientX - (rect.left + padding)
+                        const width = rect.width - (padding * 2)
+                        const percentage = Math.max(0, Math.min(1, x / width))
                         return Math.max(1, Math.ceil(percentage * 10))
                     }
                     const newRating = calculateRating(e.clientX)
                     if (isDragging || hoverRating !== null) {
-                        setHoverRating(newRating)
+                        if (newRating !== hoverRating) {
+                            setHoverRating(newRating)
+                            if (isDragging && 'vibrate' in navigator) navigator.vibrate(5)
+                        }
                     }
                 }}
                 onPointerUp={(e) => {
                     setIsDragging(false)
                     e.currentTarget.releasePointerCapture(e.pointerId)
                     if (!containerRef.current) return
-                    const rect = containerRef.current.getBoundingClientRect()
-                    const x = e.clientX - rect.left
-                    const percentage = Math.max(0, Math.min(1, x / rect.width))
-                    const newRating = Math.max(1, Math.ceil(percentage * 10))
+                    const calculateRating = (clientX: number) => {
+                        const rect = containerRef.current!.getBoundingClientRect()
+                        const padding = 24
+                        const x = clientX - (rect.left + padding)
+                        const width = rect.width - (padding * 2)
+                        const percentage = Math.max(0, Math.min(1, x / width))
+                        return Math.max(1, Math.ceil(percentage * 10))
+                    }
+                    const newRating = calculateRating(e.clientX)
                     handleRate(newRating)
                     setHoverRating(null)
+                    if ('vibrate' in navigator) navigator.vibrate(10)
                 }}
                 onPointerLeave={() => {
                     if (!isDragging) setHoverRating(null)
@@ -163,8 +178,10 @@ export default function ReviewFlow({ movieId }: ReviewFlowProps) {
                 onPointerEnter={(e) => {
                     if (!isDragging && containerRef.current) {
                         const rect = containerRef.current.getBoundingClientRect()
-                        const x = e.clientX - rect.left
-                        const percentage = Math.max(0, Math.min(1, x / rect.width))
+                        const padding = 24
+                        const x = e.clientX - (rect.left + padding)
+                        const width = rect.width - (padding * 2)
+                        const percentage = Math.max(0, Math.min(1, x / width))
                         setHoverRating(Math.max(1, Math.ceil(percentage * 10)))
                     }
                 }}
@@ -176,11 +193,24 @@ export default function ReviewFlow({ movieId }: ReviewFlowProps) {
                     const isFull = displayRating >= value
                     const isHalf = displayRating === value - 1
 
+                    // Progressive scaling for the active star
+                    const isActive = hoverRating !== null && (displayRating === value || displayRating === value - 1)
+                    const scale = isDragging
+                        ? (isActive ? 'scale(1.25)' : 'scale(1.1)')
+                        : (isActive ? 'scale(1.2)' : 'scale(1)')
+
                     return (
-                        <div key={index} className="relative w-12 h-12 flex-shrink-0 pointer-events-none transition-transform duration-75" style={{ transform: isDragging ? 'scale(1.1)' : hoverRating !== null && (isFull || isHalf) ? 'scale(1.15)' : 'scale(1)' }}>
-                            <Star className="absolute inset-0 w-12 h-12 text-zinc-700 fill-zinc-800" />
-                            <div className={`absolute inset-0 h-12 overflow-hidden ${isFull ? 'w-12' : isHalf ? 'w-6' : 'w-0'}`}>
-                                <Star className="w-12 h-12 text-amber-400 fill-amber-400 max-w-none drop-shadow-[0_0_10px_rgba(251,191,36,0.3)]" />
+                        <div
+                            key={index}
+                            className="relative w-12 h-12 flex-shrink-0 pointer-events-none transition-all duration-200 cubic-bezier(0.34, 1.56, 0.64, 1)"
+                            style={{ transform: scale }}
+                        >
+                            <Star className="absolute inset-0 w-12 h-12 text-zinc-800 fill-zinc-900/50" />
+                            <div
+                                className="absolute inset-0 h-12 overflow-hidden transition-all duration-300"
+                                style={{ width: isFull ? '100%' : isHalf ? '50%' : '0%' }}
+                            >
+                                <Star className="w-12 h-12 text-amber-400 fill-amber-400 max-w-none drop-shadow-[0_0_15px_rgba(251,191,36,0.5)]" />
                             </div>
                         </div>
                     )

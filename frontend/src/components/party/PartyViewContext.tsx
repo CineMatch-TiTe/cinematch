@@ -6,6 +6,7 @@ import { toast } from 'sonner'
 import { PartyResponse } from '@/model/partyResponse'
 import { MemberInfo } from '@/model/memberInfo'
 import { CurrentUserResponse } from '@/model/currentUserResponse'
+import { PartyResponseReviewRatings } from '@/model/partyResponseReviewRatings'
 import { ServerMessage } from '@/lib/ws-types'
 
 export type PartyViewType = 'room' | 'picking' | 'voting' | 'watching' | 'review'
@@ -79,6 +80,9 @@ export function PartyViewProvider({
         phase_entered_at: new Date().toISOString(),
         ...(payload.selected_movie_id !== undefined && {
           selected_movie_id: payload.selected_movie_id ?? null,
+        }),
+        ...(payload.review_ratings !== undefined && {
+          review_ratings: (payload.review_ratings as PartyResponseReviewRatings) ?? null,
         }),
       }))
       // Immediately switch the active view to match the new phase

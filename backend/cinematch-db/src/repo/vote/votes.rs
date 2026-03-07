@@ -15,17 +15,30 @@ const OTHERS_PICKS: usize = 3;
 const POPULAR_FALLBACK_LIMIT: i64 = 30;
 
 impl Database {
-    /// Clear shown_movies (and thus votes via FK) for a party. Call before building new ballots.
+    /// Clear shown_movies and votes for a party. Call before building new ballots.
     pub(crate) async fn clear_shown_movies_for_party(&self, party_id: Uuid) -> DbResult<()> {
-        use crate::schema::shown_movies::dsl;
+        use crate::schema::shown_movies::dsl as shown_dsl;
+        use crate::schema::votes::dsl as votes_dsl;
+        use diesel_async::AsyncConnection;
+        use diesel_async::scoped_futures::ScopedFutureExt;
         let mut conn = self.conn().await?;
-        diesel::delete(dsl::shown_movies.filter(dsl::party_id.eq(party_id)))
-            .execute(&mut conn)
-            .await
-            .map_err(DbError::from)?;
+
+        conn.transaction::<(), DbError, _>(|conn| {
+            async move {
+                diesel::delete(shown_dsl::shown_movies.filter(shown_dsl::party_id.eq(party_id)))
+                    .execute(conn)
+                    .await?;
+                diesel::delete(votes_dsl::votes.filter(votes_dsl::party_id.eq(party_id)))
+                    .execute(conn)
+                    .await?;
+                Ok(())
+            }
+            .scope_boxed()
+        })
+        .await?;
+
         Ok(())
     }
-
     /// Build per-user ballots when entering Voting: 5 movies each (2 own, 3 others when possible).
     /// Clears existing shown_movies for the party, then inserts new ballots and enables voting.
     pub(crate) async fn build_voting_ballots(&self, party_id: Uuid) -> DbResult<()> {

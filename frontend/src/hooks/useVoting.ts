@@ -1,7 +1,7 @@
 import { useState, useTransition, useEffect, useRef, useCallback } from 'react'
 import { toast } from 'sonner'
 import { getMoviesByIdsAction, getPartyVotesAction, voteMovieAction, setReadyAction } from '@/actions/party-room'
-import { MovieResponse } from '@/model'
+import { MovieResponse, GetVoteResponseVoteTotals } from '@/model'
 import { prefetchImages } from '@/lib/utils'
 import { usePartyView } from '@/components/party/PartyViewContext'
 
@@ -13,7 +13,7 @@ export function useVoting(partyId: string) {
 
   const [movies, setMovies] = useState<MovieResponse[]>([])
   const [votingRound, setVotingRound] = useState<number | null>(null)
-  const [voteTotals, setVoteTotals] = useState<Record<number, { likes: number; dislikes: number }>>({})
+  const [voteTotals, setVoteTotals] = useState<GetVoteResponseVoteTotals>({})
   const [loading, setLoading] = useState(true)
   const [countdown, setCountdown] = useState(() => (showCountdown ? 5 : 0))
   const [showContent, setShowContent] = useState(() => !showCountdown)
@@ -64,6 +64,7 @@ export function useVoting(partyId: string) {
         setMovies([])
       }
       setVotingRound(nextRound)
+      setVoteTotals({}) // Clear local totals on transition
       setTransitionData(null)
     },
     [transitionData, votingRound, movies]
@@ -90,6 +91,10 @@ export function useVoting(partyId: string) {
           prefetchImages(moviesResult.data.map(m => m.poster_url))
         }
       }
+
+      if (voteResult.data.vote_totals) {
+        setVoteTotals(voteResult.data.vote_totals)
+      }
       setLoading(false)
     }
     init()
@@ -115,6 +120,10 @@ export function useVoting(partyId: string) {
           handleBallotChange(newMovieIds, newRound)
         } else if (result.data.voting_round && result.data.voting_round !== votingRound) {
           setVotingRound(result.data.voting_round)
+        }
+
+        if (result.data.vote_totals) {
+          setVoteTotals(result.data.vote_totals)
         }
       }
     })

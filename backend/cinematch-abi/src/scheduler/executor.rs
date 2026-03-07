@@ -138,6 +138,19 @@ async fn execute_voting_timeout<C: AppContext + Clone + 'static>(
                 None
             };
 
+            let review_ratings = if new_state == PartyState::Review {
+                if let Some(mid) = selected_movie_id {
+                    ctx.db()
+                        .get_ratings_for_party_members(party_id, mid)
+                        .await
+                        .ok()
+                } else {
+                    None
+                }
+            } else {
+                None
+            };
+
             ctx.broadcast_party(party_id, &ServerMessage::ResetReadiness, None);
             ctx.broadcast_party(
                 party_id,
@@ -146,6 +159,7 @@ async fn execute_voting_timeout<C: AppContext + Clone + 'static>(
                     deadline_at,
                     timeout_reason: reason,
                     selected_movie_id,
+                    review_ratings,
                 }),
                 None,
             );
@@ -181,6 +195,16 @@ async fn execute_watching_timeout<C: AppContext>(party: &Party, party_id: Uuid, 
         }
     };
 
+    let selected_movie_id = party.selected_movie_id(&ctx).await.unwrap_or(None);
+    let review_ratings = if let Some(mid) = selected_movie_id {
+        ctx.db()
+            .get_ratings_for_party_members(party_id, mid)
+            .await
+            .ok()
+    } else {
+        None
+    };
+
     ctx.broadcast_party(party_id, &ServerMessage::ResetReadiness, None);
     ctx.broadcast_party(
         party_id,
@@ -188,7 +212,8 @@ async fn execute_watching_timeout<C: AppContext>(party: &Party, party_id: Uuid, 
             state: PartyState::Review.into(),
             deadline_at: None,
             timeout_reason: None,
-            selected_movie_id: None,
+            selected_movie_id,
+            review_ratings,
         }),
         None,
     );
@@ -217,6 +242,7 @@ async fn execute_review_timeout<C: AppContext>(party: &Party, party_id: Uuid, ct
             deadline_at: None,
             timeout_reason: None,
             selected_movie_id: None,
+            review_ratings: None,
         }),
         None,
     );
@@ -318,6 +344,19 @@ pub async fn execute_ready_countdown<C: AppContext + Clone + 'static>(
                 None
             };
 
+            let review_ratings = if new_phase == PartyState::Review {
+                if let Some(mid) = selected_movie_id {
+                    ctx.db()
+                        .get_ratings_for_party_members(party_id, mid)
+                        .await
+                        .ok()
+                } else {
+                    None
+                }
+            } else {
+                None
+            };
+
             ctx.broadcast_party(party_id, &ServerMessage::ResetReadiness, None);
             ctx.broadcast_party(
                 party_id,
@@ -326,6 +365,7 @@ pub async fn execute_ready_countdown<C: AppContext + Clone + 'static>(
                     deadline_at,
                     timeout_reason: reason,
                     selected_movie_id,
+                    review_ratings,
                 }),
                 None,
             );
@@ -431,6 +471,19 @@ pub async fn execute_custom_countdown<C: AppContext + Clone + 'static>(
                 None
             };
 
+            let review_ratings = if new_phase == PartyState::Review {
+                if let Some(mid) = selected_movie_id {
+                    ctx.db()
+                        .get_ratings_for_party_members(party_id, mid)
+                        .await
+                        .ok()
+                } else {
+                    None
+                }
+            } else {
+                None
+            };
+
             ctx.broadcast_party(party_id, &ServerMessage::ResetReadiness, None);
             ctx.broadcast_party(
                 party_id,
@@ -439,6 +492,7 @@ pub async fn execute_custom_countdown<C: AppContext + Clone + 'static>(
                     deadline_at,
                     timeout_reason: reason,
                     selected_movie_id,
+                    review_ratings,
                 }),
                 None,
             );
